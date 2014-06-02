@@ -26,7 +26,7 @@ import Scalaz._
  * See:
  * http://www.artima.com/scalazine/articles/package_objects.html
  */
-package object hadoop {
+package object client {
 
   /**
    * Type alias for a SchemaVer-based version.
