@@ -16,20 +16,28 @@ package com.snowplowanalytics.iglu.client
 import com.github.fge.jackson.JsonLoader
 import com.fasterxml.jackson.databind.JsonNode
 
+// LRU
+import com.twitter.util.LruMap
+
 // Scalaz
 import scalaz._
 import Scalaz._
 
 /**
- * Provides access to an Iglu schema repository.
+ * Resolves schemas from one or more Iglu schema
+ * repositories.
  *
  * This is an extremely primitive implementation.
- * Currently it only supports un-memoized access
- * to locally stored schemas specified by the
- * exact same version (i.e. MODEL-REVISION-ADDITION).
+ * Currently it only supports access to locally
+ * stored schemas specified by the exact same
+ * version (i.e. MODEL-REVISION-ADDITION).
  */
-object SchemaRepo {
+class Resolver(mode: ResolutionMode, lruCache: Int = 10000) {
   
+  // Initialise the cache
+  private val lru = if (lruCache > 0) new LruMap[SchemaKey, JsonNode](lruCache) else null // Of type mutable.Map[String, Option[IpLocation]]
+
+  // TODO: this should become a set of resolvers.
   private val localPath = "/iglu-cache"
 
   // TODO: add in a mutable cache of JSON Schemas to prevent

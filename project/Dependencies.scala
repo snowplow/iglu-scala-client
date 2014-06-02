@@ -14,7 +14,7 @@ import sbt._
 
 object Dependencies {
   val resolutionRepos = Seq(
-
+    "Twitter Maven Repo" at "http://maven.twttr.com/" // For Twitter's util functions
   )
 
   object V {
@@ -24,6 +24,7 @@ object Dependencies {
     // Scala
     val json4sJackson   = "3.2.11-SNAPSHOT"
     val scalaz7         = "7.0.0"
+    val collUtils       = "6.3.4"
     // Scala (test only)
     val specs2          = "1.14" // Downgrade to prevent issues in job tests. WAS: "2.3.11"
     val scalazSpecs2    = "0.1.2"
@@ -36,6 +37,7 @@ object Dependencies {
     // Scala
     val json4sJackson    = "org.json4s"                 %% "json4s-jackson"          % V.json4sJackson
     val scalaz7          = "org.scalaz"                 %% "scalaz-core"             % V.scalaz7
+    val collUtils        = "com.twitter"                %% "util-collection"         % V.collUtils
     // Scala (test only)
     val specs2           = "org.specs2"                 %% "specs2"                  % V.specs2          % "test"
     val scalazSpecs2     = "org.typelevel"              %% "scalaz-specs2"           % V.scalazSpecs2    % "test"
