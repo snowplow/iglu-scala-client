@@ -15,9 +15,6 @@ package com.snowplowanalytics.iglu.client
 // Jackson
 import com.fasterxml.jackson.databind.JsonNode
 
-// LRU
-// import com.twitter.util.LruMap
-
 // Scalaz
 import scalaz._
 import Scalaz._
