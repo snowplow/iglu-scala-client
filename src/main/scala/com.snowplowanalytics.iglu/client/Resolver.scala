@@ -29,6 +29,16 @@ object PessimisticResolution extends ResolutionMode
 /** Return identity schema if schema not found */
 object OptimisticResolution extends ResolutionMode
 
+object Resolver {
+
+  /**
+   * All JSONs can pass this validation. We return
+   * this in the case of OptimisticResolution if we
+   * can't find the requested schema.
+   */
+  private val IdentitySchema = asJsonNode(parse("{}"))
+}
+
 /**
  * Resolves schemas from one or more Iglu schema
  * repositories.
@@ -41,7 +51,7 @@ object OptimisticResolution extends ResolutionMode
 class Resolver(
   repos: RepositoryRefNel,
   mode: ResolutionMode,
-  lruCache: Int = 500) {
+  lruCache: Int = 500) implements Lookup {
   
   // Initialise the cache
   private val lru: MaybeSchemaLruMap = if (lruCache > 0) Some(new SchemaLruMap(lruCache)) else None

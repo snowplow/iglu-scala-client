@@ -32,17 +32,7 @@ import org.json4s.jackson.JsonMethods._
  *        empty) of schema vendors, or prefixes
  *        of schema vendors, to 
  */
-abstract class RepositoryRef(val vendorPrefixes: List[String]) implements Lookup {
-
-  /**
-   * Abstract method. All repositories with a
-   * search priority of 1 will be checked before
-   * any repository with a search priority of 2.
-   *
-   * @return the search priority for this class
-   *         of repository ref
-   */
-  def searchPriority: Int
+trait Lookup {
 
   /**
    * Abstract method. Provide a concrete
@@ -70,24 +60,4 @@ abstract class RepositoryRef(val vendorPrefixes: List[String]) implements Lookup
    * @return the JsonNode representing this schema
    */
   def unsafeLookupSchema(schemaKey: SchemaKey): JsonNode
-
-  /**
-   * Helper to check if this repository should take
-   * priority because of a vendor prefix match. Returns
-   * true if 
-   *
-   * @param schemaKey The SchemaKey uniquely identifying
-   *        the schema in Iglu. We will use the vendor
-   *        within the SchemaKey to match against our
-   *        prefixes
-   * @return whether this is a priority lookup or
-   *         not
-   */
-  def vendorMatched(schemaKey: SchemaKey): Boolean = {
-    val matches = for {
-      p <- vendorPrefixes
-      m = schemaKey.vendor.startsWith(p)
-    } yield m
-    matches.foldLeft(false)(_ || _) // Any match
-  }
 }
