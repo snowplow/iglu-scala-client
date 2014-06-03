@@ -37,9 +37,9 @@ object OptimisticResolution extends ResolutionMode
  * repositories.
  *
  * This is an extremely primitive implementation.
- * Currently it only supports access to locally
- * stored schemas specified by the exact same
- * version (i.e. MODEL-REVISION-ADDITION).
+ * Currently it only supports lookups of schemas
+ * specified by the exact same version (i.e.
+ * MODEL-REVISION-ADDITION).
  */
 class Resolver(
   repos: NonEmptyList[RepositoryRef],
