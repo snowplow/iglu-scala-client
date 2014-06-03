@@ -25,6 +25,13 @@ import Scalaz._
 // This project
 import repositories.RepositoryRef
 
+/** How to handle schema resolution */
+sealed trait ResolutionMode
+/** Return failure if schema not found */
+object PessimisticResolution extends ResolutionMode
+/** Return identity schema if schema not found */
+object OptimisticResolution extends ResolutionMode
+
 /**
  * Resolves schemas from one or more Iglu schema
  * repositories.
