@@ -20,11 +20,6 @@ import com.fasterxml.jackson.databind.JsonNode
 import scalaz._
 import Scalaz._
 
-// json4s
-import org.json4s._
-import org.json4s.JsonDSL._
-import org.json4s.jackson.JsonMethods._
-
 /**
  * Common parent of all RepositoryRef classes.
  *
@@ -32,7 +27,7 @@ import org.json4s.jackson.JsonMethods._
  *        empty) of schema vendors, or prefixes
  *        of schema vendors, to 
  */
-abstract class RepositoryRef(val vendorPrefixes: List[String]) implements Lookup {
+abstract class RepositoryRef(val vendorPrefixes: List[String]) extends Lookup {
 
   /**
    * Abstract method. All repositories with a

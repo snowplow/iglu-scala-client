@@ -19,6 +19,11 @@ import com.fasterxml.jackson.databind.JsonNode
 import scalaz._
 import Scalaz._
 
+// json4s
+import org.json4s._
+import org.json4s.JsonDSL._
+import org.json4s.jackson.JsonMethods._
+
 // This project
 import repositories.RepositoryRef
 
@@ -51,10 +56,33 @@ object Resolver {
 class Resolver(
   repos: RepositoryRefNel,
   mode: ResolutionMode,
-  lruCache: Int = 500) implements Lookup {
+  lruCache: Int = 500) extends Lookup {
   
   // Initialise the cache
   private val lru: MaybeSchemaLruMap = if (lruCache > 0) Some(new SchemaLruMap(lruCache)) else None
+
+  /**
+   * xxx
+   *
+   * @param schemaKey The SchemaKey uniquely identifying
+   *        the schema in Iglu
+   * @return a Validation boxing either the Schema's
+   *         JsonNode on Success, or an error String
+   *         on Failure 
+   */
+  def lookupSchema(schemaKey: SchemaKey): ValidatedJsonNode = "oh no".fail
+
+  /**
+   * xxx
+   *
+   * ONLY implement in a sub-class if the resolution has
+   * a good chance of succeeding (e.g. no network I/O).
+   *
+   * @param schemaKey The SchemaKey uniquely identifying
+   *        the schema in Iglu
+   * @return the JsonNode representing this schema
+   */
+  def unsafeLookupSchema(schemaKey: SchemaKey): JsonNode = Resolver.IdentitySchema
 
   /**
    * Re-sorts our Nel of RepositoryRefs into the
