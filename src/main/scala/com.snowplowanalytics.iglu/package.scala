@@ -22,6 +22,9 @@ import Scalaz._
 // LRU
 import com.twitter.util.LruMap
 
+// This project
+import client.repositories.RepositoryRef
+
 /**
  * Scala package object to hold types,
  * helper methods etc.
@@ -40,6 +43,11 @@ package object client {
    * Option-wrapped cache
    */
   type MaybeSchemaLruMap = Option[SchemaLruMap]
+
+  /**
+   * Our Nel of resolution repositories
+   */
+  type RepositoryRefNel = NonEmptyList[RepositoryRef]
 
   /**
    * A Validation-boxed JsonNode

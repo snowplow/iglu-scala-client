@@ -16,7 +16,7 @@ package com.snowplowanalytics.iglu.client
 import com.fasterxml.jackson.databind.JsonNode
 
 // LRU
-import com.twitter.util.LruMap
+// import com.twitter.util.LruMap
 
 // Scalaz
 import scalaz._
@@ -42,11 +42,20 @@ object OptimisticResolution extends ResolutionMode
  * MODEL-REVISION-ADDITION).
  */
 class Resolver(
-  repos: NonEmptyList[RepositoryRef],
+  repos: RepositoryRefNel,
   mode: ResolutionMode,
   lruCache: Int = 500) {
   
   // Initialise the cache
   private val lru: MaybeSchemaLruMap = if (lruCache > 0) Some(new SchemaLruMap(lruCache)) else None
 
+  /**
+   * Re-sorts our Nel of RepositoryRefs into the
+   * optimal order for querying.
+   *
+   * @param 
+   * @return
+   */
+  def prioritizeRepos(schemaKey: SchemaKey): RepositoryRefNel =
+    repos // TODO: implement this
 }
