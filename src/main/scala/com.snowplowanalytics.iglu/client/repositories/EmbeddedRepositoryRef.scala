@@ -98,7 +98,7 @@ case class EmbeddedRepositoryRef(
    *         JsonNode on Success, or an error String
    *         on Failure 
    */
-  def lookupSchema(schemaKey: SchemaKey): Validation[String, JsonNode] = {
+  def lookupSchema(schemaKey: SchemaKey): ValidatedJsonNode = {
     try {
       unsafeLookupSchema(schemaKey).success
     } catch {

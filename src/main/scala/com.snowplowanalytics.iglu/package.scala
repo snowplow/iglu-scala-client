@@ -19,6 +19,9 @@ import com.fasterxml.jackson.databind.JsonNode
 import scalaz._
 import Scalaz._
 
+// LRU
+import com.twitter.util.LruMap
+
 /**
  * Scala package object to hold types,
  * helper methods etc.
@@ -27,6 +30,21 @@ import Scalaz._
  * http://www.artima.com/scalazine/articles/package_objects.html
  */
 package object client {
+
+  /**
+   * Our LRU cache of schemas
+   */
+  type SchemaLruMap = LruMap[SchemaKey, JsonNode]
+
+  /**
+   * Option-wrapped cache
+   */
+  type MaybeSchemaLruMap = Option[SchemaLruMap]
+
+  /**
+   * A Validation-boxed JsonNode
+   */
+  type ValidatedJsonNode = Validation[String, JsonNode]
 
   /**
    * Type alias for a SchemaVer-based version.

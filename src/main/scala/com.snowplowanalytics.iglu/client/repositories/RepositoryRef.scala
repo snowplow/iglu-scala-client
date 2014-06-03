@@ -62,7 +62,7 @@ abstract class RepositoryRef(val vendorPrefixes: List[String]) {
    *         JsonNode on Success, or an error String
    *         on Failure 
    */
-  def lookupSchema(schemaKey: SchemaKey): Validation[String, JsonNode]
+  def lookupSchema(schemaKey: SchemaKey): ValidatedJsonNode
 
   /**
    * Abstract method. Provide a concrete

@@ -34,9 +34,12 @@ import repositories.RepositoryRef
  * stored schemas specified by the exact same
  * version (i.e. MODEL-REVISION-ADDITION).
  */
-class Resolver(repos: NonEmptyList[RepositoryRef], mode: ResolutionMode, lruCache: Int = 500) {
+class Resolver(
+  repos: NonEmptyList[RepositoryRef],
+  mode: ResolutionMode,
+  lruCache: Int = 500) {
   
   // Initialise the cache
-  private val lru = if (lruCache > 0) Some(new LruMap[SchemaKey, JsonNode](lruCache)) else None
+  private val lru: MaybeSchemaLruMap = if (lruCache > 0) Some(new SchemaLruMap(lruCache)) else None
 
 }
