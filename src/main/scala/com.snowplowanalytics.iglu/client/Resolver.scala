@@ -15,6 +15,12 @@ package com.snowplowanalytics.iglu.client
 // Jackson
 import com.github.fge.jackson.JsonLoader
 import com.fasterxml.jackson.databind.JsonNode
+import com.fasterxml.jackson.databind.node.ObjectNode
+
+// json4s
+import org.json4s._
+import org.json4s.JsonDSL._
+import org.json4s.jackson.JsonMethods._
 
 // LRU
 import com.twitter.util.LruMap
@@ -22,6 +28,9 @@ import com.twitter.util.LruMap
 // Scalaz
 import scalaz._
 import Scalaz._
+
+// This project
+import repositories.RepositoryRef
 
 /**
  * Resolves schemas from one or more Iglu schema
@@ -32,13 +41,21 @@ import Scalaz._
  * stored schemas specified by the exact same
  * version (i.e. MODEL-REVISION-ADDITION).
  */
-class Resolver(mode: ResolutionMode, lruCache: Int = 10000) {
+class Resolver(repos: NonEmptyList[RepositoryRef], mode: ResolutionMode, lruCache: Int = 500) {
   
   // Initialise the cache
-  private val lru = if (lruCache > 0) new LruMap[SchemaKey, JsonNode](lruCache) else null // Of type mutable.Map[String, Option[IpLocation]]
+  private val lru =
+    if (lruCache > 0) {
+      new LruMap[SchemaKey, JsonNode](lruCache)
+    } else {
+      throw new IllegalArgumentException("LRU cache size less than 1 (${lruCache}) makes no sense")
+    }
 
   // TODO: this should become a set of resolvers.
   private val localPath = "/iglu-cache"
+
+  // All JSONs can pass this validation
+  private val identitySchema = asJsonNode(parse("{}"))
 
   // TODO: add in a mutable cache of JSON Schemas to prevent
   // a) lots of JsonNode instantiation and (later) b) lots
@@ -59,7 +76,11 @@ class Resolver(mode: ResolutionMode, lruCache: Int = 10000) {
       unsafeLookupSchema(schemaKey).success
     } catch {
       case e: Throwable =>
-        s"Cannot find schema ${schemaKey} in any Iglu repository".fail
+        if (mode == OptimisticResolution) {
+          identitySchema.success
+        } else {
+          s"Cannot find schema ${schemaKey} in any Iglu repository".fail
+        }
     }
   }
 
