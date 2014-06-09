@@ -66,7 +66,7 @@ object EmbeddedRepositoryRef {
  */
 case class EmbeddedRepositoryRef(
   override val vendorPrefixes: List[String],
-  val resourcePath: String) extends RepositoryRef(vendorPrefixes) {
+  val resourcePath: String) extends RepositoryRef(vendorPrefixes) with UnsafeLookup {
 
   /**
    * Prioritize searching this repository because
@@ -121,10 +121,10 @@ case class EmbeddedRepositoryRef(
    * @return a Validation boxing either the Schema's
    *         JsonNode on Success, or an error String
    *         on Failure
-   *
+   */
   def lookupSchema(schemaUri: String): Validation[String, JsonNode] =
     for {
       k <- SchemaKey(schemaUri)
       s <- lookupSchema(k)
-    } yield s */
+    } yield s
 }

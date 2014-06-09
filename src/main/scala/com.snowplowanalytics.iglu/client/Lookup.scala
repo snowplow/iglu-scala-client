@@ -25,11 +25,7 @@ import org.json4s.JsonDSL._
 import org.json4s.jackson.JsonMethods._
 
 /**
- * Common parent of all RepositoryRef classes.
- *
- * @param vendorPrefixes is the list (possibly
- *        empty) of schema vendors, or prefixes
- *        of schema vendors, to 
+ * Trait for a schema lookup.
  */
 trait Lookup {
 
@@ -45,6 +41,12 @@ trait Lookup {
    *         on Failure 
    */
   def lookupSchema(schemaKey: SchemaKey): ValidatedJsonNode
+}
+
+/**
+ * Trait for an unsafe schema lookup.
+ */
+trait UnsafeLookup {
 
   /**
    * Abstract method. Provide a concrete

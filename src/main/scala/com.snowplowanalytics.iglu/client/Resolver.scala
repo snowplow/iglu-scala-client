@@ -56,7 +56,7 @@ object Resolver {
 class Resolver(
   repos: RepositoryRefNel,
   mode: ResolutionMode,
-  lruCache: Int = 500) extends Lookup {
+  lruCache: Int = 500) extends Lookup with UnsafeLookup {
   
   // Initialise the cache
   private val lru: MaybeSchemaLruMap = if (lruCache > 0) Some(new SchemaLruMap(lruCache)) else None
