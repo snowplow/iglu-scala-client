@@ -93,7 +93,7 @@ case class Resolver(
    * @return the prioritized Nel of RepositoryRefs.
    *         Pragmatically sorted to minimize lookups.
    */
-  def prioritizeRepos(schemaKey: SchemaKey): RepositoryRefNel =
+  private[client] def prioritizeRepos(schemaKey: SchemaKey): RepositoryRefNel =
     repos.toList.sortBy(r =>
       (r.vendorMatched(schemaKey), r.groupPriority, r.instancePriority)
     ) match {
