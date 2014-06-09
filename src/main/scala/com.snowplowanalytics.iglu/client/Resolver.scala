@@ -98,6 +98,6 @@ class Resolver(
       (r.vendorMatched(schemaKey), r.groupPriority, r.instancePriority)
     ) match {
       case x :: xs => NonEmptyList[RepositoryRef](x, xs: _*)
-      case Nil     => throw new RuntimeException("List to Nel to List round-trip failed. Should never happen")
+      case Nil     => throw new RuntimeException("List->Nel->List round-trip failed. Should never happen")
     }
 }
