@@ -44,7 +44,9 @@ trait Lookup {
 }
 
 /**
- * Trait for an unsafe schema lookup.
+ * Trait for an unsafe schema lookup. ONLY implement this
+ * a sub-class if the resolution has a good chance of
+ * succeeding (e.g. no network I/O).
  */
 trait UnsafeLookup {
 
@@ -52,9 +54,6 @@ trait UnsafeLookup {
    * Abstract method. Provide a concrete
    * implementation for how to lookup a schema
    * in this type of repository in an unsafe fashion.
-   *
-   * ONLY implement in a sub-class if the resolution has
-   * a good chance of succeeding (e.g. no network I/O).
    *
    * @param schemaKey The SchemaKey uniquely identifying
    *        the schema in Iglu
