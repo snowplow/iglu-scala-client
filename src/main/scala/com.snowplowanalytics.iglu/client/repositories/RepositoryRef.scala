@@ -23,14 +23,14 @@ import Scalaz._
 /**
  * Common parent of all RepositoryRef classes.
  *
- * @param refPriority The priority of this
+ * @param instancePriority The priority of this
  *        reference instance
  * @param vendorPrefixes The list (possibly
  *        empty) of schema vendors, or prefixes
  *        of schema vendors, to 
  */
 abstract class RepositoryRef(
-  val refPriority: Int,
+  val instancePriority: Int,
   val vendorPrefixes: List[String]) extends Lookup {
 
   /**
@@ -38,10 +38,10 @@ abstract class RepositoryRef(
    * search priority of 1 will be checked before
    * any repository with a search priority of 2.
    *
-   * @return the search priority for this class
-   *         of repository ref
+   * @return the search priority for this group
+   *         aka class of repository references
    */
-  def priority: Int
+  def groupPriority: Int
 
   /**
    * Helper to check if this repository should take

@@ -65,15 +65,15 @@ object EmbeddedRepositoryRef {
  * resources folder.
  */
 case class EmbeddedRepositoryRef(
-  override val refPriority: Int,
+  override val instancePriority: Int,
   override val vendorPrefixes: List[String],
-  val resourcePath: String) extends RepositoryRef(refPriority, vendorPrefixes) with UnsafeLookup {
+  val resourcePath: String) extends RepositoryRef(instancePriority, vendorPrefixes) with UnsafeLookup {
 
   /**
    * Prioritize searching this repository because
    * it is low cost.
    */
-  def priority: Int = 1
+  def groupPriority: Int = 1
 
   /**
    * Retrieves an IgluSchema from the Iglu Repo as

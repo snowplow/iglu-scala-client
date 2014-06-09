@@ -88,9 +88,16 @@ class Resolver(
    * Re-sorts our Nel of RepositoryRefs into the
    * optimal order for querying.
    *
-   * @param 
-   * @return
+   * @param schemaKey SchemaKey uniquely identifying
+   *        the schema in Iglu
+   * @return the prioritized Nel of RepositoryRefs.
+   *         Pragmatically sorted to minimize lookups.
    */
   def prioritizeRepos(schemaKey: SchemaKey): RepositoryRefNel =
-    repos // TODO: implement this
+    repos.toList.sortBy(r =>
+      (r.vendorMatched(schemaKey), r.groupPriority, r.instancePriority)
+    ) match {
+      case x :: xs => NonEmptyList[RepositoryRef](x, xs: _*)
+      case Nil     => throw new RuntimeException("List to Nel to List round-trip failed. Should never happen")
+    }
 }
