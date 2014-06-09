@@ -53,10 +53,10 @@ object Resolver {
  * specified by the exact same version (i.e.
  * MODEL-REVISION-ADDITION).
  */
-class Resolver(
-  repos: RepositoryRefNel,
-  mode: ResolutionMode,
-  lruCache: Int = 500) extends Lookup with UnsafeLookup {
+case class Resolver(
+  val repos: RepositoryRefNel,
+  val mode: ResolutionMode,
+  val lruCache: Int = 500) extends Lookup with UnsafeLookup {
   
   // Initialise the cache
   private val lru: MaybeSchemaLruMap = if (lruCache > 0) Some(new SchemaLruMap(lruCache)) else None
