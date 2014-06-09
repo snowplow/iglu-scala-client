@@ -55,7 +55,7 @@ object EmbeddedRepositoryRef {
    */
   // TODO: implement this properly
   def apply(ref: JValue): EmbeddedRepositoryRef =
-    EmbeddedRepositoryRef(Nil, "/iglu-cache")
+    EmbeddedRepositoryRef(1, Nil, "/iglu-cache")
 
 }
 
@@ -65,14 +65,15 @@ object EmbeddedRepositoryRef {
  * resources folder.
  */
 case class EmbeddedRepositoryRef(
+  override val refPriority: Int,
   override val vendorPrefixes: List[String],
-  val resourcePath: String) extends RepositoryRef(vendorPrefixes) with UnsafeLookup {
+  val resourcePath: String) extends RepositoryRef(refPriority, vendorPrefixes) with UnsafeLookup {
 
   /**
    * Prioritize searching this repository because
    * it is low cost.
    */
-  def searchPriority: Int = 1
+  def priority: Int = 1
 
   /**
    * Retrieves an IgluSchema from the Iglu Repo as
