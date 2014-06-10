@@ -61,6 +61,25 @@ case class Resolver(
   /**
    * Tries to find the given schema in any of the
    * provided repository refs.
+   * 
+   * Convenience function which converts an
+   * Iglu-format schema URI to a SchemaKey to
+   * perform the lookup.
+   *
+   * @param schemaUri The Iglu-format schema URI
+   * @return a Validation boxing either the Schema's
+   *         JsonNode on Success, or an error String
+   *         on Failure
+   */
+  def lookupSchema(schemaUri: String): ValidatedJsonNode =
+    for {
+      k <- SchemaKey(schemaUri)
+      s <- lookupSchema(k)
+    } yield s
+
+  /**
+   * Tries to find the given schema in any of the
+   * provided repository refs.
    *
    * @param schemaKey The SchemaKey uniquely identifying
    *        the schema in Iglu

@@ -118,28 +118,7 @@ case class EmbeddedRepositoryRef(
       unsafeLookupSchema(schemaKey).success
     } catch {
       case e: Throwable =>
-        //if (mode == OptimisticResolution) {
-        //  identitySchema.success
-       // } else {
-          s"Cannot find schema ${schemaKey} in any Iglu repository".fail
-      //  }
+        s"Cannot find schema ${schemaKey} in any Iglu repository".fail
     }
   }
-
-  /**
-   * Retrieves an IgluSchema from the Iglu Repo as
-   * a JsonNode. Convenience function which converts
-   * an Iglu-format schema URI to a SchemaKey to
-   * perform the lookup.
-   *
-   * @param schemaUri The Iglu-format schema URI
-   * @return a Validation boxing either the Schema's
-   *         JsonNode on Success, or an error String
-   *         on Failure
-   */
-  def lookupSchema(schemaUri: String): Validation[String, JsonNode] =
-    for {
-      k <- SchemaKey(schemaUri)
-      s <- lookupSchema(k)
-    } yield s
 }
