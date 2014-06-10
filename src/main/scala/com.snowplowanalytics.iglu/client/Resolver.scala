@@ -15,6 +15,9 @@ package com.snowplowanalytics.iglu.client
 // Jackson
 import com.fasterxml.jackson.databind.JsonNode
 
+// Scala
+import scala.annotation.tailrec
+
 // Scalaz
 import scalaz._
 import Scalaz._
@@ -27,23 +30,6 @@ import org.json4s.jackson.JsonMethods._
 // This project
 import repositories.RepositoryRef
 
-/** How to handle schema resolution */
-sealed trait ResolutionMode
-/** Return failure if schema not found */
-object PessimisticResolution extends ResolutionMode
-/** Return identity schema if schema not found */
-object OptimisticResolution extends ResolutionMode
-
-object Resolver {
-
-  /**
-   * All JSONs can pass this validation. We return
-   * this in the case of OptimisticResolution if we
-   * can't find the requested schema.
-   */
-  private val IdentitySchema = asJsonNode(parse("{}"))
-}
-
 /**
  * Resolves schemas from one or more Iglu schema
  * repositories.
@@ -55,14 +41,14 @@ object Resolver {
  */
 case class Resolver(
   val repos: RepositoryRefNel,
-  val mode: ResolutionMode,
   val lruCache: Int = 500) extends Lookup with UnsafeLookup {
   
   // Initialise the cache
   private val lru: MaybeSchemaLruMap = if (lruCache > 0) Some(new SchemaLruMap(lruCache)) else None
 
   /**
-   * xxx
+   * Tries to find the given schema in any of the
+   * provided repository refs.
    *
    * @param schemaKey The SchemaKey uniquely identifying
    *        the schema in Iglu
@@ -70,7 +56,25 @@ case class Resolver(
    *         JsonNode on Success, or an error String
    *         on Failure 
    */
-  def lookupSchema(schemaKey: SchemaKey): ValidatedJsonNode = "oh no".fail
+  def lookupSchema(schemaKey: SchemaKey): ValidatedJsonNode = {
+
+    @tailrec def recurse(schemaKey: SchemaKey, remainingRepos: RepositoryRefs): ValidatedJsonNode = {
+      remainingRepos match {
+        case Nil           => s"Could not find schema with key ${schemaKey} in any repository".fail
+        case repo :: repos => {
+          repo.lookupSchema(schemaKey) match {
+            case Success(schema) => cache(schemaKey, schema).success
+            case _               => recurse(schemaKey, repos)
+          }
+        }
+      }
+    }
+
+    getFromCache(schemaKey) match {
+      case Some(schema) => schema.success
+      case None         => recurse(schemaKey, prioritizeRepos(schemaKey))
+    }
+  }
 
   /**
    * xxx
@@ -82,22 +86,50 @@ case class Resolver(
    *        the schema in Iglu
    * @return the JsonNode representing this schema
    */
-  def unsafeLookupSchema(schemaKey: SchemaKey): JsonNode = Resolver.IdentitySchema
+  def unsafeLookupSchema(schemaKey: SchemaKey): JsonNode = asJsonNode(parse("{}"))
+
+  /**
+   * Looks up the given schema key in the cache.
+   *
+   * @param schemaKey The SchemaKey uniquely identifying
+   *        the schema in Iglu
+   * @return the schema if found as Some JsonNode or None
+   *         if not found, or cache is not enabled.
+   */
+  def getFromCache(schemaKey: SchemaKey): MaybeJsonNode =
+    for {
+      l <- lru
+      k <- l.get(schemaKey)
+    } yield k
+
+  /**
+   * Caches and returns the given schema. Does
+   * nothing if we don't have an LRU cache
+   * available.
+   *
+   * @param schema The provided schema
+   * @return the same schema
+   */
+  def cache(schemaKey: SchemaKey, schema: JsonNode): JsonNode = {
+    lru match {
+      case Some(c) => c.put(schemaKey, schema)
+      case None    => // Do nothing
+    }
+    schema
+  }
 
   /**
    * Re-sorts our Nel of RepositoryRefs into the
-   * optimal order for querying.
+   * optimal order for querying (optimal =
+   * minimizing unsafe I/O).
    *
    * @param schemaKey SchemaKey uniquely identifying
    *        the schema in Iglu
-   * @return the prioritized Nel of RepositoryRefs.
+   * @return the prioritized List of RepositoryRefs.
    *         Pragmatically sorted to minimize lookups.
    */
-  private[client] def prioritizeRepos(schemaKey: SchemaKey): RepositoryRefNel =
+  private[client] def prioritizeRepos(schemaKey: SchemaKey): RepositoryRefs =
     repos.toList.sortBy(r =>
       (r.vendorMatched(schemaKey), r.groupPriority, r.instancePriority)
-    ) match {
-      case x :: xs => NonEmptyList[RepositoryRef](x, xs: _*)
-      case Nil     => throw new RuntimeException("List->Nel->List round-trip failed. Should never happen")
-    }
+    )
 }

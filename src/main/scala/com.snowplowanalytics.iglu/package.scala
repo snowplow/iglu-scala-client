@@ -35,6 +35,11 @@ import client.repositories.RepositoryRef
 package object client {
 
   /**
+   * An Option-boxed JsonNode
+   */
+  type MaybeJsonNode = Option[JsonNode]
+
+  /**
    * Our LRU cache of schemas
    */
   type SchemaLruMap = LruMap[SchemaKey, JsonNode]
@@ -48,6 +53,11 @@ package object client {
    * Our Nel of resolution repositories
    */
   type RepositoryRefNel = NonEmptyList[RepositoryRef]
+
+  /**
+   * Our List (possibly empty) of resolution repositories
+   */
+  type RepositoryRefs = List[RepositoryRef]
 
   /**
    * A Validation-boxed JsonNode

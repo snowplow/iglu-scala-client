@@ -46,7 +46,8 @@ abstract class RepositoryRef(
   /**
    * Helper to check if this repository should take
    * priority because of a vendor prefix match. Returns
-   * true if 
+   * true if we matched our schema's vendor in the
+   * list of vendor prefixes.
    *
    * @param schemaKey The SchemaKey uniquely identifying
    *        the schema in Iglu. We will use the vendor
