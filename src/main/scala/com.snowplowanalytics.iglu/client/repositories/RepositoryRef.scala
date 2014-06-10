@@ -69,7 +69,7 @@ abstract class RepositoryRef(
    * @return the search priority for this group
    *         aka class of repository references
    */
-  def groupPriority: Int
+  def classPriority: Int
 
   /**
    * Helper to check if this repository should take

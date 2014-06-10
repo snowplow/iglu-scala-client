@@ -84,10 +84,10 @@ case class EmbeddedRepositoryRef(
   path: String) extends RepositoryRef(config) with UnsafeLookup {
 
   /**
-   * Prioritize searching this repository because
+   * Prioritize searching this class of repository because
    * it is low cost.
    */
-  def groupPriority: Int = 1
+  def classPriority: Int = 1
 
   /**
    * Retrieves an IgluSchema from the Iglu Repo as
