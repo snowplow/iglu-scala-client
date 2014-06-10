@@ -130,6 +130,6 @@ case class Resolver(
    */
   private[client] def prioritizeRepos(schemaKey: SchemaKey): RepositoryRefs =
     repos.toList.sortBy(r =>
-      (r.vendorMatched(schemaKey), r.groupPriority, r.instancePriority)
+      (!r.vendorMatched(schemaKey), r.groupPriority, r.instancePriority)
     )
 }
