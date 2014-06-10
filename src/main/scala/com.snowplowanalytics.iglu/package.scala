@@ -35,11 +35,11 @@ import client.repositories.RepositoryRef
 package object client {
 
   /**
-   * Type alias for a `ValidationNel`
-   * containing Strings for `Failure`
-   * or any type of `Success`.
+   * Type alias for a Validation
+   * containing a String for Failure
+   * or any type of Success.
    *
-   * @tparam A the type of `Success`
+   * @tparam A the type of Success
    */
   type Validated[A] = Validation[String, A]
 
