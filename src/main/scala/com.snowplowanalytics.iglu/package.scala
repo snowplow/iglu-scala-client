@@ -35,6 +35,15 @@ import client.repositories.RepositoryRef
 package object client {
 
   /**
+   * Type alias for a `ValidationNel`
+   * containing Strings for `Failure`
+   * or any type of `Success`.
+   *
+   * @tparam A the type of `Success`
+   */
+  type Validated[A] = Validation[String, A]
+
+  /**
    * An Option-boxed JsonNode
    */
   type MaybeJsonNode = Option[JsonNode]
@@ -62,7 +71,7 @@ package object client {
   /**
    * A Validation-boxed JsonNode
    */
-  type ValidatedJsonNode = Validation[String, JsonNode]
+  type ValidatedJsonNode = Validated[JsonNode]
 
   /**
    * Type alias for a SchemaVer-based version.

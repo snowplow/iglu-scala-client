@@ -41,7 +41,7 @@ object EmbeddedRepositoryRef {
    * @return a configured reference to this embedded
    *         repository
    */
-  def apply(ref: JsonNode): EmbeddedRepositoryRef =
+  def apply(ref: JsonNode): Validated[EmbeddedRepositoryRef] =
     apply(fromJsonNode(ref))
 
   /**
@@ -53,9 +53,24 @@ object EmbeddedRepositoryRef {
    * @return a configured reference to this embedded
    *         repository
    */
+  def apply(ref: JValue): Validated[EmbeddedRepositoryRef] =
+    for {
+      config <- RepositoryRefConfig(ref)
+      path   <- extractPath(ref)
+    } yield EmbeddedRepositoryRef(config, path)
+
+  /**
+   * Validates that we are working with an embedded
+   * repository ref and returns the path.
+   *
+   * @param ref The JSON containing the configuration
+   *        for this repository reference
+   * @return the path to the embedded repository on
+   *         Success, or an error String on Failure
+   */
   // TODO: implement this properly
-  def apply(ref: JValue): EmbeddedRepositoryRef =
-    EmbeddedRepositoryRef(1, Nil, "/iglu-cache")
+  def extractPath(ref: JValue): Validated[String] =
+    "/iglu-cache".success
 
 }
 
@@ -65,9 +80,8 @@ object EmbeddedRepositoryRef {
  * resources folder.
  */
 case class EmbeddedRepositoryRef(
-  override val instancePriority: Int,
-  override val vendorPrefixes: List[String],
-  val resourcePath: String) extends RepositoryRef(instancePriority, vendorPrefixes) with UnsafeLookup {
+  override val config: RepositoryRefConfig,
+  path: String) extends RepositoryRef(config) with UnsafeLookup {
 
   /**
    * Prioritize searching this repository because
@@ -85,7 +99,7 @@ case class EmbeddedRepositoryRef(
    * @return the JsonNode representing this schema
    */
   def unsafeLookupSchema(schemaKey: SchemaKey): JsonNode = {
-    val schemaPath = s"${resourcePath}/schemas/${schemaKey.toPath}"
+    val schemaPath = s"${path}/schemas/${schemaKey.toPath}"
     JsonLoader.fromResource(schemaPath)
   }
 

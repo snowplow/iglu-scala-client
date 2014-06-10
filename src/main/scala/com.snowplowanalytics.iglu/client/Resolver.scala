@@ -31,6 +31,18 @@ import org.json4s.jackson.JsonMethods._
 import repositories.RepositoryRef
 
 /**
+ * Companion object. Lets us create a Resolver from
+ * a JsonNode or JValue.
+ */
+object Resolver {
+
+  /**
+   *
+   */
+
+}
+
+/**
  * Resolves schemas from one or more Iglu schema
  * repositories.
  *
@@ -130,6 +142,6 @@ case class Resolver(
    */
   private[client] def prioritizeRepos(schemaKey: SchemaKey): RepositoryRefs =
     repos.toList.sortBy(r =>
-      (!r.vendorMatched(schemaKey), r.groupPriority, r.instancePriority)
+      (!r.vendorMatched(schemaKey), r.groupPriority, r.config.instancePriority)
     )
 }

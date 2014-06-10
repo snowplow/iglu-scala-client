@@ -20,9 +20,38 @@ import com.fasterxml.jackson.databind.JsonNode
 import scalaz._
 import Scalaz._
 
+// json4s
+import org.json4s._
+import org.json4s.JsonDSL._
+import org.json4s.jackson.JsonMethods._
+
+object RepositoryRefConfig {
+
+  /**
+   */
+  def apply(ref: JsonNode): Validated[RepositoryRefConfig] =
+    apply(fromJsonNode(ref))
+
+  /**
+   */
+  implicit val formats = DefaultFormats
+  def apply(ref: JValue): Validated[RepositoryRefConfig] =
+    ref.extract[RepositoryRefConfig].success
+}
+
+/**
+ * Common config for RepositoryRef classes.
+ */
+case class RepositoryRefConfig(
+  name: String,
+  instancePriority: Int,
+  vendorPrefixes: List[String]
+  )
+
 /**
  * Common parent of all RepositoryRef classes.
  *
+ * @param name The name of this repository
  * @param instancePriority The priority of this
  *        reference instance
  * @param vendorPrefixes The list (possibly
@@ -30,8 +59,7 @@ import Scalaz._
  *        of schema vendors, to 
  */
 abstract class RepositoryRef(
-  val instancePriority: Int,
-  val vendorPrefixes: List[String]) extends Lookup {
+  val config: RepositoryRefConfig) extends Lookup {
 
   /**
    * Abstract method. All repositories with a
@@ -58,9 +86,9 @@ abstract class RepositoryRef(
    */
   def vendorMatched(schemaKey: SchemaKey): Boolean = {
     val matches = for {
-      p <- vendorPrefixes
+      p <- config.vendorPrefixes
       m = schemaKey.vendor.startsWith(p)
     } yield m
-    matches.foldLeft(false)(_ || _) // Any match
+    matches.foldLeft(false)(_ || _) // True if any match
   }
 }
