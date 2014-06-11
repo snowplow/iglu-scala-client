@@ -40,21 +40,9 @@ import Scalaz._
 // This project
 import ProcessingMessageUtils._
 
-object ValidatableJsonNode {
+object ValidatableJsonMethods {
 
   private[validation] lazy val JsonSchemaValidator = getJsonSchemaValidator(SchemaVersion.DRAFTV4)
-
-  /**
-   * Get our schema for self-describing Iglu instances.
-   *
-   * Unsafe lookup is fine here because we know this
-   * schema exists in our resources folder
-   */
-  // TODO: cache this value rather than lookup each time.
-  private[validation] def getSelfDescSchema(implicit resolver: Resolver): JsonNode =
-    resolver.unsafeLookupSchema(
-      SchemaKey("com.snowplowanalytics.self-desc", "instance-iglu-only", "jsonschema", "1-0-0")
-    )
 
   /**
    * Implicit to pimp a JsonNode to our
@@ -90,19 +78,6 @@ object ValidatableJsonNode {
     }
   }
 
-  /**
-   * Validates that this JSON is a self-
-   * describing JSON.
-   *
-   * @param instance The JSON to check
-   * @return either Success boxing the
-   *         JsonNode, or a Failure boxing
-   *         a NonEmptyList of
-   *         ProcessingMessages
-   */
-  private[validation] def validateAsSelfDescribing(instance: JsonNode)(implicit resolver: Resolver): ValidatedJson = {
-    validateAgainstSchema(instance, getSelfDescSchema)
-  }
 
   /**
    * Validates a self-describing JSON against
@@ -160,6 +135,32 @@ object ValidatableJsonNode {
     } yield if (dataOnly) (sk, d) else (sk, instance)
 
   /**
+   * Get our schema for self-describing Iglu instances.
+   *
+   * Unsafe lookup is fine here because we know this
+   * schema exists in our resources folder
+   */
+  // TODO: cache this value rather than lookup each time.
+  private[validation] def getSelfDescSchema(implicit resolver: Resolver): JsonNode =
+    resolver.unsafeLookupSchema(
+      SchemaKey("com.snowplowanalytics.self-desc", "instance-iglu-only", "jsonschema", "1-0-0")
+    )
+
+  /**
+   * Validates that this JSON is a self-
+   * describing JSON.
+   *
+   * @param instance The JSON to check
+   * @return either Success boxing the
+   *         JsonNode, or a Failure boxing
+   *         a NonEmptyList of
+   *         ProcessingMessages
+   */
+  private[validation] def validateAsSelfDescribing(instance: JsonNode)(implicit resolver: Resolver): ValidatedJson = {
+    validateAgainstSchema(instance, getSelfDescSchema)
+  }
+
+  /**
    * Factory for retrieving a JSON Schema
    * validator with the specific version.
    *
@@ -191,12 +192,18 @@ object ValidatableJsonNode {
  */
 class ValidatableJsonNode(instance: JsonNode) {
 
+  import validation.{ValidatableJsonMethods => VJM}
+
   def validateAgainstSchema(schema: JsonNode)(implicit resolver: Resolver): ValidatedJson = 
-    ValidatableJsonNode.validateAgainstSchema(instance, schema)
+    VJM.validateAgainstSchema(instance, schema)
 
   def validate(dataOnly: Boolean)(implicit resolver: Resolver): ValidatedJson =
-    ValidatableJsonNode.validate(instance, dataOnly)
+    VJM.validate(instance, dataOnly)
 
   def validateAndIdentifySchema(dataOnly: Boolean)(implicit resolver: Resolver): ValidatedJsonSchemaPair =
-    ValidatableJsonNode.validateAndIdentifySchema(instance, dataOnly)
+    VJM.validateAndIdentifySchema(instance, dataOnly)
 }
+
+/**
+ * TODO: add ValidatableJValue too
+ */
