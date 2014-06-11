@@ -25,12 +25,16 @@ import org.json4s._
 import org.json4s.JsonDSL._
 import org.json4s.jackson.JsonMethods._
 
-// TODO: get rid of this (move functionality to Resolver)
+/**
+ * Singleton object contains a constructor
+ * from a JValue.
+ */
 object RepositoryRefConfig {
+
+  implicit val formats = DefaultFormats
 
   /**
    */
-  implicit val formats = DefaultFormats
   def apply(ref: JValue): Validated[RepositoryRefConfig] =
     ref.extract[RepositoryRefConfig].success
 }

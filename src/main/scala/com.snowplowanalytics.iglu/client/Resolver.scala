@@ -55,8 +55,23 @@ object Resolver {
    *        for this resolver
    * @return a configured Resolver instance
    */
-  def apply(config: JsonNode): Validated[Resolver] =
-    apply(fromJsonNode(config))
+  def apply(config: JsonNode): Validated[Resolver] = {
+
+    // We can use the bootstrap Resolver for working
+    // with JSON Schemas here.
+    implicit val resolver = Bootstrap.Resolver
+
+    // Check it passes validation
+    // TODO
+
+    // Now retrieve cache size
+    // TODO
+
+    // Now let's loop through and create our RepositoryRefs
+    // TODO
+
+    "TODO".fail
+  }
 
   /**
    * Creates a Resolver instance from a JValue.
@@ -65,18 +80,8 @@ object Resolver {
    *        for this resolver
    * @return a configured Resolver instance
    */
-  def apply(config: JValue): Validated[Resolver] = {
-
-    // Validate that the config passes validation
-
-    // TODO: check that we 
-
-    // First retrieve the cache size
-    
-
-    "TODO".fail
-
-  }
+  def apply(config: JValue): Validated[Resolver] =
+    apply(asJsonNode(config))
 
 }
 
