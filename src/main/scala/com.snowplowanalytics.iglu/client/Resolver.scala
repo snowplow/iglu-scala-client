@@ -41,12 +41,12 @@ object Resolver {
    * of RepositoryRefs.
    *
    * @param lruCache The size of the LRU cache
-   * @param firstRef The first RepositoryRef
-   * @param moreRefs Any further RepositoryRefs
+   * @param headRef The first RepositoryRef
+   * @param tailRefs Any further RepositoryRefs
    * @return a configured Resolver instance
    */
-  def apply(lruCache: Int, firstRef: RepositoryRef, moreRefs: RepositoryRef*): Resolver =
-    Resolver(lruCache, NonEmptyList[RepositoryRef](firstRef, moreRefs: _*))
+  def apply(lruCache: Int, headRef: RepositoryRef, tailRefs: RepositoryRef*): Resolver =
+    Resolver(lruCache, NonEmptyList[RepositoryRef](headRef, tailRefs: _*))
 
   /**
    * Constructs a Resolver instance from a JsonNode.
