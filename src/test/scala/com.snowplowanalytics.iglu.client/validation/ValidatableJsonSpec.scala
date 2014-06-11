@@ -80,12 +80,10 @@ class ValidatableJsonSpec extends Specification with DataTables with ValidationM
   val SimpleSchema = JsonLoader.fromResource("/jsonschema/simple_schema.json")
 
   import ValidatableJsonMethods._
-  import ValidatableJsonSpec._
-
   implicit val resolver = Bootstrap.Resolver
 
   def e1 = {
-    val json = asJsonNode("""{"country": "JP", "beers": ["Asahi", "Orion", "..."]}""")
+    val json = ValidatableJsonSpec.asJsonNode("""{"country": "JP", "beers": ["Asahi", "Orion", "..."]}""")
     json.validateAgainstSchema(SimpleSchema) must beSuccessful(json)
   }
 
@@ -96,7 +94,8 @@ class ValidatableJsonSpec extends Specification with DataTables with ValidationM
       """{"country": "fr","beers": ["Jenlain"]}"""
     )) {
       str: String => {
-        val json = asJsonNode(str)
+        val json = ValidatableJsonSpec.asJsonNode(str)
+        // json.validate(false)/*AgainstSchema(SimpleSchema)*/ must beSuccessful(json)
         json.validateAgainstSchema(SimpleSchema) must beSuccessful(json)
       }
     }
@@ -108,10 +107,10 @@ class ValidatableJsonSpec extends Specification with DataTables with ValidationM
     "heterogenous beers" !! """{"country": "GB", "beers": ["ale", false]}""" ! """instance type (boolean) does not match any allowed primitive type (allowed: ["string"])""" ! """{"loadingURI":"#","pointer":"/properties/beers/items"}""" ! """{"pointer":"/beers/1"}""" ! "type"        ! Some(("boolean", """["string"]""")) ! None                                               |> {
 
       (_, input, message, schema, instance, keyword, foundExpected, requiredMissing) => {
-        val json = asJsonNode(input)
+        val json = ValidatableJsonSpec.asJsonNode(input)
         json.validateAgainstSchema(SimpleSchema) must beLike {
           case Failure(NonEmptyList(head, tail @ _*)) if tail.isEmpty =>
-            head.toString must_== asProcessingMessage(message, schema, instance, keyword, foundExpected, requiredMissing).toString
+            head.toString must_== ValidatableJsonSpec.asProcessingMessage(message, schema, instance, keyword, foundExpected, requiredMissing).toString
         }
       }
     }

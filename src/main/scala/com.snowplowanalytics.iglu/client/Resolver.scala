@@ -184,7 +184,7 @@ case class Resolver(
   def unsafeLookupSchema(schemaKey: SchemaKey): JsonNode =
     lookupSchema(schemaKey) match {
       case Success(schema) => schema
-      case Failure(err)    => throw new RuntimeException(s"Unsafe schema lookup of ${schemaKey} failed with: ${err}")
+      case Failure(err)    => throw new RuntimeException(s"Unsafe schema lookup failed: ${err}")
     }
 
   /**
