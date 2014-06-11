@@ -24,13 +24,8 @@ import com.github.fge.jsonschema.core.report.{
   LogLevel
 }
 
-// Scalaz
-import scalaz._
-import Scalaz._
-
 // This project
 import repositories.{
-  RepositoryRef,
   RepositoryRefConfig,
   EmbeddedRepositoryRef
 }
@@ -52,10 +47,8 @@ object SelfDescValidationSpec {
       EmbeddedRepositoryRef(config, path = "/iglu-test-embedded")    
     }
 
-    Resolver(
-      lruCache = 0, // Disable as not thread-safe for tests
-      repos = NonEmptyList[RepositoryRef](repo)
-    )
+    // Disable LRU cache as not thread-safe for tests
+    Resolver(lruCache = 0, repo)
   }
 }
 

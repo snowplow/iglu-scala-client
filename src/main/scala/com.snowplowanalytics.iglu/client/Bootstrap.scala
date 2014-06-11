@@ -45,8 +45,5 @@ object Bootstrap {
   }
 
   // A Resolver which only looks at our embedded repo.
-  lazy val Resolver = UrResolver(
-    repos = NonEmptyList[RepositoryRef](Repo),
-    lruCache = EmbeddedSchemaCount
-  )
+  lazy val Resolver = UrResolver(lruCache = EmbeddedSchemaCount, Repo)
 }

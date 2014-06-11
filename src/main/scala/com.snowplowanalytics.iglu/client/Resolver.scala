@@ -37,6 +37,18 @@ import repositories.RepositoryRef
 object Resolver {
 
   /**
+   * Constructs a Resolver instance from an arg array
+   * of RepositoryRefs.
+   *
+   * @param lruCache The size of the LRU cache
+   * @param firstRef The first RepositoryRef
+   * @param moreRefs Any further RepositoryRefs
+   * @return a configured Resolver instance
+   */
+  def apply(lruCache: Int, firstRef: RepositoryRef, moreRefs: RepositoryRef*): Resolver =
+    Resolver(lruCache, NonEmptyList[RepositoryRef](firstRef, moreRefs: _*))
+
+  /**
    * Constructs a Resolver instance from a JsonNode.
    *
    * @param config The JSON containing the configuration
