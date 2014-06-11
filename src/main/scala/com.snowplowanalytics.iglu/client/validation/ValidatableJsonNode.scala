@@ -42,11 +42,19 @@ import ProcessingMessageUtils._
 
 object ValidatableJsonNode {
 
-  private lazy val JsonSchemaValidator = getJsonSchemaValidator(SchemaVersion.DRAFTV4)
+  private[validation] lazy val JsonSchemaValidator = getJsonSchemaValidator(SchemaVersion.DRAFTV4)
 
-  // Unsafe lookup is fine here because we know this schema exists in our resources folder
-  private lazy val SelfDescSchema = SchemaRepo.unsafeLookupSchema(
-    SchemaKey("com.snowplowanalytics.self-desc", "instance-iglu-only", "jsonschema", "1-0-0"))
+  /**
+   * Get our schema for self-describing Iglu instances.
+   *
+   * Unsafe lookup is fine here because we know this
+   * schema exists in our resources folder
+   */
+  // TODO: cache this value rather than lookup each time.
+  private[validation] def getSelfDescSchema(implicit resolver: Resolver): JsonNode =
+    resolver.unsafeLookupSchema(
+      SchemaKey("com.snowplowanalytics.self-desc", "instance-iglu-only", "jsonschema", "1-0-0")
+    )
 
   /**
    * Implicit to pimp a JsonNode to our
@@ -72,7 +80,7 @@ object ValidatableJsonNode {
    *         a NonEmptyList of
    *         ProcessingMessages
    */
-  def validateAgainstSchema(instance: JsonNode, schema: JsonNode): ValidatedJson = {
+  def validateAgainstSchema(instance: JsonNode, schema: JsonNode)(implicit resolver: Resolver): ValidatedJson = {
     val report = JsonSchemaValidator.validateUnchecked(schema, instance)
     val msgs = report.iterator.toList
     msgs match {
@@ -92,8 +100,8 @@ object ValidatableJsonNode {
    *         a NonEmptyList of
    *         ProcessingMessages
    */
-  private def validateAsSelfDescribing(instance: JsonNode): ValidatedJson = {
-    validateAgainstSchema(instance, SelfDescSchema)
+  private[validation] def validateAsSelfDescribing(instance: JsonNode)(implicit resolver: Resolver): ValidatedJson = {
+    validateAgainstSchema(instance, getSelfDescSchema)
   }
 
   /**
@@ -113,12 +121,12 @@ object ValidatableJsonNode {
    *         or a Failure boxing a NonEmptyList
    *         of ProcessingMessages
    */
-  def validate(instance: JsonNode, dataOnly: Boolean = false): ValidatedJson =
+  def validate(instance: JsonNode, dataOnly: Boolean = false)(implicit resolver: Resolver): ValidatedJson =
     for {
       j  <- validateAsSelfDescribing(instance)
       s  =  j.get("schema").asText
       d  =  j.get("data")
-      js <- SchemaRepo.lookupSchema(s).toProcessingMessageNel
+      js <- resolver.lookupSchema(s).toProcessingMessageNel
       v  <- validateAgainstSchema(d, js)
     } yield if (dataOnly) d else instance
 
@@ -141,13 +149,13 @@ object ValidatableJsonNode {
    *         or a Failure boxing a NonEmptyList
    *         of ProcessingMessages
    */
-  def validateAndIdentifySchema(instance: JsonNode, dataOnly: Boolean = false): ValidatedJsonSchemaPair =
+  def validateAndIdentifySchema(instance: JsonNode, dataOnly: Boolean = false)(implicit resolver: Resolver): ValidatedJsonSchemaPair =
     for {
       j  <- validateAsSelfDescribing(instance)
       s  =  j.get("schema").asText
       d  =  j.get("data")
       sk <- SchemaKey(s).toProcessingMessageNel
-      js <- SchemaRepo.lookupSchema(sk).toProcessingMessageNel
+      js <- resolver.lookupSchema(sk).toProcessingMessageNel
       v  <- validateAgainstSchema(d, js)
     } yield if (dataOnly) (sk, d) else (sk, instance)
 
@@ -159,7 +167,7 @@ object ValidatableJsonNode {
    *        Schema spec to validate against
    * @return a JsonValidator
    */
-  private def getJsonSchemaValidator(version: SchemaVersion): JsonValidator = {
+  private[validation] def getJsonSchemaValidator(version: SchemaVersion): JsonValidator = {
     
     // Override the ReportProvider so we never throw Exceptions and only collect ERRORS+
     val rep = new ListReportProvider(LogLevel.ERROR, LogLevel.NONE)
@@ -183,12 +191,12 @@ object ValidatableJsonNode {
  */
 class ValidatableJsonNode(instance: JsonNode) {
 
-  def validateAgainstSchema(schema: JsonNode): ValidatedJson = 
+  def validateAgainstSchema(schema: JsonNode)(implicit resolver: Resolver): ValidatedJson = 
     ValidatableJsonNode.validateAgainstSchema(instance, schema)
 
-  def validate(dataOnly: Boolean): ValidatedJson =
+  def validate(dataOnly: Boolean)(implicit resolver: Resolver): ValidatedJson =
     ValidatableJsonNode.validate(instance, dataOnly)
 
-  def validateAndIdentifySchema(dataOnly: Boolean): ValidatedJsonSchemaPair =
+  def validateAndIdentifySchema(dataOnly: Boolean)(implicit resolver: Resolver): ValidatedJsonSchemaPair =
     ValidatableJsonNode.validateAndIdentifySchema(instance, dataOnly)
 }
