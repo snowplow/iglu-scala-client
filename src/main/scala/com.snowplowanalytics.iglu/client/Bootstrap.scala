@@ -17,12 +17,12 @@ import scalaz._
 import Scalaz._
 
 // This project
+import com.snowplowanalytics.iglu.client.{Resolver => UrResolver}
 import repositories.{
   RepositoryRef,
   RepositoryRefConfig,
   EmbeddedRepositoryRef
 }
-import com.snowplowanalytics.iglu.client.{Resolver => UrResolver}
 
 /**
  * Bootstrap object contains our embedded JSON
