@@ -24,7 +24,7 @@ object IgluJavaScalaClientBuild extends Build {
   }
 
   // Define our project, with basic project information and library dependencies
-  lazy val project = Project("iglu-java-scala-client", file("."))
+  lazy val project = Project("iglu-scala-client", file("."))
     .settings(buildSettings: _*)
     .settings(
       libraryDependencies ++= Seq(

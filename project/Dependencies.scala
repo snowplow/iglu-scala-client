@@ -22,7 +22,7 @@ object Dependencies {
     val jacksonDatabind = "2.2.3"
     val jsonValidator   = "2.2.3"
     // Scala
-    val json4sJackson   = "3.2.11-SNAPSHOT"
+    val json4sJackson   = "3.2.11-SNAPSHOT" // Not available yet, need to publish-local
     val scalaz7         = "7.0.0"
     val collUtils       = "6.3.4"
     // Scala (test only)
