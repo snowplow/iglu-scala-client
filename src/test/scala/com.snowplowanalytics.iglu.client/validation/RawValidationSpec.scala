@@ -14,15 +14,7 @@ package com.snowplowanalytics.iglu.client
 package validation
 
 // Jackson
-import com.fasterxml.jackson.databind.{
-  ObjectMapper,
-  JsonNode
-}
 import com.github.fge.jackson.JsonLoader
-import com.github.fge.jsonschema.core.report.{
-  ProcessingMessage,
-  LogLevel
-}
 
 // Scalaz
 import scalaz._
@@ -33,57 +25,22 @@ import org.specs2.Specification
 import org.specs2.matcher.DataTables
 import org.specs2.scalaz.ValidationMatchers
 
-object ValidatableJsonSpec {
+class RawValidationSpec extends Specification with DataTables with ValidationMatchers { def is =
 
-  private lazy val Mapper = new ObjectMapper
-  
-  def asJsonNode(str: String) =
-    Mapper.readTree(str)
-
-  def asProcessingMessage(message: String, schema: String, instance: String, keyword: String, foundExpected: Option[(String, String)], requiredMissing: Option[(String, String)]) = {
-
-    val pm = new ProcessingMessage()
-                   .setLogLevel(LogLevel.ERROR)
-                   .setMessage(message)
-                   .put("schema",   asJsonNode(schema))
-                   .put("instance", asJsonNode(instance))
-                   .put("domain",  "validation")
-                   .put("keyword",  keyword)
-
-    foundExpected match {
-      case Some(Tuple2(found, expected)) =>
-        pm.put("found",    found)
-        pm.put("expected", asJsonNode(expected))
-      case _ =>
-    }
-    requiredMissing match {
-      case Some(Tuple2(required, missing)) =>
-        pm.put("required", asJsonNode(required))
-        pm.put("missing",  asJsonNode(missing))
-      case _ =>
-    }
-
-    pm
-  }
-
-}
-
-class ValidatableJsonSpec extends Specification with DataTables with ValidationMatchers { def is =
-
-  "This is a specification to test the ValidatableJsonNode functionality"               ^
+  "This is a specification to test the basic ValidatableJsonNode functionality"         ^
                                                                                        p^
   "a JsonNode should be pimped to a ValidatableJsonNode as needed"                      ! e1^
-  "JsonNodes that pass explicit validation should be wrapped in a Success"              ! e2^  
+  "JsonNodes that pass explicit validation should be wrapped in a Success"              ! e2^
   "JsonNodes that fail explicit validation should wrap ProcessageMessages in a Failure" ! e3^  
                                                                                         end
 
-  val SimpleSchema = JsonLoader.fromResource("/jsonschema/simple_schema.json")
+  val SimpleSchema = JsonLoader.fromResource("/raw-jsonschema/beer-schema.json")
 
   import ValidatableJsonMethods._
   implicit val resolver = Bootstrap.Resolver
 
   def e1 = {
-    val json = ValidatableJsonSpec.asJsonNode("""{"country": "JP", "beers": ["Asahi", "Orion", "..."]}""")
+    val json = ValidationSpecHelpers.asJsonNode("""{"country": "JP", "beers": ["Asahi", "Orion", "..."]}""")
     json.validateAgainstSchema(SimpleSchema) must beSuccessful(json)
   }
 
@@ -94,7 +51,7 @@ class ValidatableJsonSpec extends Specification with DataTables with ValidationM
       """{"country": "fr","beers": ["Jenlain"]}"""
     )) {
       str: String => {
-        val json = ValidatableJsonSpec.asJsonNode(str)
+        val json = ValidationSpecHelpers.asJsonNode(str)
         json.validateAgainstSchema(SimpleSchema) must beSuccessful(json)
       }
     }
@@ -106,10 +63,10 @@ class ValidatableJsonSpec extends Specification with DataTables with ValidationM
     "heterogenous beers" !! """{"country": "GB", "beers": ["ale", false]}""" ! """instance type (boolean) does not match any allowed primitive type (allowed: ["string"])""" ! """{"loadingURI":"#","pointer":"/properties/beers/items"}""" ! """{"pointer":"/beers/1"}""" ! "type"        ! Some(("boolean", """["string"]""")) ! None                                               |> {
 
       (_, input, message, schema, instance, keyword, foundExpected, requiredMissing) => {
-        val json = ValidatableJsonSpec.asJsonNode(input)
+        val json = ValidationSpecHelpers.asJsonNode(input)
         json.validateAgainstSchema(SimpleSchema) must beLike {
           case Failure(NonEmptyList(head, tail @ _*)) if tail.isEmpty =>
-            head.toString must_== ValidatableJsonSpec.asProcessingMessage(message, schema, instance, keyword, foundExpected, requiredMissing).toString
+            head.toString must_== ValidationSpecHelpers.asProcessingMessage(message, schema, instance, keyword, foundExpected, requiredMissing).toString
         }
       }
     }

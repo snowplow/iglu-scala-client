@@ -30,7 +30,7 @@ import org.json4s.jackson.JsonMethods._
  */
 object SchemaKey {
 
-  private val SchemaUriRegex = "^iglu://([a-zA-Z0-9-_.]+)/([a-zA-Z0-9-_]+)/([a-zA-Z0-9-_]+)/([0-9]+-[0-9]+-[0-9]+)$".r
+  private val SchemaUriRegex = "^iglu:([a-zA-Z0-9-_.]+)/([a-zA-Z0-9-_]+)/([a-zA-Z0-9-_]+)/([0-9]+-[0-9]+-[0-9]+)$".r
 
   /**
    * Custom constructor for an Iglu SchemaKey from
@@ -106,7 +106,7 @@ case class SchemaKey(
    *         URI.
    */
   def toSchemaUri: String =
-    s"iglu://${toPath}"
+    s"iglu:${toPath}"
 
   /**
    * The optimal String representation of a SchemaKey
