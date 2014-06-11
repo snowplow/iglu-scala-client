@@ -70,12 +70,12 @@ object ValidatableJsonSpec {
 
 class ValidatableJsonSpec extends Specification with DataTables with ValidationMatchers { def is =
 
-  "This is a specification to test the ValidatableJsonNode functionality"      ^
-                                                                              p^
-  "a JsonNode should be pimped to a ValidatableJsonNode as needed"             ! e1^
-  "JsonNodes that pass validation should be wrapped in a Success"              ! e2^  
-  "JsonNodes that fail validation should wrap ProcessageMessages in a Failure" ! e3^  
-                                                                               end
+  "This is a specification to test the ValidatableJsonNode functionality"               ^
+                                                                                       p^
+  "a JsonNode should be pimped to a ValidatableJsonNode as needed"                      ! e1^
+  "JsonNodes that pass explicit validation should be wrapped in a Success"              ! e2^  
+  "JsonNodes that fail explicit validation should wrap ProcessageMessages in a Failure" ! e3^  
+                                                                                        end
 
   val SimpleSchema = JsonLoader.fromResource("/jsonschema/simple_schema.json")
 
