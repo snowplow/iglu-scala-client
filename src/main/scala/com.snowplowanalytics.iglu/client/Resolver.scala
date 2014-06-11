@@ -89,16 +89,81 @@ object Resolver {
  * MODEL-REVISION-ADDITION).
  */
 case class Resolver(
-  val repos: RepositoryRefNel,
-  val lruCache: Int = 500) extends Lookup with UnsafeLookup {
+  repos: RepositoryRefNel,
+  lruCache: Int = 500) extends Lookup with UnsafeLookup {
   
-  // Initialise the cache
-  private val lru: MaybeSchemaLruMap = if (lruCache > 0) Some(new SchemaLruMap(lruCache)) else None
+  /**
+   * Our LRU cache.
+   */
+  object cache {
+
+    private val lru: MaybeSchemaLruMap = if (lruCache > 0) Some(new SchemaLruMap(lruCache)) else None
+
+    /**
+     * Looks up the given schema key in the cache.
+     *
+     * @param schemaKey The SchemaKey uniquely identifying
+     *        the schema in Iglu
+     * @return the schema if found as Some JsonNode or None
+     *         if not found, or cache is not enabled.
+     */
+    def get(schemaKey: SchemaKey): MaybeJsonNode =
+      for {
+        l <- lru
+        k <- l.get(schemaKey)
+      } yield k
+
+    /**
+     * Caches and returns the given schema. Does
+     * nothing if we don't have an LRU cache
+     * available.
+     *
+     * @param schema The provided schema
+     * @return the same schema
+     */
+    def store(schemaKey: SchemaKey, schema: JsonNode): JsonNode = {
+      for (l <- lru) {
+        l.put(schemaKey, schema)
+      }
+      schema
+    }
+  }
 
   /**
    * Tries to find the given schema in any of the
    * provided repository refs.
-   * 
+   *
+   * @param schemaKey The SchemaKey uniquely identifying
+   *        the schema in Iglu
+   * @return a Validation boxing either the Schema's
+   *         JsonNode on Success, or an error String
+   *         on Failure 
+   */
+  // TODO: should we accumulate a Nel on Failure side?
+  def lookupSchema(schemaKey: SchemaKey): ValidatedJsonNode = {
+
+    @tailrec def recurse(schemaKey: SchemaKey, remainingRepos: RepositoryRefs): ValidatedJsonNode = {
+      remainingRepos match {
+        case Nil           => s"Could not find schema with key ${schemaKey} in any repository".fail
+        case repo :: repos => {
+          repo.lookupSchema(schemaKey) match {
+            case Success(schema) => cache.store(schemaKey, schema).success
+            case _               => recurse(schemaKey, repos)
+          }
+        }
+      }
+    }
+
+    cache.get(schemaKey) match {
+      case Some(schema) => schema.success
+      case None         => recurse(schemaKey, prioritizeRepos(schemaKey))
+    }
+  }
+
+  /**
+   * Tries to find the given schema in any of the
+   * provided repository refs.
+   *
    * Convenience function which converts an
    * Iglu-format schema URI to a SchemaKey to
    * perform the lookup.
@@ -118,73 +183,18 @@ case class Resolver(
    * Tries to find the given schema in any of the
    * provided repository refs.
    *
-   * @param schemaKey The SchemaKey uniquely identifying
-   *        the schema in Iglu
-   * @return a Validation boxing either the Schema's
-   *         JsonNode on Success, or an error String
-   *         on Failure 
-   */
-  def lookupSchema(schemaKey: SchemaKey): ValidatedJsonNode = {
-
-    @tailrec def recurse(schemaKey: SchemaKey, remainingRepos: RepositoryRefs): ValidatedJsonNode = {
-      remainingRepos match {
-        case Nil           => s"Could not find schema with key ${schemaKey} in any repository".fail
-        case repo :: repos => {
-          repo.lookupSchema(schemaKey) match {
-            case Success(schema) => cache(schemaKey, schema).success
-            case _               => recurse(schemaKey, repos)
-          }
-        }
-      }
-    }
-
-    getFromCache(schemaKey) match {
-      case Some(schema) => schema.success
-      case None         => recurse(schemaKey, prioritizeRepos(schemaKey))
-    }
-  }
-
-  /**
-   * xxx
-   *
-   * ONLY implement in a sub-class if the resolution has
-   * a good chance of succeeding (e.g. no network I/O).
+   * Unsafe as will throw an exception if the
+   * schema cannot be found.
    *
    * @param schemaKey The SchemaKey uniquely identifying
    *        the schema in Iglu
    * @return the JsonNode representing this schema
    */
-  def unsafeLookupSchema(schemaKey: SchemaKey): JsonNode = asJsonNode(parse("{}"))
-
-  /**
-   * Looks up the given schema key in the cache.
-   *
-   * @param schemaKey The SchemaKey uniquely identifying
-   *        the schema in Iglu
-   * @return the schema if found as Some JsonNode or None
-   *         if not found, or cache is not enabled.
-   */
-  def getFromCache(schemaKey: SchemaKey): MaybeJsonNode =
-    for {
-      l <- lru
-      k <- l.get(schemaKey)
-    } yield k
-
-  /**
-   * Caches and returns the given schema. Does
-   * nothing if we don't have an LRU cache
-   * available.
-   *
-   * @param schema The provided schema
-   * @return the same schema
-   */
-  def cache(schemaKey: SchemaKey, schema: JsonNode): JsonNode = {
-    lru match {
-      case Some(c) => c.put(schemaKey, schema)
-      case None    => // Do nothing
+  def unsafeLookupSchema(schemaKey: SchemaKey): JsonNode =
+    lookupSchema(schemaKey) match {
+      case Success(schema) => schema
+      case Failure(err)    => throw new RuntimeException(s"Unsafe schema lookup of ${schemaKey} failed with: ${err}")
     }
-    schema
-  }
 
   /**
    * Re-sorts our Nel of RepositoryRefs into the

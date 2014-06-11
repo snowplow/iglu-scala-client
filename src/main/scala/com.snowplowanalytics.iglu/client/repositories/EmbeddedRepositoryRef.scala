@@ -118,7 +118,7 @@ case class EmbeddedRepositoryRef(
       unsafeLookupSchema(schemaKey).success
     } catch {
       case e: Throwable =>
-        s"Cannot find schema ${schemaKey} in any Iglu repository".fail
+        s"Cannot find schema ${schemaKey} in embedded Iglu repository ${config.name}".fail
     }
   }
 }
