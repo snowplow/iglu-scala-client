@@ -95,7 +95,6 @@ class ValidatableJsonSpec extends Specification with DataTables with ValidationM
     )) {
       str: String => {
         val json = ValidatableJsonSpec.asJsonNode(str)
-        // json.validate(false)/*AgainstSchema(SimpleSchema)*/ must beSuccessful(json)
         json.validateAgainstSchema(SimpleSchema) must beSuccessful(json)
       }
     }
