@@ -28,7 +28,11 @@ import org.json4s.JsonDSL._
 import org.json4s.jackson.JsonMethods._
 
 // This project
-import repositories.RepositoryRef
+import repositories.{
+  RepositoryRef,
+  RepositoryRefConfig,
+  EmbeddedRepositoryRef
+}
 
 /**
  * Companion object. Lets us create a Resolver from
@@ -36,9 +40,31 @@ import repositories.RepositoryRef
  */
 object Resolver {
 
+  // Bootstrap us an embedded repo to validate these incoming JSONs
+  private val EmbeddedRepoRef = {
+    val config = RepositoryRefConfig("Iglu Client Embedded", 0, Nil)
+    EmbeddedRepositoryRef(config, "/iglu-embedded")
+  }
+
   /**
+   * Constructs a Resolver instance from a JsonNode.
    *
+   * @param config The JSON containing the configuration
+   *        for this resolver
+   * @return a configured Resolver instance
    */
+  def apply(config: JsonNode): Validated[Resolver] =
+    apply(fromJsonNode(config))
+
+  /**
+   * Creates a Resolver instance from a JValue.
+   *
+   * @param config The JSON containing the configuration
+   *        for this resolver
+   * @return a configured Resolver instance
+   */
+  def apply(config: JValue): Validated[Resolver] =
+    "TODO".fail
 
 }
 
