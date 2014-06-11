@@ -48,7 +48,7 @@ object SelfDescValidationSpec {
     }
 
     // Disable LRU cache as not thread-safe for tests
-    Resolver(lruCache = 0, repo)
+    Resolver(cacheSize = 0, repo)
   }
 }
 

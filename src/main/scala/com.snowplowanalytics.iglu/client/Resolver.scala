@@ -40,13 +40,13 @@ object Resolver {
    * Constructs a Resolver instance from an arg array
    * of RepositoryRefs.
    *
-   * @param lruCache The size of the LRU cache
+   * @param cacheSize The size of the cache
    * @param headRef The first RepositoryRef
    * @param tailRefs Any further RepositoryRefs
    * @return a configured Resolver instance
    */
-  def apply(lruCache: Int, headRef: RepositoryRef, tailRefs: RepositoryRef*): Resolver =
-    Resolver(lruCache, NonEmptyList[RepositoryRef](headRef, tailRefs: _*))
+  def apply(cacheSize: Int, headRef: RepositoryRef, tailRefs: RepositoryRef*): Resolver =
+    Resolver(cacheSize, NonEmptyList[RepositoryRef](headRef, tailRefs: _*))
 
   /**
    * Constructs a Resolver instance from a JsonNode.
@@ -90,7 +90,7 @@ object Resolver {
  * MODEL-REVISION-ADDITION).
  */
 case class Resolver(
-  lruCache: Int = 500,
+  cacheSize: Int = 500,
   repos: RepositoryRefNel
 ) extends Lookup with UnsafeLookup {
   
@@ -101,7 +101,7 @@ case class Resolver(
    */
   object cache {
 
-    private val lru: MaybeSchemaLruMap = if (lruCache > 0) Some(new SchemaLruMap(lruCache)) else None
+    private val lru: MaybeSchemaLruMap = if (cacheSize > 0) Some(new SchemaLruMap(cacheSize)) else None
 
     /**
      * Looks up the given schema key in the cache.
