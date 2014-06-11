@@ -15,6 +15,9 @@ package com.snowplowanalytics.iglu
 // Jackson
 import com.fasterxml.jackson.databind.JsonNode
 
+// JSON Schema Validator
+import com.github.fge.jsonschema.core.report.ProcessingMessage
+
 // Scalaz
 import scalaz._
 import Scalaz._
@@ -23,6 +26,7 @@ import Scalaz._
 import com.twitter.util.LruMap
 
 // This project
+import client.SchemaKey
 import client.repositories.RepositoryRef
 
 /**
@@ -74,10 +78,33 @@ package object client {
   type ValidatedJsonNode = Validated[JsonNode]
 
   /**
+   * Type alias for a ValidationNel
+   * containing either error ProcessingMessages
+   * or a successfully validated JsonNode.
+   */
+  // TODO: fix this
+  type ValidatedJson = ValidationNel[ProcessingMessage, JsonNode]
+
+  /**
    * Type alias for a SchemaVer-based version.
    *
    * We may update this in the future to be
    * a full-fledged case class or similar.
    */
   type SchemaVer = String
+
+  /**
+   * Type alias for a Tuple2
+   * containing a SchemaKey and its
+   * corresponding JsonNode.
+   */
+  type JsonSchemaPair = Tuple2[SchemaKey, JsonNode]
+
+  /**
+   * Type alias for a ValidationNel
+   * containing either error ProcessingMessages
+   * or a successfully validated tuple of a
+   * JSON's SchemaKey and its JsonNode.
+   */
+  type ValidatedJsonSchemaPair = ValidationNel[ProcessingMessage, JsonSchemaPair]
 }

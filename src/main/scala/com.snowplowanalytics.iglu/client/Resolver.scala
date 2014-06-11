@@ -40,10 +40,11 @@ import repositories.{
  */
 object Resolver {
 
-  // Bootstrap us an embedded repo to validate these incoming JSONs
-  private val EmbeddedRepoRef = {
-    val config = RepositoryRefConfig("Iglu Client Embedded", 0, Nil)
-    EmbeddedRepositoryRef(config, "/iglu-embedded")
+  // Bootstrap us a Resolver just to validate these incoming JSONs
+  private val BootstrapResolver = {
+    val config  = RepositoryRefConfig("Iglu Client Embedded", 0, Nil)
+    val repoRef = EmbeddedRepositoryRef(config, path = "/iglu-embedded")
+    Resolver(NonEmptyList[RepositoryRef](repoRef), lruCache = 0)
   }
 
   /**
@@ -63,8 +64,18 @@ object Resolver {
    *        for this resolver
    * @return a configured Resolver instance
    */
-  def apply(config: JValue): Validated[Resolver] =
+  def apply(config: JValue): Validated[Resolver] = {
+
+    // Validate that the config passes validation
+
+    // TODO: check that we 
+
+    // First retrieve the cache size
+    
+
     "TODO".fail
+
+  }
 
 }
 
