@@ -49,7 +49,7 @@ class ResolverSpec extends Specification with DataTables with ValidationMatchers
     val resolver = Resolver(NonEmptyList(Repos.one, Repos.two, Repos.three), lruCache = 0)
     val schemaKey = SchemaKey("com.snowplowanalytics.snowplow", "mobile_context", "jsonschema", "1-0-0")
 
-    resolver.prioritizeRepos(schemaKey) must_== List(Repos.two, Repos.three, Repos.one)
+    resolver.prioritizeRepos(schemaKey) must_== List(Repos.two, Repos.three, Bootstrap.Repo, Repos.one)
   }
 
 }

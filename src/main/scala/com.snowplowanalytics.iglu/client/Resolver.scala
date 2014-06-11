@@ -85,6 +85,8 @@ case class Resolver(
   repos: RepositoryRefNel,
   lruCache: Int = 500) extends Lookup with UnsafeLookup {
   
+  private[this] val allRepos = Bootstrap.Repo :: repos.toList
+
   /**
    * Our LRU cache.
    */
@@ -200,7 +202,7 @@ case class Resolver(
    *         Pragmatically sorted to minimize lookups.
    */
   private[client] def prioritizeRepos(schemaKey: SchemaKey): RepositoryRefs =
-    repos.toList.sortBy(r =>
+    allRepos.sortBy(r =>
       (!r.vendorMatched(schemaKey), r.classPriority, r.config.instancePriority)
     )
 }
