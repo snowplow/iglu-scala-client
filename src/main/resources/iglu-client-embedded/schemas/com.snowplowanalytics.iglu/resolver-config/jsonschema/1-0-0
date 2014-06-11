@@ -1,0 +1,48 @@
+{
+	"$schema": "http://json-schema.org/schema#",
+	"description": "Schema for an Iglu resolver's configuration",
+	"self": {
+		"vendor": "com.snowplowanalytics.iglu",
+		"name": "resolver-config",
+		"format": "jsonschema",
+		"version": "1-0-0"
+	},
+	
+	"type": "object",
+
+	"properties": {
+
+		"schema": {
+			"type": "string",
+			"pattern": "^iglu:[a-zA-Z0-9-_.]+/[a-zA-Z0-9-_]+/[a-zA-Z0-9-_]+/[0-9]+-[0-9]+-[0-9]+$"
+		},
+
+		"data": {}
+	},
+
+	"required": ["cacheSize", "data"],
+	"additionalProperties": false
+}
+
+repositoryResolvers: [
+	{
+		name: "Iglu Central",
+		connection: {
+			http: {
+				uri: "//iglucentral.com"
+			}
+		},
+		priority: 0,
+		vendorPrefixes: [ "com.snowplowanalytics" ]
+	},
+	{
+		name: "Iglu Client Embedded",
+		connection: {
+			embedded: {
+				path: "/iglu-embedded"
+			}
+		},
+		priority: 0,
+		vendorPrefixes: [ "com.snowplowanalytics" ]
+	}
+]
