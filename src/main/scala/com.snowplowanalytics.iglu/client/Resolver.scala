@@ -28,11 +28,7 @@ import org.json4s.JsonDSL._
 import org.json4s.jackson.JsonMethods._
 
 // This project
-import repositories.{
-  RepositoryRef,
-  RepositoryRefConfig,
-  EmbeddedRepositoryRef
-}
+import repositories.RepositoryRef
 
 /**
  * Companion object. Lets us create a Resolver from
