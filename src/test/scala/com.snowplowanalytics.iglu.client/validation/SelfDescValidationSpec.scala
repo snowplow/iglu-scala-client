@@ -28,63 +28,56 @@ import com.github.fge.jsonschema.core.report.{
 import scalaz._
 import Scalaz._
 
+// This project
+import repositories.{
+  RepositoryRef,
+  RepositoryRefConfig,
+  EmbeddedRepositoryRef
+}
+
 // Specs2
 import org.specs2.Specification
 import org.specs2.matcher.DataTables
 import org.specs2.scalaz.ValidationMatchers
-/*
+
+object SelfDescValidationSpec {
+
+  implicit val resolver = {
+    val repo = {
+      val config = RepositoryRefConfig(
+        name = "Iglu Test Embedded",
+        instancePriority = 0,
+        vendorPrefixes = Nil
+      )
+      EmbeddedRepositoryRef(config, path = "/iglu-test-embedded")    
+    }
+
+    Resolver(
+      lruCache = 0, // Disable as not thread-safe for tests
+      repos = NonEmptyList[RepositoryRef](repo)
+    )
+  }
+}
+
+// TODO: add in some Failures
 class SelfDescValidationSpec extends Specification with DataTables with ValidationMatchers { def is =
 
-  "This is a specification to test the ValidatableJsonNode functionality"               ^
-                                                                                       p^
-  "a JsonNode should be pimped to a ValidatableJsonNode as needed"                      ! e1^
-  "JsonNodes that pass explicit validation should be wrapped in a Success"              ! e2^
-  "a self-describing JsonNode that passes validation should be wrapped in a Success"    ! e3^
-  "JsonNodes that fail explicit validation should wrap ProcessageMessages in a Failure" ! e4^  
-                                                                                        end
-
-  val SimpleSchema = JsonLoader.fromResource("/raw-jsonschema/beer-schema.json")
+  "This is a specification to test validation of self-describing JsonNodes"                                ^
+                                                                                                          p^
+  "validating a correct self-desc JSON should return the JSON in a Success"                                ! e1^
+  "validating a correct self-desc JSON should return only the JSON's data field in a Success if requested" ! e2^
+  // "JsonNodes that fail explicit validation should wrap ProcessageMessages in a Failure" ! e2^  
+                                                                                           end
 
   import ValidatableJsonMethods._
-  implicit val resolver = Bootstrap.Resolver
+  import SelfDescValidationSpec._
 
-  def e1 = {
-    val json = SelfDescValidationSpec.asJsonNode("""{"country": "JP", "beers": ["Asahi", "Orion", "..."]}""")
-    json.validateAgainstSchema(SimpleSchema) must beSuccessful(json)
-  }
+  val ValidJson = ValidationSpecHelpers.asJsonNode(
+    """{"schema": "iglu:com.snowplowanalytics.iglu-test/stock-item/jsonschema/1-0-0", "data": { "id": "123-12", "name": "t-shirt", "price": 29.99 } }"""
+    )
 
-  def e2 =
-    foreach(Seq(
-      """{"country": "AQ", "beers": []}""",
-      """{"country":"GR","beers":["Fix","Mythos"]}""",
-      """{"country": "fr","beers": ["Jenlain"]}"""
-    )) {
-      str: String => {
-        val json = SelfDescValidationSpec.asJsonNode(str)
-        json.validateAgainstSchema(SimpleSchema) must beSuccessful(json)
-      }
-    }
+  def e1 = ValidJson.validate(false) must beSuccessful(ValidJson)
 
-    /*
+  def e2 = ValidJson.validate(true) must beSuccessful(ValidJson.get("data"))
 
-  def e3 = {
-    val json = SelfDescValidationSpec.asJsonNode("""{"schema": "iglu:com.snowplowanalytics.iglu-test/stock-item/jsonschema/1-0-0", "data": { "id": "123-12", "name": "t-shirt", "price": 29.99 } }""")
-    json.validate(false) must beSuccessful(json)
-  } */
-
-  def e4 =
-    "SPEC NAME"          || "IN JSON"                                        | "OUT MESSAGE"                                                                                 | "OUT SCHEMA"                                                 | "OUT INSTANCE"               | "OUT KEYWORD" | "OUT FOUND & EXPECTED"              | "OUT REQUIRED & MISSING"                           |
-    "numeric country"    !! """{"country": 123, "beers": []}"""              ! """instance type (integer) does not match any allowed primitive type (allowed: ["string"])""" ! """{"loadingURI":"#","pointer":"/properties/country"}"""     ! """{"pointer":"/country"}""" ! "type"        ! Some(("integer", """["string"]""")) ! None                                               |
-    "missing beers"      !! """{"country": "cy"}"""                          ! """object has missing required properties (["beers"])"""                                      ! """{"loadingURI":"#","pointer":""}"""                        ! """{"pointer":""}"""         ! "required"    ! None                                ! Some(("""["beers","country"]""", """["beers"]""")) |
-    "heterogenous beers" !! """{"country": "GB", "beers": ["ale", false]}""" ! """instance type (boolean) does not match any allowed primitive type (allowed: ["string"])""" ! """{"loadingURI":"#","pointer":"/properties/beers/items"}""" ! """{"pointer":"/beers/1"}""" ! "type"        ! Some(("boolean", """["string"]""")) ! None                                               |> {
-
-      (_, input, message, schema, instance, keyword, foundExpected, requiredMissing) => {
-        val json = SelfDescValidationSpec.asJsonNode(input)
-        json.validateAgainstSchema(SimpleSchema) must beLike {
-          case Failure(NonEmptyList(head, tail @ _*)) if tail.isEmpty =>
-            head.toString must_== SelfDescValidationSpec.asProcessingMessage(message, schema, instance, keyword, foundExpected, requiredMissing).toString
-        }
-      }
-    }
-
-} */
+}

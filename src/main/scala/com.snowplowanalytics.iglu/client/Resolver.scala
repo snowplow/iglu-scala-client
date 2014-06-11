@@ -78,8 +78,9 @@ object Resolver {
  * MODEL-REVISION-ADDITION).
  */
 case class Resolver(
-  repos: RepositoryRefNel,
-  lruCache: Int = 500) extends Lookup with UnsafeLookup {
+  lruCache: Int = 500,
+  repos: RepositoryRefNel
+) extends Lookup with UnsafeLookup {
   
   private[this] val allRepos = Bootstrap.Repo :: repos.toList
 
