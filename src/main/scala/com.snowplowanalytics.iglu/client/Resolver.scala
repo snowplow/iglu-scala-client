@@ -40,13 +40,6 @@ import repositories.{
  */
 object Resolver {
 
-  // Bootstrap us a Resolver just to validate these incoming JSONs
-  private val BootstrapResolver = {
-    val config  = RepositoryRefConfig("Iglu Client Embedded", 0, Nil)
-    val repoRef = EmbeddedRepositoryRef(config, path = "/iglu-embedded")
-    Resolver(NonEmptyList[RepositoryRef](repoRef), lruCache = 0)
-  }
-
   /**
    * Constructs a Resolver instance from a JsonNode.
    *
