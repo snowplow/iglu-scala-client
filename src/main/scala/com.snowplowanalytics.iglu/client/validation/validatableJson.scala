@@ -38,7 +38,7 @@ import scalaz._
 import Scalaz._
 
 // This project
-import ProcessingMessageUtils._
+import ProcessingMessageMethods._
 
 object ValidatableJsonMethods {
 
@@ -192,7 +192,7 @@ object ValidatableJsonMethods {
  */
 class ValidatableJsonNode(instance: JsonNode) {
 
-  import validation.{ValidatableJsonMethods => VJM}
+  val VJM = ValidatableJsonMethods
 
   def validateAgainstSchema(schema: JsonNode)(implicit resolver: Resolver): ValidatedJson = 
     VJM.validateAgainstSchema(instance, schema)

@@ -26,7 +26,7 @@ import Scalaz._
 /**
  * Makes it easier to work with ProcessingMessages.
  */
-object ProcessingMessageUtils {
+object ProcessingMessageMethods {
 
   /**
    * Implicit to pimp a Scalaz Validation to a
@@ -76,7 +76,7 @@ class ProcMsgValidation[+A](validation: Validation[String, A]) {
 
   def toProcessingMessage: Validation[ProcessingMessage, A] =
     validation.leftMap { err =>
-      ProcessingMessageUtils.toProcMsg(err, LogLevel.ERROR)
+      ProcessingMessageMethods.toProcMsg(err, LogLevel.ERROR)
     }
 
   def toProcessingMessageNel: ValidationNel[ProcessingMessage, A] =
@@ -92,6 +92,6 @@ class ProcMsgValidationNel[+A](validation: ValidationNel[String, A]) {
 
   def toProcessingMessages: ValidationNel[ProcessingMessage, A] =
     validation.leftMap { err =>
-      ProcessingMessageUtils.toProcMsg(err, LogLevel.ERROR)
+      ProcessingMessageMethods.toProcMsg(err, LogLevel.ERROR)
     }
 }
