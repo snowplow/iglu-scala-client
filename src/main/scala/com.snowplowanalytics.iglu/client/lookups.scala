@@ -37,14 +37,6 @@ trait Lookup {
    *         on Failure 
    */
   def lookupSchema(schemaKey: SchemaKey): Validation[String, JsonNode]
-}
-
-/**
- * Trait for an unsafe schema lookup. ONLY implement this
- * a sub-class if the resolution has a good chance of
- * succeeding (e.g. no network I/O).
- */
-trait UnsafeLookup {
 
   /**
    * Abstract method. Provide a concrete

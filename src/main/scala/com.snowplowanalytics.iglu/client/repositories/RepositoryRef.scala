@@ -91,4 +91,25 @@ trait RepositoryRef extends Lookup {
     } yield m
     matches.foldLeft(false)(_ || _) // True if any match
   }
+
+  /**
+   * Retrieves an IgluSchema from the Iglu Repo as
+   * a JsonNode.
+   *
+   * @param schemaKey The SchemaKey uniquely identifies
+   *        the schema in Iglu
+   * @return a Validation boxing either the Schema's
+   *         JsonNode on Success, or an error String
+   *         on Failure 
+   */
+  // TODO: we should distinguish between not found and
+  // invalid JSON
+  def lookupSchema(schemaKey: SchemaKey): Validation[String, JsonNode] = {
+    try {
+      unsafeLookupSchema(schemaKey).success
+    } catch {
+      case e: Throwable =>
+        s"Cannot find schema ${schemaKey} in ${descriptor} Iglu repository ${config.name}".fail
+    }
+  }
 }

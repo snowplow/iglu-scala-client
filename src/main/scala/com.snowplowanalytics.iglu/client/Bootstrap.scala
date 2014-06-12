@@ -27,7 +27,7 @@ import repositories.{
 object Bootstrap {
 
   // Keep this up-to-date
-  private[this] val EmbeddedSchemaCount = 2
+  private[client] val EmbeddedSchemaCount = 2
 
   // Our embedded JSON Schema repository.
   lazy val Repo = {

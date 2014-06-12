@@ -106,7 +106,7 @@ object Resolver {
    * @return our assembled List of RepositoryRefs
    */
   // TODO: fix the return type
-  private[this] def getRepositoryRefs(repositoriesConfig: JValue): Validation[String, RepositoryRefs] = {
+  private[client] def getRepositoryRefs(repositoriesConfig: JValue): Validation[String, RepositoryRefs] = {
     // TODO: implement this
     Nil.success
   }
@@ -125,7 +125,7 @@ object Resolver {
    * @return our constructed RepositoryRef
    */
   // TODO: fix the return type
-  private[this] def buildRepositoryRef(repositoryConfig: JValue): Validation[String, RepositoryRef] =
+  private[client] def buildRepositoryRef(repositoryConfig: JValue): Validation[String, RepositoryRef] =
     // TODO: implement this
     if (true) {
       EmbeddedRepositoryRef(repositoryConfig)
@@ -149,9 +149,9 @@ object Resolver {
 case class Resolver(
   cacheSize: Int = 500,
   repos: RepositoryRefs
-) extends Lookup with UnsafeLookup {
+) extends Lookup {
   
-  private[this] val allRepos = Bootstrap.Repo :: repos
+  private[client] val allRepos = Bootstrap.Repo :: repos
 
   /**
    * Our LRU cache.

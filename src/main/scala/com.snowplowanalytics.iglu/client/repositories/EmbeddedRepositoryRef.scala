@@ -80,7 +80,7 @@ object EmbeddedRepositoryRef {
  */
 case class EmbeddedRepositoryRef(
   override val config: RepositoryRefConfig,
-  path: String) extends RepositoryRef with UnsafeLookup {
+  path: String) extends RepositoryRef {
 
   /**
    * Prioritize searching this class of repository because
@@ -106,26 +106,5 @@ case class EmbeddedRepositoryRef(
   def unsafeLookupSchema(schemaKey: SchemaKey): JsonNode = {
     val schemaPath = s"${path}/schemas/${schemaKey.toPath}"
     JsonLoader.fromResource(schemaPath)
-  }
-
-  /**
-   * Retrieves an IgluSchema from the Iglu Repo as
-   * a JsonNode.
-   *
-   * @param schemaKey The SchemaKey uniquely identifies
-   *        the schema in Iglu
-   * @return a Validation boxing either the Schema's
-   *         JsonNode on Success, or an error String
-   *         on Failure 
-   */
-  // TODO: we should distinguish between not found and
-  // invalid JSON
-  def lookupSchema(schemaKey: SchemaKey): Validation[String, JsonNode] = {
-    try {
-      unsafeLookupSchema(schemaKey).success
-    } catch {
-      case e: Throwable =>
-        s"Cannot find schema ${schemaKey} in embedded Iglu repository ${config.name}".fail
-    }
   }
 }
