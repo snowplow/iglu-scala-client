@@ -49,27 +49,27 @@ case class RepositoryRefConfig(
   )
 
 /**
- * Common parent of all RepositoryRef classes.
- *
- * @param name The name of this repository
- * @param instancePriority The priority of this
- *        reference instance
- * @param vendorPrefixes The list (possibly
- *        empty) of schema vendors, or prefixes
- *        of schema vendors, to 
+ * Common behavior for all RepositoryRef classes.
  */
-abstract class RepositoryRef(
-  val config: RepositoryRefConfig) extends Lookup {
+trait RepositoryRef extends Lookup {
 
   /**
-   * Abstract method. All repositories with a
+   * Our configuration for this RepositoryRef
+   */
+  val config: RepositoryRefConfig
+
+  /**
+   * All repositories with a
    * search priority of 1 will be checked before
    * any repository with a search priority of 2.
-   *
-   * @return the search priority for this group
-   *         aka class of repository references
    */
-  def classPriority: Int
+  val classPriority: Int
+
+  /**
+   * Human-readable descriptor for this
+   * type of repository ref.
+   */
+  val descriptor: String
 
   /**
    * Helper to check if this repository should take

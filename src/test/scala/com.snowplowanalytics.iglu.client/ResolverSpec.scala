@@ -27,29 +27,76 @@ import org.specs2.Specification
 import org.specs2.matcher.DataTables
 import org.specs2.scalaz.ValidationMatchers
 
+object ResolverSpec {
+
+  object Repos { 
+
+    private val embedRef: (String, Int) => EmbeddedRepositoryRef = (prefix, priority) =>
+      EmbeddedRepositoryRef(RepositoryRefConfig("An embedded repo", priority, List(prefix)), "/embed-path")
+
+    val one   = embedRef("com.acme", 0)
+    val two   = embedRef("com.snowplowanalytics.snowplow", 40)
+    val three = embedRef("com.snowplowanalytics.snowplow", 100)
+
+    // TODO: update this once we have our HttpRepositoryRef
+    val igluCentral = embedRef("com.snowplowanalytics", 0)
+  }
+}
+
 class ResolverSpec extends Specification with DataTables with ValidationMatchers { def is =
 
   "This is a specification to test the Resolver functionality"                   ^
                                                                                 p^
   "our prioritizeRepos algorithm should sort repository refs in priority order"  ! e1^
+  "we should be able to construct a Resolver from a resolver configuration JSON" ! e2^
                                                                                  end
+
+  import ResolverSpec._
 
   // TODO: update this test once we have an HttpRepositoryRef to test against too
   def e1 = {
-
-    object Repos { 
-      private val getRef: (String, Int) => EmbeddedRepositoryRef = (prefix, priority) =>
-        EmbeddedRepositoryRef(RepositoryRefConfig("n/a", priority, List(prefix)), "n/a")
-
-      val one   = getRef("com.zendesk", 0)
-      val two   = getRef("com.snowplowanalytics.snowplow", 40)
-      val three = getRef("com.snowplowanalytics.snowplow", 100)
-    }
-
-    val resolver = Resolver(cacheSize = 0, repos = NonEmptyList(Repos.one, Repos.two, Repos.three))
+    val resolver = Resolver(cacheSize = 0, Repos.one, Repos.two, Repos.three)
     val schemaKey = SchemaKey("com.snowplowanalytics.snowplow", "mobile_context", "jsonschema", "1-0-0")
 
     resolver.prioritizeRepos(schemaKey) must_== List(Repos.two, Repos.three, Bootstrap.Repo, Repos.one)
+  }
+
+  def e2 = {
+
+    val config = 
+      s"""|{
+            |"schema": "iglu:com.snowplowanalytics.iglu/resolver-config/jsonschema/1-0-0",
+            |"data": {
+              |"cacheSize": 500,
+              |"repositories": [
+                |{
+                  |"name": "Iglu Central",
+                  |"priority": 0,
+                  |"vendorPrefixes": [ "com.snowplowanalytics" ],
+                  |"connection": {
+                    |"http": {
+                      |"uri": "http://iglucentral.com"
+                    |}
+                  |}
+                |}, {                
+                  |"name": "An embedded repo",
+                  |"priority": 100,
+                  |"vendorPrefixes": [ "com.snowplowanalytics.snowplow" ],
+                  |"connection": {
+                    |"embedded": {
+                      |"path": "/embed-path"
+                    |}
+                  |}
+                |}
+              |]
+            |}
+          |}""".stripMargin.replaceAll("[\n\r]","")
+
+    val expected = Resolver(cacheSize = 500, Repos.igluCentral, Repos.three)
+
+    val actual = Resolver(SpecHelpers.asJsonNode(config))
+
+    actual must beSuccessful(expected)
   }
 
 }

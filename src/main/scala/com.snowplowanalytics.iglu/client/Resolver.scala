@@ -28,7 +28,10 @@ import org.json4s.JsonDSL._
 import org.json4s.jackson.JsonMethods._
 
 // This project
-import repositories.RepositoryRef
+import repositories.{
+  RepositoryRef,
+  EmbeddedRepositoryRef
+}
 import validation.ValidatableJsonMethods
 
 /**
@@ -48,8 +51,8 @@ object Resolver {
    * @param tailRefs Any further RepositoryRefs
    * @return a configured Resolver instance
    */
-  def apply(cacheSize: Int, headRef: RepositoryRef, tailRefs: RepositoryRef*): Resolver =
-    Resolver(cacheSize, NonEmptyList[RepositoryRef](headRef, tailRefs: _*))
+  def apply(cacheSize: Int, refs: RepositoryRef*): Resolver =
+    Resolver(cacheSize, List[RepositoryRef](refs: _*))
 
   /**
    * Constructs a Resolver instance from a JsonNode.
@@ -77,8 +80,10 @@ object Resolver {
       }
       case Success((key, node)) if key != ConfigurationSchema =>
         s"Expected a ${ConfigurationSchema} as resolver configuration, got: ${key}".fail
-      case Failure(err) =>
+      case Failure(err) => {
+        System.out.println(err)
         "Resolver configuration failed JSON Schema validation".fail
+      }
     }
   }
 
@@ -93,8 +98,42 @@ object Resolver {
     apply(asJsonNode(config))
 
   /**
-   * Extracts 
+   * Extracts a List of RepositoryRefs from the
+   * given JValue.
+   *
+   * @param repositoriesConfig The JSON containing
+   *        all of the repository configurations
+   * @return our assembled List of RepositoryRefs
    */
+  // TODO: fix the return type
+  private[this] def getRepositoryRefs(repositoriesConfig: JValue): Validated[RepositoryRefs] = {
+    // TODO: implement this
+    Nil.success
+  }
+
+  /**
+   * Builds a RepositoryRef sub-type from the
+   * given JValue. Uses the connection property
+   * to determine which RepositoryRef to build.
+   *
+   * Currently supports:
+   * 1. EmbeddedRepositoryRef
+   * 2. HttpRepositoryRef
+   *
+   * @param repositoryConfig The JSON containing the
+   *        configuration for this repository
+   * @return our constructed RepositoryRef
+   */
+  // TODO: fix the return type
+  private[this] def buildRepositoryRef(repositoryConfig: JValue): Validated[RepositoryRef] =
+    // TODO: implement this
+    if (true) {
+      EmbeddedRepositoryRef(repositoryConfig)
+    } else if (false) {
+      EmbeddedRepositoryRef(repositoryConfig)
+    } else {
+      s"Configuration unrecognizable as either embedded or HTTP repository".fail
+    }
 
 }
 
@@ -109,10 +148,10 @@ object Resolver {
  */
 case class Resolver(
   cacheSize: Int = 500,
-  repos: RepositoryRefNel
+  repos: RepositoryRefs
 ) extends Lookup with UnsafeLookup {
   
-  private[this] val allRepos = Bootstrap.Repo :: repos.toList
+  private[this] val allRepos = Bootstrap.Repo :: repos
 
   /**
    * Our LRU cache.
@@ -164,13 +203,16 @@ case class Resolver(
   // TODO: should we accumulate a Nel on Failure side?
   def lookupSchema(schemaKey: SchemaKey): ValidatedJsonNode = {
 
-    @tailrec def recurse(schemaKey: SchemaKey, remainingRepos: RepositoryRefs): ValidatedJsonNode = {
-      remainingRepos match {
-        case Nil           => s"Could not find schema with key ${schemaKey} in any repository".fail
+    @tailrec def recurse(schemaKey: SchemaKey, tried: RepositoryRefs, remaining: RepositoryRefs): ValidatedJsonNode = {
+      remaining match {
+        case Nil => {
+          val tr = tried.map(t => s"${t.config.name} [${t.descriptor}]").mkString(", ")
+          s"Could not find schema with key ${schemaKey} in any repository, tried: ${tr}".fail
+        }
         case repo :: repos => {
           repo.lookupSchema(schemaKey) match {
             case Success(schema) => cache.store(schemaKey, schema).success
-            case _               => recurse(schemaKey, repos)
+            case _               => recurse(schemaKey, tried.::(repo), repos)
           }
         }
       }
@@ -178,7 +220,7 @@ case class Resolver(
 
     cache.get(schemaKey) match {
       case Some(schema) => schema.success
-      case None         => recurse(schemaKey, prioritizeRepos(schemaKey))
+      case None         => recurse(schemaKey, Nil, prioritizeRepos(schemaKey))
     }
   }
 

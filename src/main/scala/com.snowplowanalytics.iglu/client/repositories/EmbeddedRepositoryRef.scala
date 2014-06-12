@@ -48,20 +48,19 @@ object EmbeddedRepositoryRef {
    * Constructs an EmbeddedRepositoryRef
    * from a JValue.
    *
-   * @param ref The JSON containing the configuration
+   * @param config The JSON containing the configuration
    *        for this repository reference
    * @return a configured reference to this embedded
    *         repository
    */
-  def apply(ref: JValue): Validated[EmbeddedRepositoryRef] =
+  def apply(config: JValue): Validated[EmbeddedRepositoryRef] =
     for {
-      config <- RepositoryRefConfig(ref)
-      path   <- extractPath(ref)
-    } yield EmbeddedRepositoryRef(config, path)
+      conf <- RepositoryRefConfig(config)
+      path <- extractPath(config)
+    } yield EmbeddedRepositoryRef(conf, path)
 
   /**
-   * Validates that we are working with an embedded
-   * repository ref and returns the path.
+   * Returns the path to this embedded repository.
    *
    * @param ref The JSON containing the configuration
    *        for this repository reference
@@ -69,7 +68,7 @@ object EmbeddedRepositoryRef {
    *         Success, or an error String on Failure
    */
   // TODO: implement this properly
-  def extractPath(ref: JValue): Validated[String] =
+  def extractPath(config: JValue): Validated[String] =
     "/iglu-cache".success
 
 }
@@ -81,13 +80,19 @@ object EmbeddedRepositoryRef {
  */
 case class EmbeddedRepositoryRef(
   override val config: RepositoryRefConfig,
-  path: String) extends RepositoryRef(config) with UnsafeLookup {
+  path: String) extends RepositoryRef with UnsafeLookup {
 
   /**
    * Prioritize searching this class of repository because
    * it is low cost.
    */
-  def classPriority: Int = 1
+  override val classPriority: Int = 1
+
+  /**
+   * Human-readable descriptor for this
+   * type of repository ref.
+   */
+  val descriptor = "embedded"
 
   /**
    * Retrieves an IgluSchema from the Iglu Repo as
@@ -113,6 +118,8 @@ case class EmbeddedRepositoryRef(
    *         JsonNode on Success, or an error String
    *         on Failure 
    */
+  // TODO: we should distinguish between not found and
+  // invalid JSON
   def lookupSchema(schemaKey: SchemaKey): ValidatedJsonNode = {
     try {
       unsafeLookupSchema(schemaKey).success

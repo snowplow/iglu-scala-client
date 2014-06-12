@@ -40,7 +40,7 @@ class RawValidationSpec extends Specification with DataTables with ValidationMat
   implicit val resolver = Bootstrap.Resolver
 
   def e1 = {
-    val json = ValidationSpecHelpers.asJsonNode("""{"country": "JP", "beers": ["Asahi", "Orion", "..."]}""")
+    val json = SpecHelpers.asJsonNode("""{"country": "JP", "beers": ["Asahi", "Orion", "..."]}""")
     json.validateAgainstSchema(SimpleSchema) must beSuccessful(json)
   }
 
@@ -51,7 +51,7 @@ class RawValidationSpec extends Specification with DataTables with ValidationMat
       """{"country": "fr","beers": ["Jenlain"]}"""
     )) {
       str: String => {
-        val json = ValidationSpecHelpers.asJsonNode(str)
+        val json = SpecHelpers.asJsonNode(str)
         json.validateAgainstSchema(SimpleSchema) must beSuccessful(json)
       }
     }
@@ -63,10 +63,10 @@ class RawValidationSpec extends Specification with DataTables with ValidationMat
     "heterogenous beers" !! """{"country": "GB", "beers": ["ale", false]}""" ! """instance type (boolean) does not match any allowed primitive type (allowed: ["string"])""" ! """{"loadingURI":"#","pointer":"/properties/beers/items"}""" ! """{"pointer":"/beers/1"}""" ! "type"        ! Some(("boolean", """["string"]""")) ! None                                               |> {
 
       (_, input, message, schema, instance, keyword, foundExpected, requiredMissing) => {
-        val json = ValidationSpecHelpers.asJsonNode(input)
+        val json = SpecHelpers.asJsonNode(input)
         json.validateAgainstSchema(SimpleSchema) must beLike {
           case Failure(NonEmptyList(head, tail @ _*)) if tail.isEmpty =>
-            head.toString must_== ValidationSpecHelpers.asProcessingMessage(message, schema, instance, keyword, foundExpected, requiredMissing).toString
+            head.toString must_== SpecHelpers.asProcessingMessage(message, schema, instance, keyword, foundExpected, requiredMissing).toString
         }
       }
     }

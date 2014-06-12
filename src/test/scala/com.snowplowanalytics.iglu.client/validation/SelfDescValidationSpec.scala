@@ -65,12 +65,12 @@ class SelfDescValidationSpec extends Specification with DataTables with Validati
   import ValidatableJsonMethods._
   import SelfDescValidationSpec._
 
-  val ValidJson = ValidationSpecHelpers.asJsonNode(
+  val validJson = SpecHelpers.asJsonNode(
     """{"schema": "iglu:com.snowplowanalytics.iglu-test/stock-item/jsonschema/1-0-0", "data": { "id": "123-12", "name": "t-shirt", "price": 29.99 } }"""
     )
 
-  def e1 = ValidJson.validate(false) must beSuccessful(ValidJson)
+  def e1 = validJson.validate(false) must beSuccessful(validJson)
 
-  def e2 = ValidJson.validate(true) must beSuccessful(ValidJson.get("data"))
+  def e2 = validJson.validate(true) must beSuccessful(validJson.get("data"))
 
 }

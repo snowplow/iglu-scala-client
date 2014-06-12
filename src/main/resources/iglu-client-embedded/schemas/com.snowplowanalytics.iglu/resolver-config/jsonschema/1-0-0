@@ -1,5 +1,5 @@
 {
-	"$schema": "http://json-schema.org/schema#",
+	"$schema": "http://iglucentral.com/schemas/com.snowplowanalytics.iglu/resolver-config/jsonschema/1-0-0#",
 	"description": "Schema for an Iglu resolver's configuration",
 	"self": {
 		"vendor": "com.snowplowanalytics.iglu",
@@ -12,37 +12,78 @@
 
 	"properties": {
 
-		"schema": {
-			"type": "string",
-			"pattern": "^iglu:[a-zA-Z0-9-_.]+/[a-zA-Z0-9-_]+/[a-zA-Z0-9-_]+/[0-9]+-[0-9]+-[0-9]+$"
+		"cacheSize": {
+			"type": "number"
 		},
 
-		"data": {}
+		"repositories": {
+			"type": "array",
+			"items": {
+				"type": "object",
+
+				"properties": {
+
+					"name": {
+						"type": "string"
+					},
+
+					"priority": {
+						"type": "number"
+					},
+
+					"vendorPrefixes": {
+						"type": "array",
+						"items": {
+							"type": "string"
+						}
+					},
+
+					"connection": {
+						"type": "object",
+						"oneOf": [
+							{
+								"properties": {
+									"embedded": {
+										"type": "object",
+										"properties": {
+											"path": {
+												"type": "string"
+											}
+										},
+										"required": ["path"],
+										"additionalProperties": false
+									}
+								},
+								"required": ["embedded"],
+								"additionalProperties": false
+							},
+							{
+								"properties": {
+									"http": {
+										"type": "object",
+										"properties": {
+											"uri": {
+												"type": "string",
+												"format": "uri"
+											}
+										},
+										"required": ["uri"],
+										"additionalProperties": false
+									}
+								},
+								"required": ["http"],
+								"additionalProperties": false
+							}
+						]
+					}
+				},
+				"required": ["name", "priority", "vendorPrefixes", "connection"],
+				"additionalProperties": false
+			}
+		}
+
 	},
 
-	"required": ["cacheSize", "data"],
+	"required": ["cacheSize", "repositories"],
 	"additionalProperties": false
 }
-
-repositoryResolvers: [
-	{
-		name: "Iglu Central",
-		connection: {
-			http: {
-				uri: "//iglucentral.com"
-			}
-		},
-		priority: 0,
-		vendorPrefixes: [ "com.snowplowanalytics" ]
-	},
-	{
-		name: "Iglu Client Embedded",
-		connection: {
-			embedded: {
-				path: "/iglu-embedded"
-			}
-		},
-		priority: 0,
-		vendorPrefixes: [ "com.snowplowanalytics" ]
-	}
-]
