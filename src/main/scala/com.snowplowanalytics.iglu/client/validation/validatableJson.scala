@@ -68,7 +68,7 @@ object ValidatableJsonMethods {
    *         a NonEmptyList of
    *         ProcessingMessages
    */
-  def validateAgainstSchema(instance: JsonNode, schema: JsonNode)(implicit resolver: Resolver): ValidatedJsonNode = {
+  def validateAgainstSchema(instance: JsonNode, schema: JsonNode)(implicit resolver: Resolver): ValidatedNel[JsonNode] = {
     val report = JsonSchemaValidator.validateUnchecked(schema, instance)
     val msgs = report.iterator.toList
     msgs match {
@@ -96,7 +96,7 @@ object ValidatableJsonMethods {
    *         or a Failure boxing a NonEmptyList
    *         of ProcessingMessages
    */
-  def validate(instance: JsonNode, dataOnly: Boolean = false)(implicit resolver: Resolver): ValidatedJsonNode =
+  def validate(instance: JsonNode, dataOnly: Boolean = false)(implicit resolver: Resolver): ValidatedNel[JsonNode] =
     for {
       j  <- validateAsSelfDescribing(instance)
       s  =  j.get("schema").asText
@@ -124,7 +124,7 @@ object ValidatableJsonMethods {
    *         or a Failure boxing a NonEmptyList
    *         of ProcessingMessages
    */
-  def validateAndIdentifySchema(instance: JsonNode, dataOnly: Boolean = false)(implicit resolver: Resolver): ValidatedJsonNodeSchemaPair =
+  def validateAndIdentifySchema(instance: JsonNode, dataOnly: Boolean = false)(implicit resolver: Resolver): ValidatedNel[JsonSchemaPair] =
     for {
       j  <- validateAsSelfDescribing(instance)
       s  =  j.get("schema").asText
@@ -156,7 +156,7 @@ object ValidatableJsonMethods {
    *         a NonEmptyList of
    *         ProcessingMessages
    */
-  private[validation] def validateAsSelfDescribing(instance: JsonNode)(implicit resolver: Resolver): ValidatedJsonNode = {
+  private[validation] def validateAsSelfDescribing(instance: JsonNode)(implicit resolver: Resolver): ValidatedNel[JsonNode] = {
     validateAgainstSchema(instance, getSelfDescSchema)
   }
 
@@ -194,13 +194,13 @@ class ValidatableJsonNode(instance: JsonNode) {
 
   import validation.{ValidatableJsonMethods => VJM}
 
-  def validateAgainstSchema(schema: JsonNode)(implicit resolver: Resolver): ValidatedJsonNode = 
+  def validateAgainstSchema(schema: JsonNode)(implicit resolver: Resolver): ValidatedNel[JsonNode] = 
     VJM.validateAgainstSchema(instance, schema)
 
-  def validate(dataOnly: Boolean)(implicit resolver: Resolver): ValidatedJsonNode =
+  def validate(dataOnly: Boolean)(implicit resolver: Resolver): ValidatedNel[JsonNode] =
     VJM.validate(instance, dataOnly)
 
-  def validateAndIdentifySchema(dataOnly: Boolean)(implicit resolver: Resolver): ValidatedJsonNodeSchemaPair =
+  def validateAndIdentifySchema(dataOnly: Boolean)(implicit resolver: Resolver): ValidatedNel[JsonSchemaPair] =
     VJM.validateAndIdentifySchema(instance, dataOnly)
 }
 

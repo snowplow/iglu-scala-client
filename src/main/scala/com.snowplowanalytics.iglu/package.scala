@@ -55,13 +55,6 @@ package object client {
   type RepositoryRefs = List[RepositoryRef]
 
   /**
-   * Type alias for a ValidationNel
-   * containing either error ProcessingMessages
-   * or a successfully validated JsonNode.
-   */
-  type ValidatedJsonNode = ValidatedNel[JsonNode]
-
-  /**
    * Type alias for a SchemaVer-based version.
    *
    * We may update this in the future to be
@@ -75,12 +68,4 @@ package object client {
    * corresponding JsonNode.
    */
   type JsonSchemaPair = Tuple2[SchemaKey, JsonNode]
-
-  /**
-   * Type alias for a ValidationNel
-   * containing either error ProcessingMessages
-   * or a successfully validated tuple of a
-   * JSON's SchemaKey and its JsonNode.
-   */
-  type ValidatedJsonNodeSchemaPair = ValidatedNel[JsonSchemaPair]
 }
