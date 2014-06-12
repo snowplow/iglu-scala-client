@@ -192,7 +192,7 @@ object ValidatableJsonMethods {
  */
 class ValidatableJsonNode(instance: JsonNode) {
 
-  val VJM = ValidatableJsonMethods
+  import validation.{ValidatableJsonMethods => VJM}
 
   def validateAgainstSchema(schema: JsonNode)(implicit resolver: Resolver): ValidatedJsonNode = 
     VJM.validateAgainstSchema(instance, schema)
