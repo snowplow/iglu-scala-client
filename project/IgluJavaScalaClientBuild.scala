@@ -33,6 +33,7 @@ object IgluJavaScalaClientBuild extends Build {
         Libraries.jsonValidator,
         // Scala
         Libraries.json4sJackson,
+        Libraries.json4sScalaz,
         Libraries.scalaz7,
         Libraries.collUtils,
         // Scala (test only)

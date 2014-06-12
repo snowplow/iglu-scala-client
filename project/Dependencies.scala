@@ -22,7 +22,7 @@ object Dependencies {
     val jacksonDatabind = "2.2.3"
     val jsonValidator   = "2.2.3"
     // Scala
-    val json4sJackson   = "3.2.11-SNAPSHOT" // Not available yet, need to publish-local
+    val json4s          = "3.2.11-SNAPSHOT" // Not available yet, need to publish-local [1]
     val scalaz7         = "7.0.0"
     val collUtils       = "6.3.4"
     // Scala (test only)
@@ -30,12 +30,23 @@ object Dependencies {
     val scalazSpecs2    = "0.1.2"
   }
 
+  /**
+   * [1] Instructions for json4sJackson
+   * TODO: remove these when it's available on Sonatype
+   *
+   * $ git clone https://github.com/json4s/json4s.git
+   * $ cd json4s
+   * $ git checkout -t origin/scala_2.10
+   * $ sbt publish-local
+   */
+
   object Libraries {
     // Java
     val jacksonDatabind  = "com.fasterxml.jackson.core" %  "jackson-databind"        % V.jacksonDatabind
     val jsonValidator    = "com.github.fge"             %  "json-schema-validator"   % V.jsonValidator
     // Scala
-    val json4sJackson    = "org.json4s"                 %% "json4s-jackson"          % V.json4sJackson
+    val json4sJackson    = "org.json4s"                 %% "json4s-jackson"          % V.json4s
+    val json4sScalaz     = "org.json4s"                 %% "json4s-scalaz"           % V.json4s
     val scalaz7          = "org.scalaz"                 %% "scalaz-core"             % V.scalaz7
     val collUtils        = "com.twitter"                %% "util-collection"         % V.collUtils
     // Scala (test only)
