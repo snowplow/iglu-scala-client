@@ -61,7 +61,7 @@ object Resolver {
    *        for this resolver
    * @return a configured Resolver instance
    */
-  def apply(config: JsonNode): Validated[Resolver] = {
+  def apply(config: JsonNode): Validation[String, Resolver] = {
 
     // We can use the bootstrap Resolver for working
     // with JSON Schemas here.
@@ -94,7 +94,7 @@ object Resolver {
    *        for this resolver
    * @return a configured Resolver instance
    */
-  def apply(config: JValue): Validated[Resolver] =
+  def apply(config: JValue): Validation[String, Resolver] =
     apply(asJsonNode(config))
 
   /**
@@ -106,7 +106,7 @@ object Resolver {
    * @return our assembled List of RepositoryRefs
    */
   // TODO: fix the return type
-  private[this] def getRepositoryRefs(repositoriesConfig: JValue): Validated[RepositoryRefs] = {
+  private[this] def getRepositoryRefs(repositoriesConfig: JValue): Validation[String, RepositoryRefs] = {
     // TODO: implement this
     Nil.success
   }
@@ -125,7 +125,7 @@ object Resolver {
    * @return our constructed RepositoryRef
    */
   // TODO: fix the return type
-  private[this] def buildRepositoryRef(repositoryConfig: JValue): Validated[RepositoryRef] =
+  private[this] def buildRepositoryRef(repositoryConfig: JValue): Validation[String, RepositoryRef] =
     // TODO: implement this
     if (true) {
       EmbeddedRepositoryRef(repositoryConfig)
@@ -158,7 +158,7 @@ case class Resolver(
    */
   object cache {
 
-    private val lru: MaybeSchemaLruMap = if (cacheSize > 0) Some(new SchemaLruMap(cacheSize)) else None
+    private val lru: Option[SchemaLruMap] = if (cacheSize > 0) Some(new SchemaLruMap(cacheSize)) else None
 
     /**
      * Looks up the given schema key in the cache.
@@ -168,7 +168,7 @@ case class Resolver(
      * @return the schema if found as Some JsonNode or None
      *         if not found, or cache is not enabled.
      */
-    def get(schemaKey: SchemaKey): MaybeJsonNode =
+    def get(schemaKey: SchemaKey): Option[JsonNode] =
       for {
         l <- lru
         k <- l.get(schemaKey)
@@ -201,9 +201,9 @@ case class Resolver(
    *         on Failure 
    */
   // TODO: should we accumulate a Nel on Failure side?
-  def lookupSchema(schemaKey: SchemaKey): ValidatedJsonNode = {
+  def lookupSchema(schemaKey: SchemaKey): Validation[String, JsonNode] = {
 
-    @tailrec def recurse(schemaKey: SchemaKey, tried: RepositoryRefs, remaining: RepositoryRefs): ValidatedJsonNode = {
+    @tailrec def recurse(schemaKey: SchemaKey, tried: RepositoryRefs, remaining: RepositoryRefs): Validation[String, JsonNode] = {
       remaining match {
         case Nil => {
           val tr = tried.map(t => s"${t.config.name} [${t.descriptor}]").mkString(", ")
@@ -237,7 +237,7 @@ case class Resolver(
    *         JsonNode on Success, or an error String
    *         on Failure
    */
-  def lookupSchema(schemaUri: String): ValidatedJsonNode =
+  def lookupSchema(schemaUri: String): Validation[String, JsonNode] =
     for {
       k <- SchemaKey(schemaUri)
       s <- lookupSchema(k)

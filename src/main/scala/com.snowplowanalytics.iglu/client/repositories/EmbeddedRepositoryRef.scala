@@ -41,7 +41,7 @@ object EmbeddedRepositoryRef {
    * @return a configured reference to this embedded
    *         repository
    */
-  def apply(ref: JsonNode): Validated[EmbeddedRepositoryRef] =
+  def apply(ref: JsonNode): Validation[String, EmbeddedRepositoryRef] =
     apply(fromJsonNode(ref))
 
   /**
@@ -53,7 +53,7 @@ object EmbeddedRepositoryRef {
    * @return a configured reference to this embedded
    *         repository
    */
-  def apply(config: JValue): Validated[EmbeddedRepositoryRef] =
+  def apply(config: JValue): Validation[String, EmbeddedRepositoryRef] =
     for {
       conf <- RepositoryRefConfig(config)
       path <- extractPath(config)
@@ -68,7 +68,7 @@ object EmbeddedRepositoryRef {
    *         Success, or an error String on Failure
    */
   // TODO: implement this properly
-  def extractPath(config: JValue): Validated[String] =
+  def extractPath(config: JValue): Validation[String, String] =
     "/iglu-cache".success
 
 }
@@ -120,7 +120,7 @@ case class EmbeddedRepositoryRef(
    */
   // TODO: we should distinguish between not found and
   // invalid JSON
-  def lookupSchema(schemaKey: SchemaKey): ValidatedJsonNode = {
+  def lookupSchema(schemaKey: SchemaKey): Validation[String, JsonNode] = {
     try {
       unsafeLookupSchema(schemaKey).success
     } catch {

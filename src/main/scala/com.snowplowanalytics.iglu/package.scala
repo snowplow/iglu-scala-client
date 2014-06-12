@@ -39,18 +39,10 @@ import client.repositories.RepositoryRef
 package object client {
 
   /**
-   * Type alias for a Validation
-   * containing a String for Failure
-   * or any type of Success.
-   *
-   * @tparam A the type of Success
+   * Helpful archetypes
    */
-  type Validated[A] = Validation[String, A]
-
-  /**
-   * An Option-boxed JsonNode
-   */
-  type MaybeJsonNode = Option[JsonNode]
+  type Validated[A] = Validation[ProcessingMessage, A]
+  type ValidatedNel[A] = ValidationNel[ProcessingMessage, A]
 
   /**
    * Our LRU cache of schemas
@@ -58,32 +50,16 @@ package object client {
   type SchemaLruMap = LruMap[SchemaKey, JsonNode]
 
   /**
-   * Option-wrapped cache
-   */
-  type MaybeSchemaLruMap = Option[SchemaLruMap]
-
-  /**
-   * Our Nel of resolution repositories
-   */
-  type RepositoryRefNel = NonEmptyList[RepositoryRef]
-
-  /**
-   * Our List (possibly empty) of resolution repositories
+   * Our List (possibly empty) of Iglu repositories
    */
   type RepositoryRefs = List[RepositoryRef]
-
-  /**
-   * A Validation-boxed JsonNode
-   */
-  type ValidatedJsonNode = Validated[JsonNode]
 
   /**
    * Type alias for a ValidationNel
    * containing either error ProcessingMessages
    * or a successfully validated JsonNode.
    */
-  // TODO: fix this
-  type ValidatedJson = ValidationNel[ProcessingMessage, JsonNode]
+  type ValidatedJsonNode = ValidatedNel[JsonNode]
 
   /**
    * Type alias for a SchemaVer-based version.
@@ -106,5 +82,5 @@ package object client {
    * or a successfully validated tuple of a
    * JSON's SchemaKey and its JsonNode.
    */
-  type ValidatedJsonSchemaPair = ValidationNel[ProcessingMessage, JsonSchemaPair]
+  type ValidatedJsonNodeSchemaPair = ValidatedNel[JsonSchemaPair]
 }

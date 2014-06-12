@@ -15,6 +15,11 @@ package com.snowplowanalytics.iglu.client
 // Jackson
 import com.fasterxml.jackson.databind.JsonNode
 
+// Scalaz
+// TODO: remove this once we have a type alias in play for lookupSchema's retval
+import scalaz._
+import Scalaz._
+
 /**
  * Trait for a schema lookup.
  */
@@ -31,7 +36,7 @@ trait Lookup {
    *         JsonNode on Success, or an error String
    *         on Failure 
    */
-  def lookupSchema(schemaKey: SchemaKey): ValidatedJsonNode
+  def lookupSchema(schemaKey: SchemaKey): Validation[String, JsonNode]
 }
 
 /**
