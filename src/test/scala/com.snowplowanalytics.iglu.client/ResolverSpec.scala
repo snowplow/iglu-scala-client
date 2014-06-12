@@ -12,6 +12,9 @@
  */
 package com.snowplowanalytics.iglu.client
 
+// Java
+import java.net.URL
+
 // Scalaz
 import scalaz._
 import Scalaz._
@@ -19,6 +22,7 @@ import Scalaz._
 // This project
 import repositories.{
   EmbeddedRepositoryRef,
+  HttpRepositoryRef,
   RepositoryRefConfig
 }
 
@@ -39,7 +43,8 @@ object ResolverSpec {
     val three = embedRef("com.snowplowanalytics.snowplow", 100)
 
     // TODO: update this once we have our HttpRepositoryRef
-    val igluCentral = embedRef("com.snowplowanalytics", 0)
+    val igluCentral =
+      HttpRepositoryRef(RepositoryRefConfig("Iglu Central", 0, List("com.snowplowanalytics")), new URL("http://iglucentral.com"))
   }
 }
 
