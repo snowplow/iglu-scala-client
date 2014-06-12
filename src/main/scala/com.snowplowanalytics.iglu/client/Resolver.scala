@@ -64,8 +64,12 @@ object Resolver {
     // Check it passes validation
     // TODO
 
+    // Convert to a JValue
+    val json = fromJsonNode(config)
+
     // Now retrieve cache size
-    // TODO
+    implicit lazy val formats = org.json4s.DefaultFormats
+    val cacheSize = (json \ "cacheSize").extract[Int]
 
     // Now let's loop through and create our RepositoryRefs
     // TODO
