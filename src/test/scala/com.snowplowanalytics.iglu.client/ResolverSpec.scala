@@ -58,12 +58,11 @@ class ResolverSpec extends Specification with DataTables with ValidationMatchers
 
   import ResolverSpec._
 
-  // TODO: update this test once we have an HttpRepositoryRef to test against too
   def e1 = {
-    val resolver = Resolver(cacheSize = 0, Repos.one, Repos.two, Repos.three)
+    val resolver = Resolver(cacheSize = 0, Repos.igluCentral, Repos.one, Repos.two, Repos.three)
     val schemaKey = SchemaKey("com.snowplowanalytics.snowplow", "mobile_context", "jsonschema", "1-0-0")
 
-    resolver.prioritizeRepos(schemaKey) must_== List(Repos.two, Repos.three, Bootstrap.Repo, Repos.one)
+    resolver.prioritizeRepos(schemaKey) must_== List(Repos.two, Repos.three, Bootstrap.Repo, Repos.one, Repos.igluCentral)
   }
 
   def e2 = {
