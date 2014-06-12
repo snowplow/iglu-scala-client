@@ -2,33 +2,6 @@
 
 Scala client for Iglu repository server
 
-## Scratchpad
-
-```json
-repositoryResolvers: [
-	{
-		name: "Iglu Central",
-		connection: {
-			http: {
-				uri: "//iglucentral.com"
-			}
-		},
-		priority: 0,
-		vendorPrefixes: [ "com.snowplowanalytics" ]
-	},
-	{
-		name: "Iglu Client Embedded",
-		connection: {
-			embedded: {
-				path: "/iglu-embedded"
-			}
-		},
-		priority: 0,
-		vendorPrefixes: [ "com.snowplowanalytics" ]
-	}
-]
-```
-
 ## Copyright and license
 
 Copyright 2014 Snowplow Analytics Ltd.
