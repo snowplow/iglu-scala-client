@@ -94,9 +94,7 @@ class ResolverSpec extends Specification with DataTables with ValidationMatchers
 
     val expected = Resolver(cacheSize = 500, Repos.igluCentral, Repos.three)
 
-    val actual = Resolver(SpecHelpers.asJsonNode(config))
-
-    actual must beSuccessful(expected)
+    Resolver(SpecHelpers.asJsonNode(config)) must beSuccessful(expected)
   }
 
 }
