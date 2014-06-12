@@ -29,12 +29,15 @@ import org.json4s.jackson.JsonMethods._
 
 // This project
 import repositories.RepositoryRef
+import validation.ValidatableJsonMethods
 
 /**
  * Companion object. Lets us create a Resolver from
  * a JsonNode or JValue.
  */
 object Resolver {
+
+  private val ConfigurationSchema = SchemaKey("com.snowplowanalytics.iglu", "resolver-config", "jsonschema", "1-0-0")
 
   /**
    * Constructs a Resolver instance from an arg array
@@ -60,21 +63,23 @@ object Resolver {
     // We can use the bootstrap Resolver for working
     // with JSON Schemas here.
     implicit val resolver = Bootstrap.Resolver
+    implicit lazy val formats = org.json4s.DefaultFormats
+
+    import ValidatableJsonMethods._
 
     // Check it passes validation
-    // TODO
+    config.validateAndIdentifySchema(dataOnly = true) match {
+      case Success((key, node)) if key == ConfigurationSchema => {
+        val json = fromJsonNode(node)
+        val cacheSize = (json \ "cacheSize").extract[Int]
 
-    // Convert to a JValue
-    val json = fromJsonNode(config)
-
-    // Now retrieve cache size
-    implicit lazy val formats = org.json4s.DefaultFormats
-    val cacheSize = (json \ "cacheSize").extract[Int]
-
-    // Now let's loop through and create our RepositoryRefs
-    // TODO
-
-    "TODO".fail
+        "TODO".fail
+      }
+      case Success((key, node)) if key != ConfigurationSchema =>
+        s"Expected a ${ConfigurationSchema} as resolver configuration, got: ${key}".fail
+      case Failure(err) =>
+        "Resolver configuration failed JSON Schema validation".fail
+    }
   }
 
   /**
@@ -86,6 +91,10 @@ object Resolver {
    */
   def apply(config: JValue): Validated[Resolver] =
     apply(asJsonNode(config))
+
+  /**
+   * Extracts 
+   */
 
 }
 
