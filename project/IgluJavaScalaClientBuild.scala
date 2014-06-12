@@ -29,6 +29,7 @@ object IgluJavaScalaClientBuild extends Build {
     .settings(
       libraryDependencies ++= Seq(
         // Java
+        Libraries.commonsLang,
         Libraries.jacksonDatabind,
         Libraries.jsonValidator,
         // Scala

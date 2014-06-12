@@ -30,9 +30,12 @@ import org.json4s.jackson.JsonMethods._
 // This project
 import repositories.{
   RepositoryRef,
-  EmbeddedRepositoryRef
+  EmbeddedRepositoryRef,
+  HttpRepositoryRef
 }
 import validation.ValidatableJsonMethods
+import validation.ProcessingMessageMethods
+import ProcessingMessageMethods._
 
 /**
  * Companion object. Lets us create a Resolver from
@@ -61,7 +64,7 @@ object Resolver {
    *        for this resolver
    * @return a configured Resolver instance
    */
-  def apply(config: JsonNode): Validation[String, Resolver] = {
+  def apply(config: JsonNode): Validated[Resolver] = {
 
     // We can use the bootstrap Resolver for working
     // with JSON Schemas here.
@@ -76,13 +79,13 @@ object Resolver {
         val json = fromJsonNode(node)
         val cacheSize = (json \ "cacheSize").extract[Int]
 
-        "TODO".fail
+        "TODO".fail.toProcessingMessage
       }
       case Success((key, node)) if key != ConfigurationSchema =>
-        s"Expected a ${ConfigurationSchema} as resolver configuration, got: ${key}".fail
+        s"Expected a ${ConfigurationSchema} as resolver configuration, got: ${key}".fail.toProcessingMessage
       case Failure(err) => {
         System.out.println(err)
-        "Resolver configuration failed JSON Schema validation".fail
+        "Resolver configuration failed JSON Schema validation".fail.toProcessingMessage
       }
     }
   }
@@ -94,7 +97,7 @@ object Resolver {
    *        for this resolver
    * @return a configured Resolver instance
    */
-  def apply(config: JValue): Validation[String, Resolver] =
+  def apply(config: JValue): Validated[Resolver] =
     apply(asJsonNode(config))
 
   /**
@@ -106,9 +109,9 @@ object Resolver {
    * @return our assembled List of RepositoryRefs
    */
   // TODO: fix the return type
-  private[client] def getRepositoryRefs(repositoriesConfig: JValue): Validation[String, RepositoryRefs] = {
+  private[client] def getRepositoryRefs(repositoriesConfig: JValue): ValidatedNel[RepositoryRefs] = {
     // TODO: implement this
-    Nil.success
+    Nil.successNel
   }
 
   /**
@@ -125,14 +128,14 @@ object Resolver {
    * @return our constructed RepositoryRef
    */
   // TODO: fix the return type
-  private[client] def buildRepositoryRef(repositoryConfig: JValue): Validation[String, RepositoryRef] =
+  private[client] def buildRepositoryRef(repositoryConfig: JValue): ValidatedNel[RepositoryRef] =
     // TODO: implement this
     if (true) {
       EmbeddedRepositoryRef(repositoryConfig)
     } else if (false) {
-      EmbeddedRepositoryRef(repositoryConfig)
+      HttpRepositoryRef(repositoryConfig)
     } else {
-      s"Configuration unrecognizable as either embedded or HTTP repository".fail
+      s"Configuration unrecognizable as either embedded or HTTP repository".fail.toProcessingMessageNel
     }
 
 }
@@ -149,7 +152,7 @@ object Resolver {
 case class Resolver(
   cacheSize: Int = 500,
   repos: RepositoryRefs
-) extends Lookup {
+) {
   
   private[client] val allRepos = Bootstrap.Repo :: repos
 
@@ -201,18 +204,18 @@ case class Resolver(
    *         on Failure 
    */
   // TODO: should we accumulate a Nel on Failure side?
-  def lookupSchema(schemaKey: SchemaKey): Validation[String, JsonNode] = {
+  def lookupSchema(schemaKey: SchemaKey): ValidatedNel[JsonNode] = {
 
-    @tailrec def recurse(schemaKey: SchemaKey, tried: RepositoryRefs, remaining: RepositoryRefs): Validation[String, JsonNode] = {
+    @tailrec def recurse(schemaKey: SchemaKey, tried: RepositoryRefs, remaining: RepositoryRefs): ValidatedNel[JsonNode] = {
       remaining match {
         case Nil => {
           val tr = tried.map(t => s"${t.config.name} [${t.descriptor}]").mkString(", ")
-          s"Could not find schema with key ${schemaKey} in any repository, tried: ${tr}".fail
+          s"Could not find schema with key ${schemaKey} in any repository, tried: ${tr}".fail.toProcessingMessageNel
         }
         case repo :: repos => {
           repo.lookupSchema(schemaKey) match {
-            case Success(schema) => cache.store(schemaKey, schema).success
-            case _               => recurse(schemaKey, tried.::(repo), repos)
+            case Success(Some(schema)) => cache.store(schemaKey, schema).success
+            case _                     => recurse(schemaKey, tried.::(repo), repos)
           }
         }
       }
@@ -237,9 +240,9 @@ case class Resolver(
    *         JsonNode on Success, or an error String
    *         on Failure
    */
-  def lookupSchema(schemaUri: String): Validation[String, JsonNode] =
+  def lookupSchema(schemaUri: String): ValidatedNel[JsonNode] =
     for {
-      k <- SchemaKey(schemaUri)
+      k <- SchemaKey(schemaUri).toValidationNel
       s <- lookupSchema(k)
     } yield s
 

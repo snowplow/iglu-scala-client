@@ -24,6 +24,10 @@ import org.json4s._
 import org.json4s.JsonDSL._
 import org.json4s.jackson.JsonMethods._
 
+// This project
+import validation.ProcessingMessageMethods
+import ProcessingMessageMethods._
+
 /**
  * Companion object contains a custom constructor for
  * an Iglu SchemaKey.
@@ -42,11 +46,11 @@ object SchemaKey {
    * @return a Validation-boxed SchemaKey for
    *         Success, and an error String on Failure
    */
-  def apply(schemaUri: String): Validation[String, SchemaKey] = schemaUri match {
+  def apply(schemaUri: String): Validated[SchemaKey] = schemaUri match {
     case SchemaUriRegex(vnd, n, f, ver) =>
       SchemaKey(vnd, n, f, ver).success
     case _ =>
-      s"$schemaUri is not a valid Iglu-format schema URI".fail
+      s"$schemaUri is not a valid Iglu-format schema URI".fail.toProcessingMessage
   }
 }
 

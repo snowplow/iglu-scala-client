@@ -16,6 +16,9 @@ package repositories
 // Jackson
 import com.fasterxml.jackson.databind.JsonNode
 
+// JSON Schema
+import com.github.fge.jsonschema.core.report.ProcessingMessage
+
 // Scalaz
 import scalaz._
 import Scalaz._
@@ -24,6 +27,9 @@ import Scalaz._
 import org.json4s._
 import org.json4s.JsonDSL._
 import org.json4s.jackson.JsonMethods._
+
+// This project
+import validation.ProcessingMessageMethods._
 
 /**
  * Singleton object contains a constructor
@@ -35,7 +41,7 @@ object RepositoryRefConfig {
 
   /**
    */
-  def apply(ref: JValue): Validation[String, RepositoryRefConfig] =
+  def apply(ref: JValue): Validated[RepositoryRefConfig] =
     ref.extract[RepositoryRefConfig].success
 }
 
@@ -51,7 +57,7 @@ case class RepositoryRefConfig(
 /**
  * Common behavior for all RepositoryRef classes.
  */
-trait RepositoryRef extends Lookup {
+trait RepositoryRef {
 
   /**
    * Our configuration for this RepositoryRef
@@ -72,6 +78,39 @@ trait RepositoryRef extends Lookup {
   val descriptor: String
 
   /**
+   * Abstract method. Provide a concrete
+   * implementation for how to lookup a schema
+   * in this type of repository.
+   *
+   * @param schemaKey The SchemaKey uniquely identifying
+   *        the schema in Iglu
+   * @return a Validation boxing either the Schema's
+   *         JsonNode on Success, or an error String
+   *         on Failure 
+   */
+  def lookupSchema(schemaKey: SchemaKey): ValidatedNel[Option[JsonNode]]
+
+  /**
+   * Retrieves an IgluSchema from the Iglu Repo as
+   * a JsonNode. Unsafe - only use when you know the
+   * schema is available locally.
+   *
+   * @param schemaKey The SchemaKey uniquely identifies
+   *        the schema in Iglu
+   * @return the JsonNode representing this schema
+   */
+  def unsafeLookupSchema(schemaKey: SchemaKey): JsonNode = {
+    def exception(msg: NonEmptyList[ProcessingMessage]) =
+      new RuntimeException(s"Unsafe lookup of schema ${schemaKey} in ${descriptor} Iglu repository ${config.name} failed: ${msg}")
+
+    lookupSchema(schemaKey) match {
+      case Success(Some(schema)) => schema
+      case Success(None)         => throw exception("not found".toProcessingMessageNel)
+      case Failure(err)          => throw exception(err)
+    }
+  }
+
+  /**
    * Helper to check if this repository should take
    * priority because of a vendor prefix match. Returns
    * true if we matched our schema's vendor in the
@@ -90,26 +129,5 @@ trait RepositoryRef extends Lookup {
       m = schemaKey.vendor.startsWith(p)
     } yield m
     matches.foldLeft(false)(_ || _) // True if any match
-  }
-
-  /**
-   * Retrieves an IgluSchema from the Iglu Repo as
-   * a JsonNode.
-   *
-   * @param schemaKey The SchemaKey uniquely identifies
-   *        the schema in Iglu
-   * @return a Validation boxing either the Schema's
-   *         JsonNode on Success, or an error String
-   *         on Failure 
-   */
-  // TODO: we should distinguish between not found and
-  // invalid JSON
-  def lookupSchema(schemaKey: SchemaKey): Validation[String, JsonNode] = {
-    try {
-      unsafeLookupSchema(schemaKey).success
-    } catch {
-      case e: Throwable =>
-        s"Cannot find schema ${schemaKey} in ${descriptor} Iglu repository ${config.name}".fail
-    }
   }
 }

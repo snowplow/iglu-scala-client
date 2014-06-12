@@ -26,6 +26,10 @@ import org.json4s._
 import org.json4s.JsonDSL._
 import org.json4s.jackson.JsonMethods._
 
+// This project
+import validation.ProcessingMessageMethods
+import ProcessingMessageMethods._
+
 /**
  * Helpers for constructing an EmbeddedRepository.
  * See below for the definition.
@@ -41,7 +45,7 @@ object EmbeddedRepositoryRef {
    * @return a configured reference to this embedded
    *         repository
    */
-  def apply(ref: JsonNode): Validation[String, EmbeddedRepositoryRef] =
+  def apply(ref: JsonNode): ValidatedNel[EmbeddedRepositoryRef] =
     apply(fromJsonNode(ref))
 
   /**
@@ -53,11 +57,11 @@ object EmbeddedRepositoryRef {
    * @return a configured reference to this embedded
    *         repository
    */
-  def apply(config: JValue): Validation[String, EmbeddedRepositoryRef] =
-    for {
-      conf <- RepositoryRefConfig(config)
-      path <- extractPath(config)
-    } yield EmbeddedRepositoryRef(conf, path)
+  def apply(config: JValue): ValidatedNel[EmbeddedRepositoryRef] = {
+    val conf = RepositoryRefConfig(config)
+    val path = extractPath(config)
+    (conf.toValidationNel |@| path.toValidationNel) { EmbeddedRepositoryRef(_, _) }
+  }
 
   /**
    * Returns the path to this embedded repository.
@@ -68,7 +72,7 @@ object EmbeddedRepositoryRef {
    *         Success, or an error String on Failure
    */
   // TODO: implement this properly
-  def extractPath(config: JValue): Validation[String, String] =
+  def extractPath(config: JValue): Validated[String] =
     "/iglu-cache".success
 
 }
@@ -96,15 +100,23 @@ case class EmbeddedRepositoryRef(
 
   /**
    * Retrieves an IgluSchema from the Iglu Repo as
-   * a JsonNode. Unsafe - only use when you know the
-   * schema is available locally.
+   * a JsonNode.
    *
    * @param schemaKey The SchemaKey uniquely identifies
    *        the schema in Iglu
-   * @return the JsonNode representing this schema
+   * @return a Validation boxing either the Schema's
+   *         JsonNode on Success, or an error String
+   *         on Failure 
    */
-  def unsafeLookupSchema(schemaKey: SchemaKey): JsonNode = {
+  // TODO: we should distinguish between not found and
+  // invalid JSON
+  def lookupSchema(schemaKey: SchemaKey): Validated[Option[JsonNode]] = {
     val schemaPath = s"${path}/schemas/${schemaKey.toPath}"
-    JsonLoader.fromResource(schemaPath)
+    try {
+      JsonLoader.fromResource(schemaPath).some.success
+    } catch {
+      case e: Throwable =>
+        s"Cannot find schema ${schemaKey} in ${descriptor} Iglu repository ${config.name}".fail.toProcessingMessage
+    }
   }
 }

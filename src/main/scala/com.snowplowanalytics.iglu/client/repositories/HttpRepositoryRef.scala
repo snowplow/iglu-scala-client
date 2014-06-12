@@ -16,6 +16,9 @@ package repositories
 // Java
 import java.net.URL
 
+// Apache Commons
+import org.apache.commons.lang3.exception.ExceptionUtils
+
 // Jackson
 import com.github.fge.jackson.JsonLoader
 import com.fasterxml.jackson.databind.JsonNode
@@ -28,6 +31,10 @@ import Scalaz._
 import org.json4s._
 import org.json4s.JsonDSL._
 import org.json4s.jackson.JsonMethods._
+
+// This project
+import validation.ProcessingMessageMethods
+import ProcessingMessageMethods._
 
 /**
  * Helpers for constructing an HttpRepository.
@@ -44,7 +51,7 @@ object HttpRepositoryRef {
    * @return a configured reference to this embedded
    *         repository
    */
-  def apply(ref: JsonNode): Validation[String, HttpRepositoryRef] =
+  def apply(ref: JsonNode): ValidatedNel[HttpRepositoryRef] =
     apply(fromJsonNode(ref))
 
   /**
@@ -56,11 +63,12 @@ object HttpRepositoryRef {
    * @return a configured reference to this embedded
    *         repository
    */
-  def apply(config: JValue): Validation[String, HttpRepositoryRef] =
-    for {
-      conf <- RepositoryRefConfig(config)
-      uri  <- extractUri(config)
-    } yield HttpRepositoryRef(conf, uri)
+  def apply(config: JValue): ValidatedNel[HttpRepositoryRef] = {
+    
+    val conf = RepositoryRefConfig(config)
+    val url  = extractUrl(config)
+    (conf.toValidationNel |@| url.toValidationNel) { HttpRepositoryRef(_, _) }
+  }
 
   /**
    * Returns the path to this embedded repository.
@@ -70,9 +78,34 @@ object HttpRepositoryRef {
    * @return the path to the embedded repository on
    *         Success, or an error String on Failure
    */
-  // TODO: implement this properly
-  def extractUri(config: JValue): Validation[String, URL] =
-   	(new URL("http://hello.com")).success
+  // TODO: impl
+  private def extractUrl(config: JValue): Validated[URL] =
+   	stringToUrl("http://hello.com")
+
+  /**
+   * A wrapper around Java's URL.
+   *
+   * Exceptions thrown by
+   * URI.create():
+   * 1. NullPointerException
+   *    if uri is null
+   * 2. IllegalArgumentException
+   *    if uri violates RFC 2396
+   *
+   * @param url The String to
+   *        convert to a URL
+   * @return a URLobject, or an
+   *         error message, all
+   *         wrapped in a Validation
+   */       
+  private def stringToUrl(url: String): Validated[URL] =
+    (try {
+      (new URL(url)).success
+    } catch {
+      case npe: NullPointerException => "Provided URL was null".fail
+      case iae: IllegalArgumentException => "Provided URL string [%s] violates RFC 2396: [%s]".format(url, ExceptionUtils.getRootCause(iae).getMessage).fail
+      case e: Throwable => "Unexpected error creating URL from string [%s]: [%s]".format(url, e.getMessage).fail
+    }).toProcessingMessage
 
 }
 
@@ -98,17 +131,24 @@ case class HttpRepositoryRef(
 
   /**
    * Retrieves an IgluSchema from the Iglu Repo as
-   * a JsonNode. Unsafe - only use when you know the
-   * schema is available locally.
+   * a JsonNode.
    *
    * @param schemaKey The SchemaKey uniquely identifies
    *        the schema in Iglu
-   * @return the JsonNode representing this schema
+   * @return a Validation boxing either the Schema's
+   *         JsonNode on Success, or an error String
+   *         on Failure 
    */
-  def unsafeLookupSchema(schemaKey: SchemaKey): JsonNode = {
-    // TODO: fix this. Use a lens?
-    val fullPath = s"${uri.toString}/schemas/${schemaKey.toPath}"
-    val fullUri  = new URL(fullPath)
-    JsonLoader.fromURL(fullUri)
+  // TODO: we should distinguish between not found and
+  // invalid JSON
+  def lookupSchema(schemaKey: SchemaKey): Validated[Option[JsonNode]] = {
+    try {
+    	// TODO: fix this. Use a lens?
+      val fullPath = s"${uri.toString}/schemas/${schemaKey.toPath}"
+      val fullUri  = new URL(fullPath)
+      JsonLoader.fromURL(fullUri).some.success
+    } catch {
+      case e: Throwable => None.success
+    }
   }
 }

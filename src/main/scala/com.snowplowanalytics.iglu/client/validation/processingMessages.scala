@@ -40,6 +40,8 @@ object ProcessingMessageMethods {
 
   implicit def pimpValidationNel[A](validation: ValidationNel[String, A]) = new ProcMsgValidationNel[A](validation)
 
+  implicit def pimpString(str: String) = new ProcMsgString(str)
+
   /**
    * A helper method to convert a String into
    * a ProcessingMessage. Assume that the
@@ -74,6 +76,8 @@ object ProcessingMessageMethods {
  */
 class ProcMsgValidation[+A](validation: Validation[String, A]) {
 
+  // import validation.{ProcessingMessageMethods => PMM}
+
   def toProcessingMessage: Validation[ProcessingMessage, A] =
     validation.leftMap { err =>
       ProcessingMessageMethods.toProcMsg(err, LogLevel.ERROR)
@@ -94,4 +98,14 @@ class ProcMsgValidationNel[+A](validation: ValidationNel[String, A]) {
     validation.leftMap { err =>
       ProcessingMessageMethods.toProcMsg(err, LogLevel.ERROR)
     }
+}
+
+/**
+ * A wrapper to make it easy to convert a String to a ProcessingMessage.
+ */
+class ProcMsgString(str: String) {
+
+  def toProcessingMessage: ProcessingMessage = ProcessingMessageMethods.toProcMsg(str, LogLevel.ERROR)
+
+  def toProcessingMessageNel: NonEmptyList[ProcessingMessage] = ProcessingMessageMethods.toProcMsgNel(str, LogLevel.ERROR)
 }
