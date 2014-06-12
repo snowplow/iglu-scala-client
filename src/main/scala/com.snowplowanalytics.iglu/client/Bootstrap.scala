@@ -12,14 +12,9 @@
  */
 package com.snowplowanalytics.iglu.client
 
-// Scalaz
-import scalaz._
-import Scalaz._
-
 // This project
 import com.snowplowanalytics.iglu.client.{Resolver => UrResolver}
 import repositories.{
-  RepositoryRef,
   RepositoryRefConfig,
   EmbeddedRepositoryRef
 }
