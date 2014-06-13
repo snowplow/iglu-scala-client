@@ -15,6 +15,9 @@ package com.snowplowanalytics.iglu.client
 // Jackson
 import com.fasterxml.jackson.databind.JsonNode
 
+// JSON Schema
+import com.github.fge.jsonschema.core.report.ProcessingMessage
+
 // Scala
 import scala.annotation.tailrec
 
@@ -206,16 +209,15 @@ case class Resolver(
   // TODO: should we accumulate a Nel on Failure side?
   def lookupSchema(schemaKey: SchemaKey): ValidatedNel[JsonNode] = {
 
-    @tailrec def recurse(schemaKey: SchemaKey, tried: RepositoryRefs, remaining: RepositoryRefs): ValidatedNel[JsonNode] = {
+    @tailrec def recurse(schemaKey: SchemaKey, errors: ProcessingMessages, tried: RepositoryRefs, remaining: RepositoryRefs): ValidatedNel[JsonNode] = {
       remaining match {
-        case Nil => {
-          val tr = tried.map(t => s"${t.config.name} [${t.descriptor}]").mkString(", ")
-          s"Could not find schema with key ${schemaKey} in any repository, tried: ${tr}".fail.toProcessingMessageNel
-        }
+        case Nil =>
+          collectErrors(schemaKey, errors, tried).fail
         case repo :: repos => {
           repo.lookupSchema(schemaKey) match {
             case Success(Some(schema)) => cache.store(schemaKey, schema).success
-            case _                     => recurse(schemaKey, tried.::(repo), repos)
+            case Success(None)         => recurse(schemaKey, errors, tried.::(repo), repos)
+            case Failure(e)            => recurse(schemaKey, errors.::(e), tried.::(repo), repos)
           }
         }
       }
@@ -223,7 +225,7 @@ case class Resolver(
 
     cache.get(schemaKey) match {
       case Some(schema) => schema.success
-      case None         => recurse(schemaKey, Nil, prioritizeRepos(schemaKey))
+      case None         => recurse(schemaKey, Nil, Nil, prioritizeRepos(schemaKey))
     }
   }
 
@@ -262,6 +264,22 @@ case class Resolver(
       case Success(schema) => schema
       case Failure(err)    => throw new RuntimeException(s"Unsafe schema lookup failed: ${err}")
     }
+
+  /**
+   * Collects together the errors for a failed
+   * lookup into a NonEmptyList.
+   *
+   * TODO: finish params
+   *
+   * @return a NonEmptyList of ProcessingMessages
+   */
+  // TODO: rather than a text list, would be nice to add a JSON array
+  // of failed repositories
+  private[client] def collectErrors(schemaKey: SchemaKey, errors: ProcessingMessages, tried: RepositoryRefs): ProcessingMessageNel = {
+    val tr  = tried.map(t => s"${t.config.name} [${t.descriptor}]").mkString(", ")
+    val err = s"Could not find schema with key ${schemaKey} in any repository, tried: ${tr}".toProcessingMessage
+    NonEmptyList[ProcessingMessage](err, errors: _*)
+  }
 
   /**
    * Re-sorts our Nel of RepositoryRefs into the

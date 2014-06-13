@@ -61,10 +61,10 @@ object ProcessingMessageMethods {
       .setLogLevel(logLevel)
       .setMessage(message)
 
-  def toProcMsg(messages: NonEmptyList[String], logLevel: LogLevel): NonEmptyList[ProcessingMessage] =
+  def toProcMsg(messages: NonEmptyList[String], logLevel: LogLevel): ProcessingMessageNel =
     messages.map(msg => toProcMsg(msg, logLevel))
 
-  def toProcMsgNel(message: String, logLevel: LogLevel = LogLevel.ERROR): NonEmptyList[ProcessingMessage] =
+  def toProcMsgNel(message: String, logLevel: LogLevel = LogLevel.ERROR): ProcessingMessageNel =
     NonEmptyList(toProcMsg(message, logLevel))
 
 }
@@ -107,5 +107,5 @@ class ProcMsgString(str: String) {
 
   def toProcessingMessage: ProcessingMessage = ProcessingMessageMethods.toProcMsg(str, LogLevel.ERROR)
 
-  def toProcessingMessageNel: NonEmptyList[ProcessingMessage] = ProcessingMessageMethods.toProcMsgNel(str, LogLevel.ERROR)
+  def toProcessingMessageNel: ProcessingMessageNel = ProcessingMessageMethods.toProcMsgNel(str, LogLevel.ERROR)
 }

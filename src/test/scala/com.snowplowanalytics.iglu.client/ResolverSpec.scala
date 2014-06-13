@@ -42,9 +42,6 @@ object ResolverSpec {
     val two   = embedRef("de.acompany.snowplow", 40)
     val three = embedRef("de.acompany.snowplow", 100)
 
-    // TODO: update this once we have our HttpRepositoryRef
-    val igluCentral =
-      HttpRepositoryRef(RepositoryRefConfig("Iglu Central", 0, List("com.snowplowanalytics")), new URL("http://iglucentral.com"))
   }
 }
 
@@ -59,10 +56,10 @@ class ResolverSpec extends Specification with DataTables with ValidationMatchers
   import ResolverSpec._
 
   def e1 = {
-    val resolver = Resolver(cacheSize = 0, Repos.igluCentral, Repos.one, Repos.two, Repos.three)
+    val resolver = Resolver(cacheSize = 0, SpecHelpers.IgluCentral, Repos.one, Repos.two, Repos.three)
     val schemaKey = SchemaKey("de.acompany.snowplow", "mobile_context", "jsonschema", "1-0-0")
 
-    resolver.prioritizeRepos(schemaKey) must_== List(Repos.two, Repos.three, Bootstrap.Repo, Repos.one, Repos.igluCentral)
+    resolver.prioritizeRepos(schemaKey) must_== List(Repos.two, Repos.three, Bootstrap.Repo, Repos.one, SpecHelpers.IgluCentral)
   }
 
   def e2 = {
@@ -96,7 +93,7 @@ class ResolverSpec extends Specification with DataTables with ValidationMatchers
             |}
           |}""".stripMargin.replaceAll("[\n\r]","")
 
-    val expected = Resolver(cacheSize = 500, Repos.igluCentral, Repos.three)
+    val expected = Resolver(cacheSize = 500, SpecHelpers.IgluCentral, Repos.three)
 
     Resolver.parse(SpecHelpers.asJsonNode(config)) must beSuccessful(expected)
   }

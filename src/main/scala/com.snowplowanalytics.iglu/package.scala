@@ -55,6 +55,16 @@ package object client {
   type RepositoryRefs = List[RepositoryRef]
 
   /**
+   * Our list (possibly empty) of Processing Messages
+   */
+  type ProcessingMessages = List[ProcessingMessage]
+
+  /**
+   * Our non-empty list of Processing Messages
+   */
+  type ProcessingMessageNel = NonEmptyList[ProcessingMessage]
+
+  /**
    * Type alias for a SchemaVer-based version.
    *
    * We may update this in the future to be

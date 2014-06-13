@@ -12,6 +12,9 @@
  */
 package com.snowplowanalytics.iglu.client
 
+// Java
+import java.net.URL
+
 // Jackson
 import com.fasterxml.jackson.databind.{
   ObjectMapper,
@@ -24,10 +27,20 @@ import com.github.fge.jsonschema.core.report.{
   LogLevel
 }
 
+// This project
+import repositories.{
+  HttpRepositoryRef,
+  RepositoryRefConfig
+}
+
 object SpecHelpers {
 
   private lazy val Mapper = new ObjectMapper
   
+  val IgluCentral =
+    HttpRepositoryRef(RepositoryRefConfig("Iglu Central", 0, List("com.snowplowanalytics")), new URL("http://iglucentral.com"))
+
+  // TODO: replace with json4s based approach
   def asJsonNode(str: String) =
     Mapper.readTree(str)
 
