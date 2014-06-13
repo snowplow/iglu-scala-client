@@ -15,16 +15,18 @@ package com.snowplowanalytics.iglu.client
 // Java
 import java.net.URL
 
-// Jackson
-import com.fasterxml.jackson.databind.{
-  ObjectMapper,
-  JsonNode
-}
-
 // JSON Schema
 import com.github.fge.jsonschema.core.report.{
   ProcessingMessage,
   LogLevel
+}
+
+// json4s
+import org.json4s._
+import org.json4s.JsonDSL._
+import org.json4s.jackson.JsonMethods.{
+  parse,
+  asJsonNode => ajn
 }
 
 // This project
@@ -34,15 +36,12 @@ import repositories.{
 }
 
 object SpecHelpers {
-
-  private lazy val Mapper = new ObjectMapper
   
   val IgluCentral =
     HttpRepositoryRef(RepositoryRefConfig("Iglu Central", 0, List("com.snowplowanalytics")), new URL("http://iglucentral.com"))
 
-  // TODO: replace with json4s based approach
   def asJsonNode(str: String) =
-    Mapper.readTree(str)
+    ajn(parse(str))
 
   def asProcessingMessage(message: String, schema: String, instance: String, keyword: String, foundExpected: Option[(String, String)], requiredMissing: Option[(String, String)]) = {
 
