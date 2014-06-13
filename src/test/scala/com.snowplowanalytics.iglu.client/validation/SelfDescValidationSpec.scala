@@ -35,23 +35,6 @@ import org.specs2.Specification
 import org.specs2.matcher.DataTables
 import org.specs2.scalaz.ValidationMatchers
 
-object SelfDescValidationSpec {
-
-  implicit val resolver = {
-    val repo = {
-      val config = RepositoryRefConfig(
-        name = "Iglu Test Embedded",
-        instancePriority = 0,
-        vendorPrefixes = Nil
-      )
-      EmbeddedRepositoryRef(config, path = "/iglu-test-embedded")    
-    }
-
-    // Disable LRU cache as not thread-safe for tests
-    Resolver(cacheSize = 0, repo)
-  }
-}
-
 // TODO: add in some Failures
 class SelfDescValidationSpec extends Specification with DataTables with ValidationMatchers { def is =
 
@@ -59,11 +42,10 @@ class SelfDescValidationSpec extends Specification with DataTables with Validati
                                                                                                           p^
   "validating a correct self-desc JSON should return the JSON in a Success"                                ! e1^
   "validating a correct self-desc JSON should return only the JSON's data field in a Success if requested" ! e2^
-  // "JsonNodes that fail explicit validation should wrap ProcessageMessages in a Failure" ! e2^  
-                                                                                           end
+                                                                                                           end
 
   import ValidatableJsonMethods._
-  import SelfDescValidationSpec._
+  implicit val resolver = SpecHelpers.TestResolver
 
   val validJson = SpecHelpers.asJsonNode(
     """{"schema": "iglu:com.snowplowanalytics.iglu-test/stock-item/jsonschema/1-0-0", "data": { "id": "123-12", "name": "t-shirt", "price": 29.99 } }"""

@@ -15,6 +15,9 @@ package com.snowplowanalytics.iglu.client
 // Java
 import java.net.URL
 
+// JSON Schema
+import com.github.fge.jsonschema.core.report.ProcessingMessage
+
 // Scalaz
 import scalaz._
 import Scalaz._
@@ -25,6 +28,7 @@ import repositories.{
   HttpRepositoryRef,
   RepositoryRefConfig
 }
+import validation.ProcessingMessageMethods._
 
 // Specs2
 import org.specs2.Specification
@@ -41,17 +45,18 @@ object ResolverSpec {
     val one   = embedRef("com.acme", 0)
     val two   = embedRef("de.acompany.snowplow", 40)
     val three = embedRef("de.acompany.snowplow", 100)
-
   }
 }
 
 class ResolverSpec extends Specification with DataTables with ValidationMatchers { def is =
 
-  "This is a specification to test the Resolver functionality"                   ^
-                                                                                p^
-  "our prioritizeRepos algorithm should sort repository refs in priority order"  ! e1^
-  "we can construct a Resolver from a valid resolver configuration JSON"         ! e2^
-                                                                                 end
+  "This is a specification to test the Resolver functionality"                       ^
+                                                                                    p^
+  "our prioritizeRepos algorithm should sort repository refs in priority order"      ! e1^
+  "we can construct a Resolver from a valid resolver configuration JSON"             ! e2^
+  "a Resolver should report its failed lookups when a JSON Schema can't be resolved" ! e3^
+  "a Resolver should report issues with a corrupted JSON Schema"                     ! e4^
+                                                                                     end
 
   import ResolverSpec._
 
@@ -96,6 +101,29 @@ class ResolverSpec extends Specification with DataTables with ValidationMatchers
     val expected = Resolver(cacheSize = 500, SpecHelpers.IgluCentral, Repos.three)
 
     Resolver.parse(SpecHelpers.asJsonNode(config)) must beSuccessful(expected)
+  }
+
+  def e3 = {
+
+    val schemaKey = SchemaKey("com.acme.icarus", "wing", "jsonschema", "1-0-0")
+    val expected = NonEmptyList(
+      "Could not find schema with key iglu:com.acme.icarus/wing/jsonschema/1-0-0 in any repository, tried: Iglu Test Embedded [embedded], Iglu Client Embedded [embedded]".toProcessingMessage.toString
+    )    
+
+    val actual = SpecHelpers.TestResolver.lookupSchema(schemaKey)
+    actual.leftMap(_.map(_.toString)) must beFailing(expected)
+  }
+
+  def e4 = {
+
+    val schemaKey = SchemaKey("com.snowplowanalytics.iglu-test", "corrupted_schema", "jsonschema", "1-0-0")
+    val expected = NonEmptyList(
+      "Could not find schema with key iglu:com.snowplowanalytics.iglu-test/corrupted_schema/jsonschema/1-0-0 in any repository, tried: Iglu Client Embedded [embedded], Iglu Test Embedded [embedded]".toProcessingMessage.toString,
+      "Problem parsing /iglu-test-embedded/schemas/com.snowplowanalytics.iglu-test/corrupted_schema/jsonschema/1-0-0 as JSON in embedded Iglu repository Iglu Test Embedded: Unexpected end-of-input within/between OBJECT entries at [Source: java.io.BufferedInputStream@xxxxxx; line: 10, column: 316]".toProcessingMessage.toString
+    )
+
+    val actual = SpecHelpers.TestResolver.lookupSchema(schemaKey)
+    actual.leftMap(_.map(_.toString)) must beFailing(expected)
   }
 
 }

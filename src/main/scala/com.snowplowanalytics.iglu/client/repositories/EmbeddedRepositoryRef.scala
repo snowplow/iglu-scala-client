@@ -13,9 +13,16 @@
 package com.snowplowanalytics.iglu.client
 package repositories
 
+// Java
+import java.io.IOException
+
+// Apache Commons
+import org.apache.commons.lang3.exception.ExceptionUtils
+
 // Jackson
-import com.github.fge.jackson.JsonLoader
+import com.fasterxml.jackson.core.JsonParseException
 import com.fasterxml.jackson.databind.JsonNode
+import com.github.fge.jackson.JsonLoader
 
 // Scalaz
 import scalaz._
@@ -29,6 +36,7 @@ import org.json4s.jackson.JsonMethods._
 // This project
 import validation.ProcessingMessageMethods
 import ProcessingMessageMethods._
+import utils.{ValidationExceptions => VE}
 
 /**
  * Helpers for constructing an EmbeddedRepository.
@@ -108,15 +116,18 @@ case class EmbeddedRepositoryRef(
    *         JsonNode on Success, or an error String
    *         on Failure 
    */
-  // TODO: we should distinguish between not found and
-  // invalid JSON
+  // TODO: would be nice to abstract out fail.toProcessingMessage, and scrubbing
   def lookupSchema(schemaKey: SchemaKey): Validated[Option[JsonNode]] = {
     val schemaPath = s"${path}/schemas/${schemaKey.toPath}"
     try {
       JsonLoader.fromResource(schemaPath).some.success
     } catch {
+      case jpe: JsonParseException => // Child of IOException so match first
+        s"Problem parsing ${schemaPath} as JSON in ${descriptor} Iglu repository ${config.name}: %s".format(VE.stripInstanceEtc(jpe.getMessage)).fail.toProcessingMessage
+      case ioe: IOException =>
+        None.success // Schema not found
       case e: Throwable =>
-        s"Cannot find schema ${schemaKey} in ${descriptor} Iglu repository ${config.name}".fail.toProcessingMessage
+        s"Unknown problem reading and parsing ${schemaPath} in ${descriptor} Iglu repository ${config.name}: %s".format(ExceptionUtils.getRootCause(e).getMessage).fail.toProcessingMessage
     }
   }
 }

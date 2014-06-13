@@ -31,6 +31,7 @@ import org.json4s.jackson.JsonMethods.{
 
 // This project
 import repositories.{
+  EmbeddedRepositoryRef,
   HttpRepositoryRef,
   RepositoryRefConfig
 }
@@ -39,6 +40,16 @@ object SpecHelpers {
   
   val IgluCentral =
     HttpRepositoryRef(RepositoryRefConfig("Iglu Central", 0, List("com.snowplowanalytics")), new URL("http://iglucentral.com"))
+
+  val TestResolver = {
+    val repo = {
+      val config = RepositoryRefConfig("Iglu Test Embedded", 0, List("com.snowplowanalytics"))
+      EmbeddedRepositoryRef(config, path = "/iglu-test-embedded")    
+    }
+
+    // Disable LRU cache as not thread-safe for tests
+    Resolver(cacheSize = 10, repo)
+  }
 
   def asJsonNode(str: String) =
     ajn(parse(str))
