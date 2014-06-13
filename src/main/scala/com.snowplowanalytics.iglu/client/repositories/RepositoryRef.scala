@@ -88,7 +88,7 @@ trait RepositoryRef {
    *         JsonNode on Success, or an error String
    *         on Failure 
    */
-  def lookupSchema(schemaKey: SchemaKey): ValidatedNel[Option[JsonNode]]
+  def lookupSchema(schemaKey: SchemaKey): Validated[Option[JsonNode]]
 
   /**
    * Retrieves an IgluSchema from the Iglu Repo as
@@ -100,12 +100,12 @@ trait RepositoryRef {
    * @return the JsonNode representing this schema
    */
   def unsafeLookupSchema(schemaKey: SchemaKey): JsonNode = {
-    def exception(msg: NonEmptyList[ProcessingMessage]) =
+    def exception(msg: ProcessingMessage) =
       new RuntimeException(s"Unsafe lookup of schema ${schemaKey} in ${descriptor} Iglu repository ${config.name} failed: ${msg}")
 
     lookupSchema(schemaKey) match {
       case Success(Some(schema)) => schema
-      case Success(None)         => throw exception("not found".toProcessingMessageNel)
+      case Success(None)         => throw exception("not found".toProcessingMessage)
       case Failure(err)          => throw exception(err)
     }
   }

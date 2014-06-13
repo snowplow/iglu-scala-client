@@ -129,7 +129,7 @@ object ValidatableJsonMethods {
       j  <- validateAsSelfDescribing(instance)
       s  =  j.get("schema").asText
       d  =  j.get("data")
-      sk <- SchemaKey(s)
+      sk <- SchemaKey.applyNel(s)
       js <- resolver.lookupSchema(sk)
       v  <- validateAgainstSchema(d, js)
     } yield if (dataOnly) (sk, d) else (sk, instance)

@@ -242,7 +242,7 @@ case class Resolver(
    */
   def lookupSchema(schemaUri: String): ValidatedNel[JsonNode] =
     for {
-      k <- SchemaKey(schemaUri).toValidationNel
+      k <- SchemaKey.applyNel(schemaUri)
       s <- lookupSchema(k)
     } yield s
 

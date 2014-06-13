@@ -50,8 +50,10 @@ object SchemaKey {
     case SchemaUriRegex(vnd, n, f, ver) =>
       SchemaKey(vnd, n, f, ver).success
     case _ =>
-      s"$schemaUri is not a valid Iglu-format schema URI".fail.toProcessingMessage
+      s"${schemaUri} is not a valid Iglu-format schema URI".toProcessingMessage.fail
   }
+
+  def applyNel(schemaUri: String): ValidatedNel[SchemaKey] = apply(schemaUri).toValidationNel
 }
 
 /**

@@ -39,8 +39,8 @@ object ResolverSpec {
       EmbeddedRepositoryRef(RepositoryRefConfig("An embedded repo", priority, List(prefix)), "/embed-path")
 
     val one   = embedRef("com.acme", 0)
-    val two   = embedRef("com.snowplowanalytics.snowplow", 40)
-    val three = embedRef("com.snowplowanalytics.snowplow", 100)
+    val two   = embedRef("de.acompany.snowplow", 40)
+    val three = embedRef("de.acompany.snowplow", 100)
 
     // TODO: update this once we have our HttpRepositoryRef
     val igluCentral =
@@ -53,14 +53,14 @@ class ResolverSpec extends Specification with DataTables with ValidationMatchers
   "This is a specification to test the Resolver functionality"                   ^
                                                                                 p^
   "our prioritizeRepos algorithm should sort repository refs in priority order"  ! e1^
-  "we should be able to construct a Resolver from a resolver configuration JSON" ! e2^
+  "we can construct a Resolver from a valid resolver configuration JSON"         ! e2^
                                                                                  end
 
   import ResolverSpec._
 
   def e1 = {
     val resolver = Resolver(cacheSize = 0, Repos.igluCentral, Repos.one, Repos.two, Repos.three)
-    val schemaKey = SchemaKey("com.snowplowanalytics.snowplow", "mobile_context", "jsonschema", "1-0-0")
+    val schemaKey = SchemaKey("de.acompany.snowplow", "mobile_context", "jsonschema", "1-0-0")
 
     resolver.prioritizeRepos(schemaKey) must_== List(Repos.two, Repos.three, Bootstrap.Repo, Repos.one, Repos.igluCentral)
   }
