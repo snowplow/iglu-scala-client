@@ -45,8 +45,8 @@ object EmbeddedRepositoryRef {
    * @return a configured reference to this embedded
    *         repository
    */
-  def apply(ref: JsonNode): ValidatedNel[EmbeddedRepositoryRef] =
-    apply(fromJsonNode(ref))
+  def parse(ref: JsonNode): ValidatedNel[EmbeddedRepositoryRef] =
+    parse(fromJsonNode(ref))
 
   /**
    * Constructs an EmbeddedRepositoryRef
@@ -57,8 +57,8 @@ object EmbeddedRepositoryRef {
    * @return a configured reference to this embedded
    *         repository
    */
-  def apply(config: JValue): ValidatedNel[EmbeddedRepositoryRef] = {
-    val conf = RepositoryRefConfig(config)
+  def parse(config: JValue): ValidatedNel[EmbeddedRepositoryRef] = {
+    val conf = RepositoryRefConfig.parse(config)
     val path = extractPath(config)
     (conf.toValidationNel |@| path.toValidationNel) { EmbeddedRepositoryRef(_, _) }
   }
@@ -72,7 +72,7 @@ object EmbeddedRepositoryRef {
    *         Success, or an error String on Failure
    */
   // TODO: implement this properly
-  def extractPath(config: JValue): Validated[String] =
+  private def extractPath(config: JValue): Validated[String] =
     "/iglu-cache".success
 
 }

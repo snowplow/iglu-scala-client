@@ -41,7 +41,7 @@ object RepositoryRefConfig {
 
   /**
    */
-  def apply(ref: JValue): Validated[RepositoryRefConfig] =
+  def parse(ref: JValue): Validated[RepositoryRefConfig] =
     ref.extract[RepositoryRefConfig].success
 }
 

@@ -64,7 +64,7 @@ object Resolver {
    *        for this resolver
    * @return a configured Resolver instance
    */
-  def apply(config: JsonNode): Validated[Resolver] = {
+  def parse(config: JsonNode): Validated[Resolver] = {
 
     // We can use the bootstrap Resolver for working
     // with JSON Schemas here.
@@ -97,8 +97,8 @@ object Resolver {
    *        for this resolver
    * @return a configured Resolver instance
    */
-  def apply(config: JValue): Validated[Resolver] =
-    apply(asJsonNode(config))
+  def parse(config: JValue): Validated[Resolver] =
+    parse(asJsonNode(config))
 
   /**
    * Extracts a List of RepositoryRefs from the
@@ -131,9 +131,9 @@ object Resolver {
   private[client] def buildRepositoryRef(repositoryConfig: JValue): ValidatedNel[RepositoryRef] =
     // TODO: implement this
     if (true) {
-      EmbeddedRepositoryRef(repositoryConfig)
+      EmbeddedRepositoryRef.parse(repositoryConfig)
     } else if (false) {
-      HttpRepositoryRef(repositoryConfig)
+      HttpRepositoryRef.parse(repositoryConfig)
     } else {
       s"Configuration unrecognizable as either embedded or HTTP repository".fail.toProcessingMessageNel
     }
@@ -242,7 +242,7 @@ case class Resolver(
    */
   def lookupSchema(schemaUri: String): ValidatedNel[JsonNode] =
     for {
-      k <- SchemaKey.applyNel(schemaUri)
+      k <- SchemaKey.parseNel(schemaUri)
       s <- lookupSchema(k)
     } yield s
 

@@ -46,14 +46,14 @@ object SchemaKey {
    * @return a Validation-boxed SchemaKey for
    *         Success, and an error String on Failure
    */
-  def apply(schemaUri: String): Validated[SchemaKey] = schemaUri match {
+  def parse(schemaUri: String): Validated[SchemaKey] = schemaUri match {
     case SchemaUriRegex(vnd, n, f, ver) =>
       SchemaKey(vnd, n, f, ver).success
     case _ =>
       s"${schemaUri} is not a valid Iglu-format schema URI".toProcessingMessage.fail
   }
 
-  def applyNel(schemaUri: String): ValidatedNel[SchemaKey] = apply(schemaUri).toValidationNel
+  def parseNel(schemaUri: String): ValidatedNel[SchemaKey] = parse(schemaUri).toValidationNel
 }
 
 /**

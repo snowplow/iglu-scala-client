@@ -51,8 +51,8 @@ object HttpRepositoryRef {
    * @return a configured reference to this embedded
    *         repository
    */
-  def apply(ref: JsonNode): ValidatedNel[HttpRepositoryRef] =
-    apply(fromJsonNode(ref))
+  def parse(ref: JsonNode): ValidatedNel[HttpRepositoryRef] =
+    parse(fromJsonNode(ref))
 
   /**
    * Constructs an EmbeddedRepositoryRef
@@ -63,9 +63,9 @@ object HttpRepositoryRef {
    * @return a configured reference to this embedded
    *         repository
    */
-  def apply(config: JValue): ValidatedNel[HttpRepositoryRef] = {
+  def parse(config: JValue): ValidatedNel[HttpRepositoryRef] = {
     
-    val conf = RepositoryRefConfig(config)
+    val conf = RepositoryRefConfig.parse(config)
     val url  = extractUrl(config)
     (conf.toValidationNel |@| url.toValidationNel) { HttpRepositoryRef(_, _) }
   }
