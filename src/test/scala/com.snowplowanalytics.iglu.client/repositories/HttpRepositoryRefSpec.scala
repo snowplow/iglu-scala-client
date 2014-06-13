@@ -13,6 +13,10 @@
 package com.snowplowanalytics.iglu.client
 package repositories
 
+// Scalaz
+import scalaz._
+import Scalaz._
+
 // Specs2
 import org.specs2.Specification
 import org.specs2.matcher.DataTables
@@ -22,9 +26,50 @@ class HttpRepositoryRefSpec extends Specification with DataTables with Validatio
 
   "This is a specification to test an HTTP-based RepositoryRef"                                            ^
                                                                                                           p^
-  // "retrieving an existent JSON Schema from an HTTP-based RepositoryRef should work"                     ! e1^
+  "retrieving an existent JSON Schema from an HTTP-based RepositoryRef should work"                        ! e1^
   "requesting a non-existent JSON Schema from an HTTP-based RepositoryRef should return None"              ! e2^  
                                                                                                            end
+
+  def e1 = {
+    val schemaKey = SchemaKey("com.snowplowanalytics.snowplow", "link_click", "jsonschema", "1-0-0")
+
+    val expected = SpecHelpers.asJsonNode(
+       """|{
+            |"$schema": "http://iglucentral.com/schemas/com.snowplowanalytics.self-desc/schema/jsonschema/1-0-0#",
+            |"description": "Schema for a link click event",
+            |"self": {
+              |"vendor": "com.snowplowanalytics.snowplow",
+              |"name": "link_click",
+              |"format": "jsonschema",
+              |"version": "1-0-0"
+            |},
+            |"type": "object",
+            |"properties": {
+              |"elementId": {
+                |"type": "string"
+              |},
+              |"elementClasses": {
+                |"type": "array",
+                |"items": {
+                  |"type": "string"
+                |}
+              |},
+              |"elementTarget": {
+                |"type": "string"
+              |},
+              |"targetUrl": {
+                |"type": "string",
+                |"minLength": 1
+              |}
+            |},
+            |"required": ["targetUrl"],
+            |"additionalProperties": false
+          |}""".stripMargin.replaceAll("[\n\r]","")
+    )
+
+    val actual = SpecHelpers.IgluCentral.lookupSchema(schemaKey)
+    actual.map(_.map(_.toString)) must beSuccessful(expected.toString.some)
+  }
 
   def e2 = {
     val schemaKey = SchemaKey("de.ersatz.n-a", "null", "jsonschema", "1-0-0")
