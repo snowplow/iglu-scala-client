@@ -67,7 +67,7 @@ object HttpRepositoryRef {
     
     val conf = RepositoryRefConfig.parse(config)
     val url  = extractUrl(config)
-    (conf.toValidationNel |@| url.toValidationNel) { HttpRepositoryRef(_, _) }
+    (conf |@| url.toValidationNel) { HttpRepositoryRef(_, _) }
   }
 
   /**

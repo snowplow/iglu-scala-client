@@ -27,6 +27,7 @@ import Scalaz._
 import org.json4s._
 import org.json4s.JsonDSL._
 import org.json4s.jackson.JsonMethods._
+import org.json4s.scalaz.JsonScalaz._
 
 // This project
 import validation.ProcessingMessageMethods._
@@ -40,9 +41,20 @@ object RepositoryRefConfig {
   implicit val formats = DefaultFormats
 
   /**
+   * Parses the standard repository ref configuration
+   * out of the supplied JSON.
+   *
+   * @param config The JSON containing our repository
+   *        ref configuration
+   * @return either the RepositoryRefConfig on Success,
+   *         or a Nel of ProcessingMessages on Failure.
    */
-  def parse(ref: JValue): Validated[RepositoryRefConfig] =
-    ref.extract[RepositoryRefConfig].success
+  // TODO: convert the Scalaz Error sub-types to
+  // ProcessingMessages more cleanly (not just via toString)
+  def parse(config: JValue): ValidatedNel[RepositoryRefConfig] =
+    (field[String]("name")(config) |@| field[Int]("instancePriority")(config) |@| field[List[String]]("vendorPrefixes")(config)) {
+      RepositoryRefConfig(_, _, _)
+    }.leftMap(_.map(_.toString.toProcessingMessage))
 }
 
 /**

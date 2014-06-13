@@ -68,7 +68,7 @@ object EmbeddedRepositoryRef {
   def parse(config: JValue): ValidatedNel[EmbeddedRepositoryRef] = {
     val conf = RepositoryRefConfig.parse(config)
     val path = extractPath(config)
-    (conf.toValidationNel |@| path.toValidationNel) { EmbeddedRepositoryRef(_, _) }
+    (conf |@| path.toValidationNel) { EmbeddedRepositoryRef(_, _) }
   }
 
   /**
