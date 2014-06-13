@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2014 Snowplow Analytics Ltd. All rights reserved.
+ * Copyright (c) 2014 Snowplow Analytics Ltd. All rights reserved.
  *
  * This program is licensed to you under the Apache License Version 2.0,
  * and you may not use this file except in compliance with the Apache License Version 2.0.
@@ -13,30 +13,12 @@
 package com.snowplowanalytics.iglu.client
 package validation
 
-// Jackson
-import com.fasterxml.jackson.databind.{
-  ObjectMapper,
-  JsonNode
-}
-import com.github.fge.jackson.JsonLoader
-import com.github.fge.jsonschema.core.report.{
-  ProcessingMessage,
-  LogLevel
-}
-
-// This project
-import repositories.{
-  RepositoryRefConfig,
-  EmbeddedRepositoryRef
-}
-
 // Specs2
 import org.specs2.Specification
-import org.specs2.matcher.DataTables
 import org.specs2.scalaz.ValidationMatchers
 
 // TODO: add in some Failures
-class SelfDescValidationSpec extends Specification with DataTables with ValidationMatchers { def is =
+class SelfDescValidationSpec extends Specification with ValidationMatchers { def is =
 
   "This is a specification to test validation of self-describing JsonNodes"                                ^
                                                                                                           p^

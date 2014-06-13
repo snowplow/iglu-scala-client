@@ -18,16 +18,16 @@ import org.specs2.Specification
 import org.specs2.matcher.DataTables
 import org.specs2.scalaz.ValidationMatchers
 
-class HttpRepositoryRefSpec extends Specification with DataTables with ValidationMatchers { def is =
+class EmbeddedRepositoryRefSpec extends Specification with DataTables with ValidationMatchers { def is =
 
-  "This is a specification to test an HTTP-based RepositoryRef"                                            ^
+  "This is a specification to test an embedded RepositoryRef"                                              ^
                                                                                                           p^
   // "retrieving an existent JSON Schema from an HTTP-based RepositoryRef should work"                     ! e1^
-  "requesting a non-existent JSON Schema from an HTTP-based RepositoryRef should return None"              ! e2^  
+  "requesting a non-existent JSON Schema from an embedded RepositoryRef should return None"                ! e2^  
                                                                                                            end
 
   def e2 = {
-    val schemaKey = SchemaKey("de.ersatz.n-a", "null", "jsonschema", "1-0-0")
+    val schemaKey = SchemaKey("com.acme.n-a", "null", "jsonschema", "1-0-0")
     SpecHelpers.IgluCentral.lookupSchema(schemaKey) must beSuccessful(None)
   }
 
