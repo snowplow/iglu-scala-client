@@ -165,10 +165,10 @@ case class HttpRepositoryRef(
    */
   def lookupSchema(schemaKey: SchemaKey): Validated[Option[JsonNode]] = {
     try {
-    	// TODO: fix this. Use a lens?
-      val fullPath = s"${uri.toString}/schemas/${schemaKey.toPath}"
-      val fullUri  = new URL(fullPath)
-      JsonLoader.fromURL(fullUri).some.success
+      for {
+        url <- HttpRepositoryRef.stringToUrl(s"${uri.toString}/schemas/${schemaKey.toPath}")
+        sch = JsonLoader.fromURL(url).some
+      } yield sch
     } catch {
       case jpe: JsonParseException =>
         s"Problem parsing ${schemaKey} as JSON in ${descriptor} Iglu repository ${config.name}: %s".format(VE.stripInstanceEtc(jpe.getMessage)).fail.toProcessingMessage
