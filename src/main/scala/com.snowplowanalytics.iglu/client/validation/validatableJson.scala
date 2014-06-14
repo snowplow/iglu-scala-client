@@ -141,7 +141,7 @@ object ValidatableJsonMethods {
    * schema exists in our resources folder
    */
   // TODO: cache this value rather than lookup each time.
-  private[validation] def getSelfDescSchema(implicit resolver: Resolver): JsonNode =
+  private[validation] def getSelfDescribingSchema(implicit resolver: Resolver): JsonNode =
     resolver.unsafeLookupSchema(
       SchemaKey("com.snowplowanalytics.self-desc", "instance-iglu-only", "jsonschema", "1-0-0")
     )
@@ -157,7 +157,7 @@ object ValidatableJsonMethods {
    *         ProcessingMessages
    */
   private[validation] def validateAsSelfDescribing(instance: JsonNode)(implicit resolver: Resolver): ValidatedNel[JsonNode] = {
-    validateAgainstSchema(instance, getSelfDescSchema)
+    validateAgainstSchema(instance, getSelfDescribingSchema)
   }
 
   /**

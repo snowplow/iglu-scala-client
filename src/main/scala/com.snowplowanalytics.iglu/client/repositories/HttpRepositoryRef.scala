@@ -14,8 +14,11 @@ package com.snowplowanalytics.iglu.client
 package repositories
 
 // Java
-import java.net.URL
-import java.net.UnknownHostException
+import java.net.{
+  URL,
+  UnknownHostException,
+  MalformedURLException
+}
 
 // Apache Commons
 import org.apache.commons.lang3.exception.ExceptionUtils
@@ -45,6 +48,8 @@ import utils.{ValidationExceptions => VE}
  * See below for the definition.
  */
 object HttpRepositoryRef {
+
+  implicit val formats = DefaultFormats
 
   /**
    * Sniffs a config JSON to determine if this is
@@ -93,9 +98,12 @@ object HttpRepositoryRef {
    * @return the path to the embedded repository on
    *         Success, or an error String on Failure
    */
-  // TODO: impl
   private def extractUrl(config: JValue): Validated[URL] =
-   	stringToUrl("http://hello.com")
+    try {
+      stringToUrl((config \ "connection" \ "http" \ "uri").extract[String])
+    } catch {
+      case me: MappingException => s"Could not extract connection.http.uri from ${compact(render(config))}".fail.toProcessingMessage
+    }
 
   /**
    * A wrapper around Java's URL.
@@ -118,6 +126,7 @@ object HttpRepositoryRef {
       (new URL(url)).success
     } catch {
       case npe: NullPointerException => "Provided URL was null".fail
+      case mue: MalformedURLException => "Provided URL string [%s] is malformed: [%s]".format(url, mue.getMessage).fail
       case iae: IllegalArgumentException => "Provided URL string [%s] violates RFC 2396: [%s]".format(url, ExceptionUtils.getRootCause(iae).getMessage).fail
       case e: Throwable => "Unexpected error creating URL from string [%s]: [%s]".format(url, e.getMessage).fail
     }).toProcessingMessage

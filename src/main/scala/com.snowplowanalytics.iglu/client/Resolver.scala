@@ -103,9 +103,8 @@ object Resolver {
       }
       case Success((key, node)) if key != ConfigurationSchema =>
         s"Expected a ${ConfigurationSchema} as resolver configuration, got: ${key}".fail.toProcessingMessageNel
-      case Failure(err) => {
-        "Resolver configuration failed JSON Schema validation".fail.toProcessingMessageNel
-      }
+      case Failure(err) =>
+        (err.<::("Resolver configuration failed JSON Schema validation".toProcessingMessage)).fail[Resolver]
     }
   }
 
@@ -118,10 +117,10 @@ object Resolver {
    * @return our assembled List of RepositoryRefs
    */
   // TODO: fix the return type
-  private[client] def getRepositoryRefs(repositoryConfigs: List[JValue]): ValidatedNel[RepositoryRefs] = {
-    // TODO: implement this
-    Nil.successNel
-  }
+  private[client] def getRepositoryRefs(repositoryConfigs: List[JValue]): ValidatedNel[RepositoryRefs] =
+    repositoryConfigs.map { conf =>
+      buildRepositoryRef(conf)
+    }.sequence
 
   /**
    * Builds a RepositoryRef sub-type from the

@@ -45,6 +45,8 @@ import utils.{ValidationExceptions => VE}
  */
 object EmbeddedRepositoryRef {
 
+  implicit val formats = DefaultFormats
+
   /**
    * Sniffs a config JSON to determine if this is
    * an embedded repository ref or not.
@@ -91,9 +93,12 @@ object EmbeddedRepositoryRef {
    * @return the path to the embedded repository on
    *         Success, or an error String on Failure
    */
-  // TODO: implement this properly
   private def extractPath(config: JValue): Validated[String] =
-    "/iglu-cache".success
+    try {
+      (config \ "connection" \ "embedded" \ "path").extract[String].success
+    } catch {
+      case me: MappingException => s"Could not extract connection.embedded.path from ${compact(render(config))}".fail.toProcessingMessage
+    }
 
 }
 

@@ -87,7 +87,7 @@ class ResolverSpec extends Specification with DataTables with ValidationMatchers
                 |}, {                
                   |"name": "An embedded repo",
                   |"priority": 100,
-                  |"vendorPrefixes": [ "com.snowplowanalytics.snowplow" ],
+                  |"vendorPrefixes": [ "de.acompany.snowplow" ],
                   |"connection": {
                     |"embedded": {
                       |"path": "/embed-path"

@@ -52,7 +52,7 @@ object RepositoryRefConfig {
   // TODO: convert the Scalaz Error sub-types to
   // ProcessingMessages more cleanly (not just via toString)
   def parse(config: JValue): ValidatedNel[RepositoryRefConfig] =
-    (field[String]("name")(config) |@| field[Int]("instancePriority")(config) |@| field[List[String]]("vendorPrefixes")(config)) {
+    (field[String]("name")(config) |@| field[Int]("priority")(config) |@| field[List[String]]("vendorPrefixes")(config)) {
       RepositoryRefConfig(_, _, _)
     }.leftMap(_.map(_.toString.toProcessingMessage))
 }
