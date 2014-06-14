@@ -43,16 +43,27 @@ import ProcessingMessageMethods._
 object HttpRepositoryRef {
 
   /**
+   * Sniffs a config JSON to determine if this is
+   * an HTTP-based repository ref or not.
+   *
+   * @param config The configuration JSON to sniff
+   * @return true if this is the configuration for
+   *         an HttpRepositoryRef, else false
+   */
+  def isHttp(config: JValue): Boolean =
+    false
+
+  /**
    * Constructs an EmbeddedRepositoryRef
    * from a JsonNode.
    *
-   * @param ref The JSON containing the configuration
+   * @param config The JSON containing the configuration
    *        for this repository reference
    * @return a configured reference to this embedded
    *         repository
    */
-  def parse(ref: JsonNode): ValidatedNel[HttpRepositoryRef] =
-    parse(fromJsonNode(ref))
+  def parse(config: JsonNode): ValidatedNel[HttpRepositoryRef] =
+    parse(fromJsonNode(config))
 
   /**
    * Constructs an EmbeddedRepositoryRef

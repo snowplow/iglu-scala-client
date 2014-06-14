@@ -130,12 +130,10 @@ object Resolver {
    *        configuration for this repository
    * @return our constructed RepositoryRef
    */
-  // TODO: fix the return type
   private[client] def buildRepositoryRef(repositoryConfig: JValue): ValidatedNel[RepositoryRef] =
-    // TODO: implement this
-    if (true) {
+    if (EmbeddedRepositoryRef.isEmbedded(repositoryConfig)) {
       EmbeddedRepositoryRef.parse(repositoryConfig)
-    } else if (false) {
+    } else if (HttpRepositoryRef.isHttp(repositoryConfig)) {
       HttpRepositoryRef.parse(repositoryConfig)
     } else {
       s"Configuration unrecognizable as either embedded or HTTP repository".fail.toProcessingMessageNel
