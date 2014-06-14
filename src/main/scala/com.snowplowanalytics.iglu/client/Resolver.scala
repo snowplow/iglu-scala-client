@@ -54,12 +54,22 @@ object Resolver {
    * of RepositoryRefs.
    *
    * @param cacheSize The size of the cache
-   * @param headRef The first RepositoryRef
-   * @param tailRefs Any further RepositoryRefs
+   * @param refs Any RepositoryRef to add to this
+   *        resolver
    * @return a configured Resolver instance
    */
   def apply(cacheSize: Int, refs: RepositoryRef*): Resolver =
     Resolver(cacheSize, List[RepositoryRef](refs: _*))
+
+  /**
+   * Creates a Resolver instance from a JValue.
+   *
+   * @param config The JSON containing the configuration
+   *        for this resolver
+   * @return a configured Resolver instance
+   */
+  def parse(config: JValue): ValidatedNel[Resolver] =
+    parse(asJsonNode(config))
 
   /**
    * Constructs a Resolver instance from a JsonNode.
@@ -68,7 +78,7 @@ object Resolver {
    *        for this resolver
    * @return a configured Resolver instance
    */
-  def parse(config: JsonNode): Validated[Resolver] = {
+  def parse(config: JsonNode): ValidatedNel[Resolver] = {
 
     // We can use the bootstrap Resolver for working
     // with JSON Schemas here.
@@ -80,30 +90,24 @@ object Resolver {
     // Check it passes validation
     config.validateAndIdentifySchema(dataOnly = true) match {
       case Success((key, node)) if key == ConfigurationSchema => {
-        val json = fromJsonNode(node)
-        val cacheSize = field[Int]("cacheSize")(json)
-        val repositories = field[JValue]("repositories")(json)
 
-        "TODO".fail.toProcessingMessage
+        val json = fromJsonNode(node)
+        val cacheSize = field[Int]("cacheSize")(json).leftMap(_.map(_.toString.toProcessingMessage))
+        val repositoryRefs: ValidatedNel[RepositoryRefs] = (field[List[JValue]]("repositories")(json)).fold(
+          f => f.map(_.toString.toProcessingMessage).fail,
+          s => getRepositoryRefs(s)
+        )
+        (cacheSize |@| repositoryRefs) {
+          Resolver(_, _)
+        }
       }
       case Success((key, node)) if key != ConfigurationSchema =>
-        s"Expected a ${ConfigurationSchema} as resolver configuration, got: ${key}".fail.toProcessingMessage
+        s"Expected a ${ConfigurationSchema} as resolver configuration, got: ${key}".fail.toProcessingMessageNel
       case Failure(err) => {
-        System.out.println(err)
-        "Resolver configuration failed JSON Schema validation".fail.toProcessingMessage
+        "Resolver configuration failed JSON Schema validation".fail.toProcessingMessageNel
       }
     }
   }
-
-  /**
-   * Creates a Resolver instance from a JValue.
-   *
-   * @param config The JSON containing the configuration
-   *        for this resolver
-   * @return a configured Resolver instance
-   */
-  def parse(config: JValue): Validated[Resolver] =
-    parse(asJsonNode(config))
 
   /**
    * Extracts a List of RepositoryRefs from the
@@ -114,7 +118,7 @@ object Resolver {
    * @return our assembled List of RepositoryRefs
    */
   // TODO: fix the return type
-  private[client] def getRepositoryRefs(repositoriesConfig: JValue): ValidatedNel[RepositoryRefs] = {
+  private[client] def getRepositoryRefs(repositoryConfigs: List[JValue]): ValidatedNel[RepositoryRefs] = {
     // TODO: implement this
     Nil.successNel
   }

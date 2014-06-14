@@ -28,7 +28,7 @@ class HttpRepositoryRefSpec extends Specification with DataTables with Validatio
                                                                                                           p^
   "a JSON configuration for an HTTP-based RepositoryRef should be recognized as such"                      ! e1^
   "retrieving an existent JSON Schema from an HTTP-based RepositoryRef should work"                        ! e2^
-  "requesting a non-existent JSON Schema from an HTTP-based RepositoryRef should return None"              ! e3^  
+  "requesting a non-existent JSON Schema from an HTTP-based RepositoryRef should return None"              ! e3^
                                                                                                            end
 
   def e1 = {
