@@ -116,7 +116,6 @@ object Resolver {
    *        all of the repository configurations
    * @return our assembled List of RepositoryRefs
    */
-  // TODO: fix the return type
   private[client] def getRepositoryRefs(repositoryConfigs: List[JValue]): ValidatedNel[RepositoryRefs] =
     repositoryConfigs.map { conf =>
       buildRepositoryRef(conf)
@@ -211,7 +210,6 @@ case class Resolver(
    *         JsonNode on Success, or an error String
    *         on Failure 
    */
-  // TODO: should we accumulate a Nel on Failure side?
   def lookupSchema(schemaKey: SchemaKey): ValidatedNel[JsonNode] = {
 
     @tailrec def recurse(schemaKey: SchemaKey, errors: ProcessingMessages, tried: RepositoryRefs, remaining: RepositoryRefs): ValidatedNel[JsonNode] = {
