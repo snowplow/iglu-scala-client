@@ -22,9 +22,27 @@ class EmbeddedRepositoryRefSpec extends Specification with DataTables with Valid
 
   "This is a specification to test an embedded RepositoryRef"                                              ^
                                                                                                           p^
+  "a JSON configuration for an embedded RepositoryRef should be recognized as such"                        ! e1^
   // "retrieving an existent JSON Schema from an HTTP-based RepositoryRef should work"                     ! e1^
-  "requesting a non-existent JSON Schema from an embedded RepositoryRef should return None"                ! e2^  
+  "requesting a non-existent JSON Schema from an embedded RepositoryRef should return None"                ! e2^
+  // a corrupted JSON Schema 
                                                                                                            end
+
+  def e1 = {
+    val config = SpecHelpers.asJValue(
+       """|{
+            |"name": "An embedded repo",
+            |"priority": 100,
+            |"vendorPrefixes": [ "com.snowplowanalytics.snowplow" ],
+            |"connection": {
+              |"embedded": {
+                |"path": "/embed-path"
+              |}
+            |}
+          |}""".stripMargin.replaceAll("[\n\r]","")
+      )
+    EmbeddedRepositoryRef.isEmbedded(config) must beTrue
+  }
 
   def e2 = {
     val schemaKey = SchemaKey("com.acme.n-a", "null", "jsonschema", "1-0-0")

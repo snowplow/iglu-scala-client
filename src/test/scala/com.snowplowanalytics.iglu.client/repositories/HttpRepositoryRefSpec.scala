@@ -26,11 +26,28 @@ class HttpRepositoryRefSpec extends Specification with DataTables with Validatio
 
   "This is a specification to test an HTTP-based RepositoryRef"                                            ^
                                                                                                           p^
-  "retrieving an existent JSON Schema from an HTTP-based RepositoryRef should work"                        ! e1^
-  "requesting a non-existent JSON Schema from an HTTP-based RepositoryRef should return None"              ! e2^  
+  "a JSON configuration for an HTTP-based RepositoryRef should be recognized as such"                      ! e1^
+  "retrieving an existent JSON Schema from an HTTP-based RepositoryRef should work"                        ! e2^
+  "requesting a non-existent JSON Schema from an HTTP-based RepositoryRef should return None"              ! e3^  
                                                                                                            end
 
   def e1 = {
+    val config = SpecHelpers.asJValue(
+       """|{
+            |"name": "Iglu Central",
+            |"priority": 0,
+            |"vendorPrefixes": [ "com.snowplowanalytics" ],
+            |"connection": {
+              |"http": {
+                |"uri": "http://iglucentral.com"
+              |}
+            |}
+          |}""".stripMargin.replaceAll("[\n\r]","")
+      )
+    HttpRepositoryRef.isHttp(config) must beTrue
+  }
+
+  def e2 = {
     val schemaKey = SchemaKey("com.snowplowanalytics.snowplow", "link_click", "jsonschema", "1-0-0")
 
     val expected = SpecHelpers.asJsonNode(
@@ -71,7 +88,7 @@ class HttpRepositoryRefSpec extends Specification with DataTables with Validatio
     actual.map(_.map(_.toString)) must beSuccessful(expected.toString.some)
   }
 
-  def e2 = {
+  def e3 = {
     val schemaKey = SchemaKey("de.ersatz.n-a", "null", "jsonschema", "1-0-0")
     SpecHelpers.IgluCentral.lookupSchema(schemaKey) must beSuccessful(None)
   }

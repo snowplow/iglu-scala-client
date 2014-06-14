@@ -51,8 +51,11 @@ object SpecHelpers {
     Resolver(cacheSize = 10, repo)
   }
 
+  def asJValue(str: String) =
+    parse(str)
+
   def asJsonNode(str: String) =
-    ajn(parse(str))
+    ajn(asJValue(str))
 
   def asProcessingMessage(message: String, schema: String, instance: String, keyword: String, foundExpected: Option[(String, String)], requiredMissing: Option[(String, String)]) = {
 
