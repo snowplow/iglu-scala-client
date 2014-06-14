@@ -26,6 +26,7 @@ import scalaz._
 import Scalaz._
 
 // json4s
+import org.json4s.scalaz.JsonScalaz._
 import org.json4s._
 import org.json4s.JsonDSL._
 import org.json4s.jackson.JsonMethods._
@@ -80,7 +81,8 @@ object Resolver {
     config.validateAndIdentifySchema(dataOnly = true) match {
       case Success((key, node)) if key == ConfigurationSchema => {
         val json = fromJsonNode(node)
-        val cacheSize = (json \ "cacheSize").extract[Int]
+        val cacheSize = field[Int]("cacheSize")(json)
+        val repositories = field[JValue]("repositories")(json)
 
         "TODO".fail.toProcessingMessage
       }
@@ -130,14 +132,16 @@ object Resolver {
    *        configuration for this repository
    * @return our constructed RepositoryRef
    */
-  private[client] def buildRepositoryRef(repositoryConfig: JValue): ValidatedNel[RepositoryRef] =
-    if (EmbeddedRepositoryRef.isEmbedded(repositoryConfig)) {
-      EmbeddedRepositoryRef.parse(repositoryConfig)
-    } else if (HttpRepositoryRef.isHttp(repositoryConfig)) {
-      HttpRepositoryRef.parse(repositoryConfig)
+  private[client] def buildRepositoryRef(repositoryConfig: JValue): ValidatedNel[RepositoryRef] = {
+    val rc = repositoryConfig
+    if (EmbeddedRepositoryRef.isEmbedded(rc)) {
+      EmbeddedRepositoryRef.parse(rc)
+    } else if (HttpRepositoryRef.isHttp(rc)) {
+      HttpRepositoryRef.parse(rc)
     } else {
       s"Configuration unrecognizable as either embedded or HTTP repository".fail.toProcessingMessageNel
     }
+  }
 
 }
 

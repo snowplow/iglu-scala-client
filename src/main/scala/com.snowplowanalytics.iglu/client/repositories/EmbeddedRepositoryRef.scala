@@ -29,6 +29,7 @@ import scalaz._
 import Scalaz._
 
 // json4s
+import org.json4s.scalaz.JsonScalaz._
 import org.json4s._
 import org.json4s.JsonDSL._
 import org.json4s.jackson.JsonMethods._
@@ -53,7 +54,7 @@ object EmbeddedRepositoryRef {
    *         an EmbeddedRepositoryRef, else false
    */
   def isEmbedded(config: JValue): Boolean =
-    false
+    (config \ "connection" \ "embedded").toSome.isDefined
 
   /**
    * Constructs an EmbeddedRepositoryRef

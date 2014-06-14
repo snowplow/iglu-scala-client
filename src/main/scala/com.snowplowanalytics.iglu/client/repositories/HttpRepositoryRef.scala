@@ -15,19 +15,22 @@ package repositories
 
 // Java
 import java.net.URL
+import java.net.UnknownHostException
 
 // Apache Commons
 import org.apache.commons.lang3.exception.ExceptionUtils
 
 // Jackson
-import com.github.fge.jackson.JsonLoader
+import com.fasterxml.jackson.core.JsonParseException
 import com.fasterxml.jackson.databind.JsonNode
+import com.github.fge.jackson.JsonLoader
 
 // Scalaz
 import scalaz._
 import Scalaz._
 
 // json4s
+import org.json4s.scalaz.JsonScalaz._
 import org.json4s._
 import org.json4s.JsonDSL._
 import org.json4s.jackson.JsonMethods._
@@ -35,6 +38,7 @@ import org.json4s.jackson.JsonMethods._
 // This project
 import validation.ProcessingMessageMethods
 import ProcessingMessageMethods._
+import utils.{ValidationExceptions => VE}
 
 /**
  * Helpers for constructing an HttpRepository.
@@ -51,7 +55,7 @@ object HttpRepositoryRef {
    *         an HttpRepositoryRef, else false
    */
   def isHttp(config: JValue): Boolean =
-    false
+    (config \ "connection" \ "http").toSome.isDefined
 
   /**
    * Constructs an EmbeddedRepositoryRef
@@ -138,7 +142,7 @@ case class HttpRepositoryRef(
    * Human-readable descriptor for this
    * type of repository ref.
    */
-  val descriptor = "http"
+  val descriptor = "HTTP"
 
   /**
    * Retrieves an IgluSchema from the Iglu Repo as
@@ -159,6 +163,10 @@ case class HttpRepositoryRef(
       val fullUri  = new URL(fullPath)
       JsonLoader.fromURL(fullUri).some.success
     } catch {
+      case jpe: JsonParseException =>
+        s"Problem parsing ${schemaKey} as JSON in ${descriptor} Iglu repository ${config.name}: %s".format(VE.stripInstanceEtc(jpe.getMessage)).fail.toProcessingMessage
+      case uhe: UnknownHostException =>
+        s"Network issue fetching ${schemaKey} in ${descriptor} Iglu repository ${config.name}: ${uhe.getMessage}".fail.toProcessingMessage
       case e: Throwable => None.success
     }
   }
