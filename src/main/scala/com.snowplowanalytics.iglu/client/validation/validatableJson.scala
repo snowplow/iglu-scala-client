@@ -140,7 +140,6 @@ object ValidatableJsonMethods {
    * Unsafe lookup is fine here because we know this
    * schema exists in our resources folder
    */
-  // TODO: cache this value rather than lookup each time.
   private[validation] def getSelfDescribingSchema(implicit resolver: Resolver): JsonNode =
     resolver.unsafeLookupSchema(
       SchemaKey("com.snowplowanalytics.self-desc", "instance-iglu-only", "jsonschema", "1-0-0")

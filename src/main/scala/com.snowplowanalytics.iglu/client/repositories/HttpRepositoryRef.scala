@@ -163,8 +163,6 @@ case class HttpRepositoryRef(
    *         JsonNode on Success, or an error String
    *         on Failure 
    */
-  // TODO: we should distinguish between not found and
-  // invalid JSON
   def lookupSchema(schemaKey: SchemaKey): Validated[Option[JsonNode]] = {
     try {
     	// TODO: fix this. Use a lens?
