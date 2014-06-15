@@ -212,6 +212,21 @@ case class Resolver(
    */
   def lookupSchema(schemaKey: SchemaKey): ValidatedNel[JsonNode] = {
 
+  /**
+   * Tail-recursive function to find our schema in one
+   * of our repositories.
+   *
+   * @param schemaKey The SchemaKey uniquely identifying
+   *        this schema in Iglu
+   * @param errors A List of error messages collected so
+   *        far
+   * @param tried A List of repositories we have looked
+   *        in fruitlessly so far
+   * @param remaining A List of repositories we still
+   *        have to look in
+   * @return either a Success-boxed schema (as a JsonNode),
+   *         or a Failure-boxing Nel of ProcessingMessages
+   */
     @tailrec def recurse(schemaKey: SchemaKey, errors: ProcessingMessages, tried: RepositoryRefs, remaining: RepositoryRefs): ValidatedNel[JsonNode] = {
       remaining match {
         case Nil =>
@@ -272,10 +287,15 @@ case class Resolver(
    * Collects together the errors for a failed
    * lookup into a NonEmptyList.
    *
-   * TODO: finish params
-   *
+   * @param schemaKey The SchemaKey uniquely identifying
+   *        this schema in Iglu
+   * @param errors A (possibly empty) List of error
+   *        messages
+   * @param tried A (never empty) List of repositories
+   *        we looked up our SchemaKey in
    * @return a NonEmptyList of ProcessingMessages
    */
+  // TODO: tried really ought to be a Nel
   // TODO: rather than a text list, would be nice to add a JSON array
   // of failed repositories
   private[client] def collectErrors(schemaKey: SchemaKey, errors: ProcessingMessages, tried: RepositoryRefs): ProcessingMessageNel = {
