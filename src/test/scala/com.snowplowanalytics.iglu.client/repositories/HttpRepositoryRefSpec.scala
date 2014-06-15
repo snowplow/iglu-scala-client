@@ -50,10 +50,13 @@ class HttpRepositoryRefSpec extends Specification with DataTables with Validatio
 
   def e1 = HttpRepositoryRef.isHttp(AcmeConfig) must beTrue
 
-  def e2 = HttpRepositoryRef.parse(AcmeConfig) must beSuccessful(HttpRepositoryRef(
-    config = RepositoryRefConfig("Acme Iglu Repo", 5, List("com.acme")),
-    uri = new URL("http://iglu.acme.com")
-    ))
+  def e2 = {
+    val expected = HttpRepositoryRef(
+      config = RepositoryRefConfig("Acme Iglu Repo", 5, List("com.acme")),
+      uri = new URL("http://iglu.acme.com")
+    )
+    HttpRepositoryRef.parse(AcmeConfig) must beSuccessful(expected)
+  }
 
   def e3 = {
     val schemaKey = SchemaKey("com.snowplowanalytics.snowplow", "link_click", "jsonschema", "1-0-0")

@@ -23,28 +23,36 @@ class EmbeddedRepositoryRefSpec extends Specification with DataTables with Valid
   "This is a specification to test an embedded RepositoryRef"                                              ^
                                                                                                           p^
   "a JSON configuration for an embedded RepositoryRef should be recognized as such"                        ! e1^
-  // "retrieving an existent JSON Schema from an HTTP-based RepositoryRef should work"                     ! e1^
-  "requesting a non-existent JSON Schema from an embedded RepositoryRef should return None"                ! e2^
+  "a JSON configuration can be used to construct an embedded RepositoryRef"                                ! e2^
+  // "retrieving an existent JSON Schema from an HTTP-based RepositoryRef should work"                     ! e3^
+  "requesting a non-existent JSON Schema from an embedded RepositoryRef should return None"                ! e3^
   // a corrupted JSON Schema 
                                                                                                            end
 
-  def e1 = {
-    val config = SpecHelpers.asJValue(
-       """|{
-            |"name": "An embedded repo",
-            |"priority": 100,
-            |"vendorPrefixes": [ "com.snowplowanalytics.snowplow" ],
-            |"connection": {
-              |"embedded": {
-                |"path": "/embed-path"
-              |}
+  val AcmeConfig = SpecHelpers.asJValue(
+     """|{
+          |"name": "Acme Embedded",
+          |"priority": 100,
+          |"vendorPrefixes": [ "uk.co.acme", "de.acme" ],
+          |"connection": {
+            |"embedded": {
+              |"path": "/acme-embedded-new"
             |}
-          |}""".stripMargin.replaceAll("[\n\r]","")
-      )
-    EmbeddedRepositoryRef.isEmbedded(config) must beTrue
-  }
+          |}
+        |}""".stripMargin.replaceAll("[\n\r]","")
+    )
+
+  def e1 = EmbeddedRepositoryRef.isEmbedded(AcmeConfig) must beTrue
 
   def e2 = {
+    val expected = EmbeddedRepositoryRef(
+      config = RepositoryRefConfig("Acme Embedded", 100, List("uk.co.acme", "de.acme")),
+      path = "/acme-embedded-new"
+    )
+    EmbeddedRepositoryRef.parse(AcmeConfig) must beSuccessful(expected)
+  }
+
+  def e3 = {
     val schemaKey = SchemaKey("com.acme.n-a", "null", "jsonschema", "1-0-0")
     SpecHelpers.IgluCentral.lookupSchema(schemaKey) must beSuccessful(None)
   }

@@ -174,7 +174,7 @@ case class HttpRepositoryRef(
       case jpe: JsonParseException =>
         s"Problem parsing ${schemaKey} as JSON in ${descriptor} Iglu repository ${config.name}: %s".format(VE.stripInstanceEtc(jpe.getMessage)).fail.toProcessingMessage
       case uhe: UnknownHostException =>
-        s"Network issue fetching ${schemaKey} in ${descriptor} Iglu repository ${config.name}: ${uhe.getMessage}".fail.toProcessingMessage
+        s"Unknown host issue fetching ${schemaKey} in ${descriptor} Iglu repository ${config.name}: ${uhe.getMessage}".fail.toProcessingMessage
       case e: Throwable => None.success
     }
   }
