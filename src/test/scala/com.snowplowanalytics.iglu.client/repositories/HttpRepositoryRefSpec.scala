@@ -13,6 +13,9 @@
 package com.snowplowanalytics.iglu.client
 package repositories
 
+// Java
+import java.net.URL
+
 // Scalaz
 import scalaz._
 import Scalaz._
@@ -27,27 +30,32 @@ class HttpRepositoryRefSpec extends Specification with DataTables with Validatio
   "This is a specification to test an HTTP-based RepositoryRef"                                            ^
                                                                                                           p^
   "a JSON configuration for an HTTP-based RepositoryRef should be recognized as such"                      ! e1^
-  "retrieving an existent JSON Schema from an HTTP-based RepositoryRef should work"                        ! e2^
-  "requesting a non-existent JSON Schema from an HTTP-based RepositoryRef should return None"              ! e3^
+  "a JSON configuration can be used to construct an HTTP-based RepositoryRef"                              ! e2^
+  "retrieving an existent JSON Schema from an HTTP-based RepositoryRef should work"                        ! e3^
+  "requesting a non-existent JSON Schema from an HTTP-based RepositoryRef should return None"              ! e4^
                                                                                                            end
 
-  def e1 = {
-    val config = SpecHelpers.asJValue(
+  val AcmeConfig = SpecHelpers.asJValue(
        """|{
-            |"name": "Iglu Central",
-            |"priority": 0,
-            |"vendorPrefixes": [ "com.snowplowanalytics" ],
+            |"name": "Acme Iglu Repo",
+            |"priority": 5,
+            |"vendorPrefixes": [ "com.acme" ],
             |"connection": {
               |"http": {
-                |"uri": "http://iglucentral.com"
+                |"uri": "http://iglu.acme.com"
               |}
             |}
           |}""".stripMargin.replaceAll("[\n\r]","")
       )
-    HttpRepositoryRef.isHttp(config) must beTrue
-  }
 
-  def e2 = {
+  def e1 = HttpRepositoryRef.isHttp(AcmeConfig) must beTrue
+
+  def e2 = HttpRepositoryRef.parse(AcmeConfig) must beSuccessful(HttpRepositoryRef(
+    config = RepositoryRefConfig("Acme Iglu Repo", 5, List("com.acme")),
+    uri = new URL("http://iglu.acme.com")
+    ))
+
+  def e3 = {
     val schemaKey = SchemaKey("com.snowplowanalytics.snowplow", "link_click", "jsonschema", "1-0-0")
 
     val expected = SpecHelpers.asJsonNode(
@@ -88,7 +96,7 @@ class HttpRepositoryRefSpec extends Specification with DataTables with Validatio
     actual.map(_.map(_.toString)) must beSuccessful(expected.toString.some)
   }
 
-  def e3 = {
+  def e4 = {
     val schemaKey = SchemaKey("de.ersatz.n-a", "null", "jsonschema", "1-0-0")
     SpecHelpers.IgluCentral.lookupSchema(schemaKey) must beSuccessful(None)
   }
