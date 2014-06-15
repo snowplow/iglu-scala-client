@@ -13,7 +13,10 @@
 package com.snowplowanalytics.iglu.client
 package utils
 
-// TODO
+/**
+ * Provides helpers around converting JVM
+ * exceptions to Scalaz Validations.
+ */
 object ValidationExceptions {
   
   /**
@@ -23,12 +26,13 @@ object ValidationExceptions {
    * "... at [Source: java.io.StringReader@1fe7a8f8; line: 1, column: 2]""
    *                                       ^^^^^^^^
    *
-   * Because this makes it hard to test.
+   * Also removes any control characters and replaces
+   * tabs with 4 spaces.
    *
-   * @param message The exception message which is
-   *        leaking instance information
+   * @param message The exception message which needs
+   *        tidying up
    * @return the same exception message, but with
-   *         instance information removed
+   *         instance information etc removed
    */
   def stripInstanceEtc(message: String): String = {
     message
