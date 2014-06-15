@@ -16,11 +16,19 @@ package com.snowplowanalytics.iglu.client
 import java.net.URL
 
 // JSON Schema
-import com.github.fge.jsonschema.core.report.ProcessingMessage
+import com.github.fge.jsonschema.core.report.{
+  ProcessingMessage,
+  LogLevel
+}
 
 // Scalaz
 import scalaz._
 import Scalaz._
+
+// json4s
+import org.json4s._
+import org.json4s.JsonDSL._
+import org.json4s.jackson.JsonMethods._
 
 // This project
 import repositories.{
@@ -46,6 +54,13 @@ object ResolverSpec {
     val two   = embedRef("de.acompany.snowplow", 40)
     val three = embedRef("de.acompany.snowplow", 100)
   }
+
+  def notFoundError(schemaKey: String, repos: List[String]): String =
+    new ProcessingMessage()
+      .setLogLevel(LogLevel.ERROR)
+      .setMessage(s"Could not find schema with key ${schemaKey} in any repository, tried:")
+      .put("repositories", asJsonNode(repos))
+      .toString
 }
 
 class ResolverSpec extends Specification with DataTables with ValidationMatchers { def is =
@@ -107,8 +122,11 @@ class ResolverSpec extends Specification with DataTables with ValidationMatchers
 
     val schemaKey = SchemaKey("com.acme.icarus", "wing", "jsonschema", "1-0-0")
     val expected = NonEmptyList(
-      "Could not find schema with key iglu:com.acme.icarus/wing/jsonschema/1-0-0 in any repository, tried: Iglu Test Embedded [embedded], Iglu Client Embedded [embedded]".toProcessingMessage.toString
-    )    
+      notFoundError(
+        "iglu:com.acme.icarus/wing/jsonschema/1-0-0",
+        List("Iglu Test Embedded [embedded]", "Iglu Client Embedded [embedded]")
+      )
+    )
 
     val actual = SpecHelpers.TestResolver.lookupSchema(schemaKey)
     actual.leftMap(_.map(_.toString)) must beFailing(expected)
@@ -118,7 +136,10 @@ class ResolverSpec extends Specification with DataTables with ValidationMatchers
 
     val schemaKey = SchemaKey("com.snowplowanalytics.iglu-test", "corrupted_schema", "jsonschema", "1-0-0")
     val expected = NonEmptyList(
-      "Could not find schema with key iglu:com.snowplowanalytics.iglu-test/corrupted_schema/jsonschema/1-0-0 in any repository, tried: Iglu Client Embedded [embedded], Iglu Test Embedded [embedded]".toProcessingMessage.toString,
+      notFoundError(
+        "iglu:com.snowplowanalytics.iglu-test/corrupted_schema/jsonschema/1-0-0",
+        List("Iglu Client Embedded [embedded]", "Iglu Test Embedded [embedded]")
+      ),
       "Problem parsing /iglu-test-embedded/schemas/com.snowplowanalytics.iglu-test/corrupted_schema/jsonschema/1-0-0 as JSON in embedded Iglu repository Iglu Test Embedded: Unexpected end-of-input within/between OBJECT entries at [Source: java.io.BufferedInputStream@xxxxxx; line: 10, column: 316]".toProcessingMessage.toString
     )
 

@@ -163,6 +163,7 @@ case class HttpRepositoryRef(
    *         JsonNode on Success, or an error String
    *         on Failure 
    */
+  // TODO: this isn't working when there is a network outage (e.g. running test suite on Tube)
   def lookupSchema(schemaKey: SchemaKey): Validated[Option[JsonNode]] = {
     try {
       for {

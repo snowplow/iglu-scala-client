@@ -16,7 +16,10 @@ package com.snowplowanalytics.iglu.client
 import com.fasterxml.jackson.databind.JsonNode
 
 // JSON Schema
-import com.github.fge.jsonschema.core.report.ProcessingMessage
+import com.github.fge.jsonschema.core.report.{
+  ProcessingMessage,
+  LogLevel
+}
 
 // Scala
 import scala.annotation.tailrec
@@ -296,12 +299,15 @@ case class Resolver(
    * @return a NonEmptyList of ProcessingMessages
    */
   // TODO: tried really ought to be a Nel
-  // TODO: rather than a text list, would be nice to add a JSON array
-  // of failed repositories
   private[client] def collectErrors(schemaKey: SchemaKey, errors: ProcessingMessages, tried: RepositoryRefs): ProcessingMessageNel = {
-    val tr  = tried.map(t => s"${t.config.name} [${t.descriptor}]").mkString(", ")
-    val err = s"Could not find schema with key ${schemaKey} in any repository, tried: ${tr}".toProcessingMessage
-    NonEmptyList[ProcessingMessage](err, errors: _*)
+
+    val repos = tried.map(t => s"${t.config.name} [${t.descriptor}]")
+    val notFound = new ProcessingMessage()
+                     .setLogLevel(LogLevel.ERROR)
+                     .setMessage(s"Could not find schema with key ${schemaKey} in any repository, tried:")
+                     .put("repositories", asJsonNode(repos))
+
+    NonEmptyList[ProcessingMessage](notFound, errors: _*)
   }
 
   /**
