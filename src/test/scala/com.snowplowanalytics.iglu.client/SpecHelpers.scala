@@ -41,15 +41,10 @@ object SpecHelpers {
   val IgluCentral =
     HttpRepositoryRef(RepositoryRefConfig("Iglu Central", 0, List("com.snowplowanalytics")), new URL("http://iglucentral.com"))
 
-  val TestResolver = {
-    val repo = {
-      val config = RepositoryRefConfig("Iglu Test Embedded", 0, List("com.snowplowanalytics"))
-      EmbeddedRepositoryRef(config, path = "/iglu-test-embedded")    
-    }
+  val EmbeddedTest =
+    EmbeddedRepositoryRef(RepositoryRefConfig("Iglu Test Embedded", 0, List("com.snowplowanalytics")), path = "/iglu-test-embedded") 
 
-    // Disable LRU cache as not thread-safe for tests
-    Resolver(cacheSize = 10, repo)
-  }
+  val TestResolver = Resolver(cacheSize = 10, EmbeddedTest)
 
   def asJValue(str: String) =
     parse(str)

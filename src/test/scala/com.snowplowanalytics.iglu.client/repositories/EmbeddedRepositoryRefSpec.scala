@@ -24,8 +24,8 @@ class EmbeddedRepositoryRefSpec extends Specification with DataTables with Valid
                                                                                                           p^
   "a JSON configuration for an embedded RepositoryRef should be recognized as such"                        ! e1^
   "a JSON configuration can be used to construct an embedded RepositoryRef"                                ! e2^
-  // "retrieving an existent JSON Schema from an HTTP-based RepositoryRef should work"                     ! e3^
-  "requesting a non-existent JSON Schema from an embedded RepositoryRef should return None"                ! e3^
+  "retrieving an existent JSON Schema from an HTTP-based RepositoryRef should work"                        ! e3^
+  "requesting a non-existent JSON Schema from an embedded RepositoryRef should return None"                ! e4^
   // a corrupted JSON Schema 
                                                                                                            end
 
@@ -53,6 +53,35 @@ class EmbeddedRepositoryRefSpec extends Specification with DataTables with Valid
   }
 
   def e3 = {
+    val schemaKey = SchemaKey("com.snowplowanalytics.iglu-test", "stock-item", "jsonschema", "1-0-0")
+    val expected =
+      """{
+        |"$schema":"http://iglucentral.com/schemas/com.snowplowanalytics.self-desc/schema/jsonschema/1-0-0#",
+        |"description":"Test schema",
+        |"self":{
+          |"vendor":"com.snowplowanalytics.iglu-test",
+          |"name":"stock-item",
+          |"format":"jsonschema",
+          |"version":"1-0-0"
+        |},
+        |"type":"object",
+        |"properties":{
+          |"id":{
+            |"type":"string"
+          |},
+          |"name":{
+            |"type":"string"
+          |},
+          |"price":{
+            |"type":"number"
+          |}
+        |}
+      |}""".stripMargin.replaceAll("[\n\r]","")
+
+    SpecHelpers.EmbeddedTest.lookupSchema(schemaKey).map(_.map(_.toString)) must beSuccessful(Some(expected))
+  }
+
+  def e4 = {
     val schemaKey = SchemaKey("com.acme.n-a", "null", "jsonschema", "1-0-0")
     SpecHelpers.IgluCentral.lookupSchema(schemaKey) must beSuccessful(None)
   }
