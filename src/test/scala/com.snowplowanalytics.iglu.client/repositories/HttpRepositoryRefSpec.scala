@@ -33,6 +33,7 @@ class HttpRepositoryRefSpec extends Specification with DataTables with Validatio
   "a JSON configuration can be used to construct an HTTP-based RepositoryRef"                              ! e2^
   "retrieving an existent JSON Schema from an HTTP-based RepositoryRef should work"                        ! e3^
   "requesting a non-existent JSON Schema from an HTTP-based RepositoryRef should return None"              ! e4^
+  // TODO: add a corrupted JSON Schema test
                                                                                                            end
 
   val AcmeConfig = SpecHelpers.asJValue(

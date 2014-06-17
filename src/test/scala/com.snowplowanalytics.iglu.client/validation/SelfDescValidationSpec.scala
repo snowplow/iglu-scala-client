@@ -20,7 +20,6 @@ import ValidatableJsonMethods._
 import org.specs2.Specification
 import org.specs2.scalaz.ValidationMatchers
 
-// TODO: add in some Failures
 class SelfDescValidationSpec extends Specification with ValidationMatchers { def is =
 
   "This is a specification to test validation of self-describing JsonNodes"                                                  ^
@@ -29,6 +28,7 @@ class SelfDescValidationSpec extends Specification with ValidationMatchers { def
   "validating a correct self-desc JSON should return only the JSON's data field in a Success if requested"                   ! e2^
   "validating & identifying a correct self-desc JSON should return the JSON & the identified SchemaKey"                      ! e3^
   "validating & identifying a correct self-desc JSON should return only the JSON's data field & identified key if requested" ! e4^
+  // TODO: add an invalid JSON
                                                                                                                              end
 
 

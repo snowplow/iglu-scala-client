@@ -13,6 +13,13 @@
 package com.snowplowanalytics.iglu.client
 package repositories
 
+// Scalaz
+import scalaz._
+import Scalaz._
+
+// This project
+import validation.ProcessingMessageMethods._
+
 // Specs2
 import org.specs2.Specification
 import org.specs2.matcher.DataTables
@@ -24,9 +31,9 @@ class EmbeddedRepositoryRefSpec extends Specification with DataTables with Valid
                                                                                                           p^
   "a JSON configuration for an embedded RepositoryRef should be recognized as such"                        ! e1^
   "a JSON configuration can be used to construct an embedded RepositoryRef"                                ! e2^
-  "retrieving an existent JSON Schema from an HTTP-based RepositoryRef should work"                        ! e3^
+  "retrieving an existent JSON Schema from an embedded RepositoryRef should work"                          ! e3^
   "requesting a non-existent JSON Schema from an embedded RepositoryRef should return None"                ! e4^
-  // a corrupted JSON Schema 
+  "requesting a corrupted JSON Schema from an embedded RepositoryRef should return an appropriate Failure" ! e5^
                                                                                                            end
 
   val AcmeConfig = SpecHelpers.asJValue(
@@ -83,7 +90,13 @@ class EmbeddedRepositoryRefSpec extends Specification with DataTables with Valid
 
   def e4 = {
     val schemaKey = SchemaKey("com.acme.n-a", "null", "jsonschema", "1-0-0")
-    SpecHelpers.IgluCentral.lookupSchema(schemaKey) must beSuccessful(None)
+    SpecHelpers.EmbeddedTest.lookupSchema(schemaKey) must beSuccessful(None)
+  }
+
+  def e5 = {
+    val schemaKey = SchemaKey("com.snowplowanalytics.iglu-test", "corrupted_schema", "jsonschema", "1-0-0")
+    val expected = "Problem parsing /iglu-test-embedded/schemas/com.snowplowanalytics.iglu-test/corrupted_schema/jsonschema/1-0-0 as JSON in embedded Iglu repository Iglu Test Embedded: Unexpected end-of-input within/between OBJECT entries at [Source: java.io.BufferedInputStream@xxxxxx; line: 10, column: 316]".toProcessingMessage.toString
+    SpecHelpers.EmbeddedTest.lookupSchema(schemaKey).leftMap(_.toString) must beFailing(expected.toString)
   }
 
 }
