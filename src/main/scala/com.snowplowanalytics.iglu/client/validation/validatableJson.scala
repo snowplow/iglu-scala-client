@@ -85,7 +85,7 @@ object ValidatableJsonMethods {
    *
    * IMPORTANT: currently the exact version of
    * the JSON Schema (i.e. MODEL-REVISION-ADDITION)
-   * must be available from the IgluRepo.
+   * must be resolvable thru Iglu.
    *
    * @param instance The self-describing JSON
    *         to validate
@@ -112,7 +112,7 @@ object ValidatableJsonMethods {
    *
    * IMPORTANT: currently the exact version of
    * the JSON Schema (i.e. MODEL-REVISION-ADDITION)
-   * must be available from the IgluRepo.
+   * must be resolvable thru Iglu.
    *
    * @param instance The self-describing JSON
    *         to validate
@@ -133,6 +133,26 @@ object ValidatableJsonMethods {
       js <- resolver.lookupSchema(sk)
       v  <- validateAgainstSchema(d, js)
     } yield if (dataOnly) (sk, d) else (sk, instance)
+
+  /**
+   * Verify that this JSON is of the expected schema,
+   * then validate it against the schema.
+   *
+   * IMPORTANT: currently the exact version of
+   * the JSON Schema (i.e. MODEL-REVISION-ADDITION)
+   * must be resolvable thru Iglu.
+   *
+   * @param instance The self-describing JSON to
+   *        verify and validate
+   * @param dataOnly Whether the returned JsonNode
+   *        should be the data only, or the whole
+   *        JSON (schema + data)
+   * @return either Success boxing a Tuple2 of the
+   *         JSON's SchemaKey plus its JsonNode,
+   *         or a Failure boxing a NonEmptyList
+   *         of ProcessingMessages
+   */
+  // TODO
 
   /**
    * Get our schema for self-describing Iglu instances.
