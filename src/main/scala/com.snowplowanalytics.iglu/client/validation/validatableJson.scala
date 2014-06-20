@@ -144,15 +144,17 @@ object ValidatableJsonMethods {
    *
    * @param instance The self-describing JSON to
    *        verify and validate
+   * @param schemaKey Identifying the schema we
+   *        believe this JSON is described by
    * @param dataOnly Whether the returned JsonNode
    *        should be the data only, or the whole
    *        JSON (schema + data)
-   * @return either Success boxing a Tuple2 of the
-   *         JSON's SchemaKey plus its JsonNode,
+   * @return either Success boxing the JsonNode
    *         or a Failure boxing a NonEmptyList
    *         of ProcessingMessages
    */
-  // TODO
+  def verifySchemaAndValidate(instance: JsonNode, schemaKey: SchemaKey, dataOnly: Boolean = false)(implicit resolver: Resolver): ValidatedNel[JsonNode] =
+    instance.success // TODO: implement this
 
   /**
    * Get our schema for self-describing Iglu instances.
@@ -221,4 +223,7 @@ class ValidatableJsonNode(instance: JsonNode) {
 
   def validateAndIdentifySchema(dataOnly: Boolean)(implicit resolver: Resolver): ValidatedNel[JsonSchemaPair] =
     VJM.validateAndIdentifySchema(instance, dataOnly)
+
+  def verifySchemaAndValidate(instance: JsonNode, schemaKey: SchemaKey, dataOnly: Boolean(implicit resolver: Resolver): ValidatedNel[JsonNode] =
+    VJM.verifySchemaAndValidate(instance, schemaKey, dataOnly)
 }
