@@ -159,7 +159,7 @@ object ValidatableJsonMethods {
       s  =  j.get("schema").asText
       d  =  j.get("data")
       sk <- SchemaKey.parseNel(s)
-      m  <- if (sk == schemaKey) sk.success else s"Failed to verify schema ${sk}: expected ${schemaKey}".toProcessingMessageNel.fail
+      m  <- if (sk == schemaKey) sk.success else s"Verifying schema as ${schemaKey} failed: found ${sk}".toProcessingMessageNel.fail
       js <- resolver.lookupSchema(m)
       v  <- validateAgainstSchema(d, js)
     } yield if (dataOnly) d else instance
@@ -232,6 +232,6 @@ class ValidatableJsonNode(instance: JsonNode) {
   def validateAndIdentifySchema(dataOnly: Boolean)(implicit resolver: Resolver): ValidatedNel[JsonSchemaPair] =
     VJM.validateAndIdentifySchema(instance, dataOnly)
 
-  def verifySchemaAndValidate(instance: JsonNode, schemaKey: SchemaKey, dataOnly: Boolean)(implicit resolver: Resolver): ValidatedNel[JsonNode] =
+  def verifySchemaAndValidate(schemaKey: SchemaKey, dataOnly: Boolean)(implicit resolver: Resolver): ValidatedNel[JsonNode] =
     VJM.verifySchemaAndValidate(instance, schemaKey, dataOnly)
 }

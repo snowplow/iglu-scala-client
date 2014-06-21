@@ -29,6 +29,7 @@ class SelfDescValidationSpec extends Specification with ValidationMatchers { def
   "validating & identifying a correct self-desc JSON should return the JSON & the identified SchemaKey"                      ! e3^
   "validating & identifying a correct self-desc JSON should return only the JSON's data field & identified key if requested" ! e4^
   // TODO: add an invalid JSON
+  // TODO: add a JSON which fails schema identification
                                                                                                                              end
 
 

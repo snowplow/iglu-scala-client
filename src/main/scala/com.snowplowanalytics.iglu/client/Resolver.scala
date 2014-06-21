@@ -91,8 +91,8 @@ object Resolver {
     import ValidatableJsonMethods._
 
     // Check it passes validation
-    config.validateAndIdentifySchema(dataOnly = true) match {
-      case Success((key, node)) if key == ConfigurationSchema => {
+    config.verifySchemaAndValidate(ConfigurationSchema, dataOnly = true) match {
+      case Success(node) => {
 
         val json = fromJsonNode(node)
         val cacheSize = field[Int]("cacheSize")(json).leftMap(_.map(_.toString.toProcessingMessage))
@@ -104,8 +104,6 @@ object Resolver {
           Resolver(_, _)
         }
       }
-      case Success((key, node)) if key != ConfigurationSchema =>
-        s"Expected a ${ConfigurationSchema} as resolver configuration, got: ${key}".fail.toProcessingMessageNel
       case Failure(err) =>
         (err.<::("Resolver configuration failed JSON Schema validation".toProcessingMessage)).fail[Resolver]
     }
