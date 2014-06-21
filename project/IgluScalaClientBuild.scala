@@ -13,7 +13,7 @@
 import sbt._
 import Keys._
 
-object IgluJavaScalaClientBuild extends Build {
+object IgluScalaClientBuild extends Build {
 
   import Dependencies._
   import BuildSettings._
