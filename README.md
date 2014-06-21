@@ -23,8 +23,10 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 
+[iglu-wiki]: https://github.com/snowplow/iglu/wiki
+[snowplow-schema-post]: http://snowplowanalytics.com/blog/2014/06/06/making-snowplow-schemas-flexible-a-technical-approach/
+
 [snowplow-repo]: https://github.com/snowplow/snowplow
-[iglu]: https://github.com/snowplow/iglu/wiki
 [snowplow-website]: http://snowplowanalytics.com
 
 [techdocs-image]: https://d3i6fms1cm1j0i.cloudfront.net/github/images/techdocs.png
