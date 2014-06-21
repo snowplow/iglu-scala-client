@@ -82,7 +82,9 @@ class EmbeddedRepositoryRefSpec extends Specification with DataTables with Valid
           |"price":{
             |"type":"number"
           |}
-        |}
+        |},
+        |"required":["id","name","price"],
+        |"additionalProperties":false
       |}""".stripMargin.replaceAll("[\n\r]","")
 
     SpecHelpers.EmbeddedTest.lookupSchema(schemaKey).map(_.map(_.toString)) must beSuccessful(Some(expected))

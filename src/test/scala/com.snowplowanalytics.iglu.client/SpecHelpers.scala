@@ -52,7 +52,7 @@ object SpecHelpers {
   def asJsonNode(str: String) =
     ajn(asJValue(str))
 
-  def asProcessingMessage(message: String, schema: String, instance: String, keyword: String, foundExpected: Option[(String, String)], requiredMissing: Option[(String, String)]) = {
+  def asProcessingMessage(message: String, schema: String, instance: String, keyword: String, foundExpected: Option[(String, String)], requiredMissing: Option[(String, String)], unwanted: Option[String]) = {
 
     val pm = new ProcessingMessage()
                    .setLogLevel(LogLevel.ERROR)
@@ -73,6 +73,9 @@ object SpecHelpers {
         pm.put("required", asJsonNode(required))
         pm.put("missing",  asJsonNode(missing))
       case _ =>
+    }
+    for (unw <- unwanted) {
+      pm.put("unwanted", asJsonNode(unw))
     }
 
     pm

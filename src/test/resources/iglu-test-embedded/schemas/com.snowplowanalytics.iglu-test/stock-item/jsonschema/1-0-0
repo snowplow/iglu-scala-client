@@ -19,5 +19,8 @@
 		"price": {
 			"type": "number"
 		}
-	}
+	},
+
+	"required": ["id", "name", "price"],
+	"additionalProperties": false
 }

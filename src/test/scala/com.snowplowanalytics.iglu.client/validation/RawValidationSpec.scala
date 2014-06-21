@@ -66,7 +66,7 @@ class RawValidationSpec extends Specification with DataTables with ValidationMat
         val json = SpecHelpers.asJsonNode(input)
         json.validateAgainstSchema(SimpleSchema) must beLike {
           case Failure(NonEmptyList(head, tail @ _*)) if tail.isEmpty =>
-            head.toString must_== SpecHelpers.asProcessingMessage(message, schema, instance, keyword, foundExpected, requiredMissing).toString
+            head.toString must_== SpecHelpers.asProcessingMessage(message, schema, instance, keyword, foundExpected, requiredMissing, None).toString
         }
       }
     }

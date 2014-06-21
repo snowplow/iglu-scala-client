@@ -13,6 +13,10 @@
 package com.snowplowanalytics.iglu.client
 package validation
 
+// Scalaz
+import scalaz._
+import Scalaz._
+
 // This project
 import ValidatableJsonMethods._
 import validation.ProcessingMessageMethods._
@@ -27,12 +31,14 @@ class SelfDescValidationSpec extends Specification with ValidationMatchers { def
                                                                                                                             p^
   "validating a correct self-desc JSON should return the JSON in a Success"                                                  ! e1^
   "validating a correct self-desc JSON should return only the JSON's data field in a Success if requested"                   ! e2^
-  "validating & identifying a correct self-desc JSON should return the JSON & the identified SchemaKey"                      ! e3^
-  "validating & identifying a correct self-desc JSON should return only the JSON's data field & identified key if requested" ! e4^
-  // TODO: add an invalid JSON
-  "verifying & validating a correct self-desc JSON vs the correct schema should return the JSON in a Success"                ! e5^
-  "verifying & validating a correct self-desc JSON vs the correct schema should return the JSON's data field in a Success"   ! e6^
-  "verifying a self-desc JSON vs the incorrect schema should return a Failure message"                                       ! e7^
+  "validating an incorrect self-desc JSON should return the validation errors in a Failure"                                  ! e3^
+  "validating & identifying a correct self-desc JSON should return the JSON & the identified SchemaKey"                      ! e4^
+  "validating & identifying a correct self-desc JSON should return only the JSON's data field & identified key if requested" ! e5^
+  "validating & identifying an incorrect self-desc JSON should return the validation errors in a Failure"                    ! e6^
+  "verifying & validating a correct self-desc JSON vs the correct schema should return the JSON in a Success"                ! e7^
+  "verifying & validating a correct self-desc JSON vs the correct schema should return the JSON's data field in a Success"   ! e8^
+  "verifying a correct self-desc JSON vs the incorrect schema should return an error message in a Failure"                   ! e9^
+  "verifying an incorrect self-desc JSON vs the incorrect schema should return an error message in a Failure"                ! e10^
                                                                                                                              end
 
   implicit val resolver = SpecHelpers.TestResolver
@@ -45,20 +51,32 @@ class SelfDescValidationSpec extends Specification with ValidationMatchers { def
 
   def e2 = validJson.validate(true) must beSuccessful(validJson.get("data"))
 
+  val invalidJson = SpecHelpers.asJsonNode(
+    """{"schema": "iglu:com.snowplowanalytics.iglu-test/stock-item/jsonschema/1-0-0", "data": { "id": "123-12", "newName": "t-shirt", "price": "tbc" } }"""
+    )
+  val invalidExpected = NonEmptyList(
+    SpecHelpers.asProcessingMessage(message = """object instance has properties which are not allowed by the schema: ["newName"]""", schema = """{"loadingURI":"#","pointer":""}""", instance = """{"pointer":""}""", keyword = "additionalProperties", foundExpected = None, requiredMissing = None, unwanted = Some("""["newName"]""")),
+    SpecHelpers.asProcessingMessage(message = """object has missing required properties (["name"])""", schema = """{"loadingURI":"#","pointer":""}""", instance = """{"pointer":""}""", keyword = "required", foundExpected = None, requiredMissing = Some("""["id","name","price"]""", """["name"]"""), unwanted = None)
+    ).map(_.toString)
+
+  def e3 = invalidJson.validate(false).leftMap(_.map(_.toString)) must beFailing(invalidExpected)
+
   val expectedKey = SchemaKey("com.snowplowanalytics.iglu-test", "stock-item", "jsonschema", "1-0-0")
 
-  def e3 = validJson.validateAndIdentifySchema(false) must beSuccessful((expectedKey, validJson))
+  def e4 = validJson.validateAndIdentifySchema(false) must beSuccessful((expectedKey, validJson))
 
-  def e4 = validJson.validateAndIdentifySchema(true) must beSuccessful((expectedKey, validJson.get("data")))
+  def e5 = validJson.validateAndIdentifySchema(true) must beSuccessful((expectedKey, validJson.get("data")))
 
-  def e5 = validJson.verifySchemaAndValidate(expectedKey, false) must beSuccessful(validJson)
+  def e6 = invalidJson.validateAndIdentifySchema(false).leftMap(_.map(_.toString)) must beFailing(invalidExpected)
 
-  def e6 = validJson.verifySchemaAndValidate(expectedKey, true) must beSuccessful(validJson.get("data"))
+  def e7 = validJson.verifySchemaAndValidate(expectedKey, false) must beSuccessful(validJson)
 
-  def e7 = {
-    val incorrectKey = SchemaKey("com.snowplowanalytics.iglu-test", "stock-item", "jsonschema", "2-0-0")
-    val expected = "Verifying schema as iglu:com.snowplowanalytics.iglu-test/stock-item/jsonschema/2-0-0 failed: found iglu:com.snowplowanalytics.iglu-test/stock-item/jsonschema/1-0-0".toProcessingMessageNel
+  def e8 = validJson.verifySchemaAndValidate(expectedKey, true) must beSuccessful(validJson.get("data"))
 
-    validJson.verifySchemaAndValidate(incorrectKey, false).leftMap(_.map(_.toString)) must beFailing(expected.map(_.toString))
-  }
+  val incorrectKey = SchemaKey("com.snowplowanalytics.iglu-test", "stock-item", "jsonschema", "2-0-0")
+  val verifyExpected = "Verifying schema as iglu:com.snowplowanalytics.iglu-test/stock-item/jsonschema/2-0-0 failed: found iglu:com.snowplowanalytics.iglu-test/stock-item/jsonschema/1-0-0".toProcessingMessageNel.map(_.toString)
+
+  def e9 = validJson.verifySchemaAndValidate(incorrectKey, false).leftMap(_.map(_.toString)) must beFailing(verifyExpected)
+
+  def e10 = invalidJson.verifySchemaAndValidate(incorrectKey, false).leftMap(_.map(_.toString)) must beFailing(verifyExpected)
 }
