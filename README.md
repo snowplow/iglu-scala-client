@@ -34,9 +34,9 @@ limitations under the License.
 [roadmap-image]: https://d3i6fms1cm1j0i.cloudfront.net/github/images/roadmap.png
 [contributing-image]: https://d3i6fms1cm1j0i.cloudfront.net/github/images/contributing.png
 
-[techdocs]: https://github.com/snowplow/iglu/wiki/Iglu-Scala-Client
-[setup]: https://github.com/snowplow/iglu/wiki/Iglu-Scala-Client-setup
-[roadmap]: https://github.com/snowplow/iglu/wiki/Iglu-Scala-Client-roadmap
+[techdocs]: https://github.com/snowplow/iglu/wiki/Scala-client
+[setup]: https://github.com/snowplow/iglu/wiki/Scala-client-setup
+[roadmap]: https://github.com/snowplow/iglu/wiki/Product-roadmap
 [contributing]: https://github.com/snowplow/iglu/wiki/Contributing
 
 [license]: http://www.apache.org/licenses/LICENSE-2.0
