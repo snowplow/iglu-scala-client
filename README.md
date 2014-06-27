@@ -4,6 +4,8 @@ A Scala client and resolver for **[Iglu schema repositories] [iglu-wiki]** from 
 
 Iglu Scala Client is used extensively in **[Snowplow] [snowplow-repo]** to validate self-describing JSONs. For a presentation on how we came to build Iglu, see **[this blog post] [snowplow-schema-post]**.
 
+![scala-client-img] [scala-client-img]
+
 ## Find out more
 
 | **[Technical Docs] [techdocs]**     | **[Setup Guide] [setup]**     | **[Roadmap] [roadmap]**           | **[Contributing] [contributing]**           |
@@ -22,6 +24,8 @@ distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
+
+[scala-client-img]: https://github.com/snowplow/iglu/wiki/technical-documentation/images/iglu-clients.png
 
 [iglu-wiki]: https://github.com/snowplow/iglu/wiki
 [snowplow-schema-post]: http://snowplowanalytics.com/blog/2014/06/06/making-snowplow-schemas-flexible-a-technical-approach/
