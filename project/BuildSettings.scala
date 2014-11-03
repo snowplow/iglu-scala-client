@@ -26,5 +26,18 @@ object BuildSettings {
     resolvers     ++= Dependencies.resolutionRepos
   )
 
-  lazy val buildSettings = basicSettings
+  // Publish settings
+  // TODO: update with ivy credentials etc when we start using Nexus
+  lazy val publishSettings = Seq[Setting[_]](
+   
+    crossPaths := false,
+    publishTo <<= version { version =>
+      val basePath = "target/repo/%s".format {
+        if (version.trim.endsWith("SNAPSHOT")) "snapshots/" else "releases/"
+      }
+      Some(Resolver.file("Local Maven repository", file(basePath)) transactional())
+    }
+  )
+
+  lazy val buildSettings = basicSettings ++ publishSettings
 }
