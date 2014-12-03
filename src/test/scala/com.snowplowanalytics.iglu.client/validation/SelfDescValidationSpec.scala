@@ -32,7 +32,7 @@ class SelfDescValidationSpec extends Specification with ValidationMatchers { def
   "validating a correct self-desc JSON should return the JSON in a Success"                                                  ! e1^
   "validating a correct self-desc JSON should return only the JSON's data field in a Success if requested"                   ! e2^
   "validating an incorrect self-desc JSON should return the validation errors in a Failure"                                  ! e3^
-  "validating & identifying a correct self-desc JSON should return the JSON & the identified SchemaKey"                      ! e4^
+  "validating & identifying a correct self-desc JSON should return the JSON & the identified SchemaCriterion"                ! e4^
   "validating & identifying a correct self-desc JSON should return only the JSON's data field & identified key if requested" ! e5^
   "validating & identifying an incorrect self-desc JSON should return the validation errors in a Failure"                    ! e6^
   "verifying & validating a correct self-desc JSON vs the correct schema should return the JSON in a Success"                ! e7^
@@ -63,17 +63,19 @@ class SelfDescValidationSpec extends Specification with ValidationMatchers { def
 
   val expectedKey = SchemaKey("com.snowplowanalytics.iglu-test", "stock-item", "jsonschema", "1-0-0")
 
+  val expectedCriterion = SchemaCriterion("com.snowplowanalytics.iglu-test", "stock-item", "jsonschema", 1, Some(0), Some(0))
+
   def e4 = validJson.validateAndIdentifySchema(false) must beSuccessful((expectedKey, validJson))
 
   def e5 = validJson.validateAndIdentifySchema(true) must beSuccessful((expectedKey, validJson.get("data")))
 
   def e6 = invalidJson.validateAndIdentifySchema(false).leftMap(_.map(_.toString)) must beFailing(invalidExpected)
 
-  def e7 = validJson.verifySchemaAndValidate(expectedKey, false) must beSuccessful(validJson)
+  def e7 = validJson.verifySchemaAndValidate(expectedCriterion, false) must beSuccessful(validJson)
 
-  def e8 = validJson.verifySchemaAndValidate(expectedKey, true) must beSuccessful(validJson.get("data"))
+  def e8 = validJson.verifySchemaAndValidate(expectedCriterion, true) must beSuccessful(validJson.get("data"))
 
-  val incorrectKey = SchemaKey("com.snowplowanalytics.iglu-test", "stock-item", "jsonschema", "2-0-0")
+  val incorrectKey = SchemaCriterion("com.snowplowanalytics.iglu-test", "stock-item", "jsonschema", 2, Some(0), Some(0))
   val verifyExpected = "Verifying schema as iglu:com.snowplowanalytics.iglu-test/stock-item/jsonschema/2-0-0 failed: found iglu:com.snowplowanalytics.iglu-test/stock-item/jsonschema/1-0-0".toProcessingMessageNel.map(_.toString)
 
   def e9 = validJson.verifySchemaAndValidate(incorrectKey, false).leftMap(_.map(_.toString)) must beFailing(verifyExpected)

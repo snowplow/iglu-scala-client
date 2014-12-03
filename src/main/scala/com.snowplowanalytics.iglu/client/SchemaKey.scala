@@ -58,15 +58,6 @@ object SchemaKey {
   }
 
   def parseNel(schemaUri: String): ValidatedNel[SchemaKey] = parse(schemaUri).toValidationNel
-
-  /**
-   * Implicit conversion from SchemaKey to SchemaCriterion
-   *
-   * @param instance the SchemaKey
-   * @return the corresponding SchemaCriterion
-   */
-  implicit def schemaKeyToSchemaCriterion(key: SchemaKey): SchemaCriterion =
-    SchemaCriterion(key.vendor, key.name, key.format, key.model, key.revision.some, key.addition.some)
 }
 
 /**
@@ -84,20 +75,18 @@ case class SchemaKey(
   val format: String,
   val version: SchemaVer) {
 
-  lazy val (model, addition, revision) = getModelRevisionAddition
-
   /**
    * Extract the model, revision, and addition of the SchemaVer
    *
    * @return tuple containing the model, revision, and addition,
    *         converted to Ints
    */
-  def getModelRevisionAddition: (Int, Int, Int) = version match {
-    case SchemaKey.ModelRevisionAdditionRegex(m, r, a) => (m.toInt, r.toInt, a.toInt)
+  def getModelRevisionAddition: Option[(Int, Int, Int)] = version match {
+    case SchemaKey.ModelRevisionAdditionRegex(m, r, a) => (m.toInt, r.toInt, a.toInt).some
 
     // If no revision is provided, default to 0
-    case SchemaKey.ModelAdditionRegex(m, a) => (m.toInt, 0, a.toInt)
-    case _ => {"TODO"; ???}
+    case SchemaKey.ModelAdditionRegex(m, a) => (m.toInt, 0, a.toInt).some
+    case _ => None
   }
 
   /**

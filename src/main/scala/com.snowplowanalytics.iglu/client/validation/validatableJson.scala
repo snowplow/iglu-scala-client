@@ -232,9 +232,6 @@ class ValidatableJsonNode(instance: JsonNode) {
   def validateAndIdentifySchema(dataOnly: Boolean)(implicit resolver: Resolver): ValidatedNel[JsonSchemaPair] =
     VJM.validateAndIdentifySchema(instance, dataOnly)
 
-  def verifySchemaAndValidate(schemaKey: SchemaKey, dataOnly: Boolean)(implicit resolver: Resolver): ValidatedNel[JsonNode] =
-    VJM.verifySchemaAndValidate(instance, schemaKey, dataOnly)
-
   def verifySchemaAndValidate(schemaCriterion: SchemaCriterion, dataOnly: Boolean)(implicit resolver: Resolver): ValidatedNel[JsonNode] =
     VJM.verifySchemaAndValidate(instance, schemaCriterion, dataOnly)
 }

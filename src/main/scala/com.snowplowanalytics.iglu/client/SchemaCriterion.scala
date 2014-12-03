@@ -49,25 +49,27 @@ case class SchemaCriterion(
    */
   def matches(key: SchemaKey): Boolean = {
     prefixMatches(key) && {
-      val (keyModel, keyRevision, keyAddition) = key.getModelRevisionAddition
+      key.getModelRevisionAddition match {
+        case None => false
+        case Some((keyModel, keyRevision, keyAddition)) => {
+          keyModel == model && (addition match {
+              case None => revision match {
+                case None => true
+                case Some(r) => keyRevision <= r
+              }
+              case Some(a) => revision match {
 
-      keyModel == model && (addition match {
-          case None => revision match {
-            case None => true
-            case Some(r) => keyRevision <= r
-          }
-          case Some(a) => revision match {
+                // If we are using revisionless SchemaVer, treat the expected revision as 0
+                case None => keyRevision == 0 && keyAddition <= a
 
-            // If we are using revisionless SchemaVer, treat the expected revision as 0
-            case None => keyRevision == 0 && keyAddition <= a
-
-            // If the acutal revision is less than the expected revision, pass;
-            // otherwise only pass if the revisions are the same and the expected
-            // addition exceeds the actual addition
-            case Some(r) => keyRevision < r || (keyRevision == r && keyAddition <= a)
-          }
-        })
-
+                // If the acutal revision is less than the expected revision, pass;
+                // otherwise only pass if the revisions are the same and the expected
+                // addition exceeds the actual addition
+                case Some(r) => keyRevision < r || (keyRevision == r && keyAddition <= a)
+              }
+            })
+        }
+      }
     }
   }
 
