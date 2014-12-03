@@ -55,8 +55,8 @@ case class SchemaCriterion(
             case Some(r) => keyRevision <= r
           }
           case Some(a) => revision match {
-            case None => keyAddition <= a
-            case Some(r) => keyRevision == r && keyAddition <= a
+            case None => keyRevision == 0 && keyAddition <= a
+            case Some(r) => keyRevision < r || (keyRevision == r && keyAddition <= a)
           }
         })
 
