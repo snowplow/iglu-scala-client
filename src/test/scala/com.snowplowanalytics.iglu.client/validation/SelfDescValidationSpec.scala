@@ -63,7 +63,7 @@ class SelfDescValidationSpec extends Specification with ValidationMatchers { def
 
   val expectedKey = SchemaKey("com.snowplowanalytics.iglu-test", "stock-item", "jsonschema", "1-0-0")
 
-  val expectedCriterion = SchemaCriterion("com.snowplowanalytics.iglu-test", "stock-item", "jsonschema", 1, Some(0), Some(0))
+  val expectedCriterion = SchemaCriterion("com.snowplowanalytics.iglu-test", "stock-item", "jsonschema", 1, 0, 0)
 
   def e4 = validJson.validateAndIdentifySchema(false) must beSuccessful((expectedKey, validJson))
 
@@ -75,7 +75,7 @@ class SelfDescValidationSpec extends Specification with ValidationMatchers { def
 
   def e8 = validJson.verifySchemaAndValidate(expectedCriterion, true) must beSuccessful(validJson.get("data"))
 
-  val incorrectKey = SchemaCriterion("com.snowplowanalytics.iglu-test", "stock-item", "jsonschema", 2, Some(0), Some(0))
+  val incorrectKey = SchemaCriterion("com.snowplowanalytics.iglu-test", "stock-item", "jsonschema", 2, 0, 0)
   val verifyExpected = "Verifying schema as iglu:com.snowplowanalytics.iglu-test/stock-item/jsonschema/2-0-0 failed: found iglu:com.snowplowanalytics.iglu-test/stock-item/jsonschema/1-0-0".toProcessingMessageNel.map(_.toString)
 
   def e9 = validJson.verifySchemaAndValidate(incorrectKey, false).leftMap(_.map(_.toString)) must beFailing(verifyExpected)

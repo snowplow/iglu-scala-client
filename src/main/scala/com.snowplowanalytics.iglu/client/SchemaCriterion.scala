@@ -17,6 +17,22 @@ import scalaz._
 import Scalaz._
 
 /**
+ * Companion object containing alternative constructor for a SchemaCriterion.
+ */
+object SchemaCriterion {
+
+  def apply(vendor: String, name: String, format: String, model: Int, revision: Int, addition: Int): SchemaCriterion =
+    SchemaCriterion(vendor, name, format, model, revision.some, addition.some)
+
+  // TODO: decide whether this should overload should instead be used to create a SchemaCriterion with only a model and addition
+  def apply(vendor: String, name: String, format: String, model: Int, revision: Int): SchemaCriterion =
+    SchemaCriterion(vendor, name, format, model, revision.some, None)
+
+  def apply(vendor: String, name: String, format: String, model: Int): SchemaCriterion =
+    SchemaCriterion(vendor, name, format, model, None, None)
+}
+
+/**
  * Class to validate SchemaKeys
  */
 case class SchemaCriterion(
