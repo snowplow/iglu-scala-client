@@ -54,7 +54,6 @@ class SchemaCriterionSpec extends Specification with DataTables with ValidationM
         SchemaCriterion("com.snowplowanalytics.snowplow", "payload_data", "jsonschema", criterion._1, criterion._2, criterion._3)
           .matches(SchemaKey("com.snowplowanalytics.snowplow", "payload_data", "jsonschema", version))
           .must_==(expected)
-
     }
 
 }

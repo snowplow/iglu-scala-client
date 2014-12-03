@@ -56,6 +56,15 @@ object SchemaKey {
   }
 
   def parseNel(schemaUri: String): ValidatedNel[SchemaKey] = parse(schemaUri).toValidationNel
+
+  /**
+   * Implicit conversion from SchemaKey to SchemaCriterion
+   *
+   * @param instance the SchemaKey
+   * @return the corresponding SchemaCriterion
+   */
+  implicit def schemaKeyToSchemaCriterion(key: SchemaKey): SchemaCriterion =
+    SchemaCriterion(key.vendor, key.name, key.format, key.model, key.revision.some, key.addition.some)
 }
 
 /**

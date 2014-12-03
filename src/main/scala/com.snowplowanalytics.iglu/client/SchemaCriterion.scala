@@ -27,6 +27,8 @@ case class SchemaCriterion(
   val revision: Option[Int] = None,
   val addition: Option[Int] = None) {
 
+  lazy val versionString = "%s-%s-%s".format(model, revision.getOrElse("x"), addition.getOrElse("x"))
+
   /**
    * Whether the vendor, name, and format are all correct
    *
@@ -62,4 +64,13 @@ case class SchemaCriterion(
 
     }
   }
+
+  /**
+   * Format as a schema URI, but the revision and addition
+   * may be replaced with "x".
+   *
+   * @return the String representation of this
+   *         SchemaKey
+   */
+  override def toString = s"iglu:$vendor/$name/$format/$versionString"
 }
