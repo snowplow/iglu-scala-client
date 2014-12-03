@@ -24,8 +24,8 @@ case class SchemaCriterion(
   val name: String,
   val format: String,
   val model: Int,
-  val revision: Option[Int],
-  val addition: Option[Int]) {
+  val revision: Option[Int] = None,
+  val addition: Option[Int] = None) {
 
   /**
    * Whether the vendor, name, and format are all correct
