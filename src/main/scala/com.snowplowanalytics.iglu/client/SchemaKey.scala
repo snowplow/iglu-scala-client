@@ -34,9 +34,11 @@ import ProcessingMessageMethods._
  */
 object SchemaKey {
 
-  private val SchemaUriRegex = "^iglu:([a-zA-Z0-9-_.]+)/([a-zA-Z0-9-_]+)/([a-zA-Z0-9-_]+)/([0-9]+-[0-9]+-[0-9]+)$".r
+  private val SchemaUriRegex = "^iglu:([a-zA-Z0-9-_.]+)/([a-zA-Z0-9-_]+)/([a-zA-Z0-9-_]+)/((?:[0-9]+-)?[0-9]+-[0-9]+)$".r
 
   private val ModelRevisionAdditionRegex = "([0-9]+)-([0-9]+)-([0-9]+)".r
+
+  private val ModelAdditionRegex = "([0-9]+)-([0-9]+)".r
 
   /**
    * Custom constructor for an Iglu SchemaKey from
@@ -92,6 +94,9 @@ case class SchemaKey(
    */
   def getModelRevisionAddition: (Int, Int, Int) = version match {
     case SchemaKey.ModelRevisionAdditionRegex(m, r, a) => (m.toInt, r.toInt, a.toInt)
+
+    // If no revision is provided, default to 0
+    case SchemaKey.ModelAdditionRegex(m, a) => (m.toInt, 0, a.toInt)
     case _ => {"TODO"; ???}
   }
 
