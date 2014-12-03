@@ -1,0 +1,65 @@
+/*
+ * Copyright (c) 2014 Snowplow Analytics Ltd. All rights reserved.
+ *
+ * This program is licensed to you under the Apache License Version 2.0,
+ * and you may not use this file except in compliance with the Apache License Version 2.0.
+ * You may obtain a copy of the Apache License Version 2.0 at http://www.apache.org/licenses/LICENSE-2.0.
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the Apache License Version 2.0 is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the Apache License Version 2.0 for the specific language governing permissions and limitations there under.
+ */
+package com.snowplowanalytics.iglu.client
+
+// Scalaz
+import scalaz._
+import Scalaz._
+
+/**
+ * Class to validate SchemaKeys
+ */
+case class SchemaCriterion(
+  val vendor: String,
+  val name: String,
+  val format: String,
+  val model: Int,
+  val revision: Option[Int],
+  val addition: Option[Int]) {
+
+  /**
+   * Whether the vendor, name, and format are all correct
+   *
+   * @param key The SchemaKey to validate
+   * @return Whether the first three fields are correct
+   */
+  private def prefixMatches(key: SchemaKey): Boolean =
+    key.vendor == vendor && key.name == name && key.format == format
+
+  /**
+   * Whether a SchemaKey is valid
+   * It's valid if the vendor, name, format, and model all match
+   * and the actual revision and addition do not exceed the
+   * expected revision and addition
+   *
+   * @param key The SchemaKey to validate
+   * @return Whether the SchemaKey is valid
+   */
+  def matches(key: SchemaKey): Boolean = {
+    prefixMatches(key) && {
+      val (keyModel, keyRevision, keyAddition) = key.getModelRevisionAddition
+
+      keyModel == model && (addition match {
+          case None => revision match {
+            case None => true
+            case Some(r) => keyRevision <= r
+          }
+          case Some(a) => revision match {
+            case None => keyAddition <= a
+            case Some(r) => keyRevision == r && keyAddition <= a
+          }
+        })
+
+    }
+  }
+}
