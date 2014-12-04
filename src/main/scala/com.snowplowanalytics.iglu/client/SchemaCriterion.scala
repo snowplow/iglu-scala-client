@@ -21,19 +21,47 @@ import Scalaz._
  */
 object SchemaCriterion {
 
+  private val DefaultRevision = 0
+
+  /**
+   * Constructs an exhaustive SchemaCriterion.
+   *
+   * TODO: deprecate this when we deprecate
+   * revisions.
+   *
+   * @return our constructed SchemaCriterion
+   */
   def apply(vendor: String, name: String, format: String, model: Int, revision: Int, addition: Int): SchemaCriterion =
     SchemaCriterion(vendor, name, format, model, revision.some, addition.some)
 
-  // TODO: decide whether this should overload should instead be used to create a SchemaCriterion with only a model and addition
-  def apply(vendor: String, name: String, format: String, model: Int, revision: Int): SchemaCriterion =
-    SchemaCriterion(vendor, name, format, model, revision.some, None)
+  /**
+   * Constructs a SchemaCriterion from everything
+   * except the soon-to-be-deprecated revision.
+   *
+   * WARNING: final argument is addition, not
+   * revision.
+   *
+   * @return our constructed SchemaCriterion
+   */
+  def apply(vendor: String, name: String, format: String, model: Int, addition: Int): SchemaCriterion =
+    SchemaCriterion(vendor, name, format, model, None, addition.some)
 
+  /**
+   * Constructs a SchemaCriterion which is agnostic
+   * of addition (and soon-to-be-deprecated revision).
+   * Restricts to model only.
+   *
+   * @return our constructed SchemaCriterion
+   */
   def apply(vendor: String, name: String, format: String, model: Int): SchemaCriterion =
     SchemaCriterion(vendor, name, format, model, None, None)
 }
 
 /**
- * Class to validate SchemaKeys
+ * Class to validate SchemaKeys. Note that until we
+ * deprecate revision, a rather strange criterion
+ * such as acme.de/click/jsonschema/1-*-1 would be
+ * allowed in type terms.
  */
 case class SchemaCriterion(
   val vendor: String,
@@ -43,25 +71,29 @@ case class SchemaCriterion(
   val revision: Option[Int] = None,
   val addition: Option[Int] = None) {
 
-  lazy val versionString = "%s-%s-%s".format(model, revision.getOrElse("x"), addition.getOrElse("x"))
+  lazy val versionString = "%s-%s-%s".format(model, revision.getOrElse("*"), addition.getOrElse("*"))
 
   /**
-   * Whether the vendor, name, and format are all correct
+   * Whether the vendor, name, and format are all correct.
    *
    * @param key The SchemaKey to validate
-   * @return Whether the first three fields are correct
+   * @return whether the first three fields are correct
    */
   private def prefixMatches(key: SchemaKey): Boolean =
     key.vendor == vendor && key.name == name && key.format == format
 
   /**
-   * Whether a SchemaKey is valid
+   * Whether a SchemaKey is valid.
+   *
    * It's valid if the vendor, name, format, and model all match
-   * and the actual revision and addition do not exceed the
-   * expected revision and addition
+   * and the supplied key's revision and addition do not exceed the
+   * criterion's revision and addition.
+   *
+   * This comparator will continue to function correctly when
+   * revisions are deprecated.
    *
    * @param key The SchemaKey to validate
-   * @return Whether the SchemaKey is valid
+   * @return whether the SchemaKey is valid
    */
   def matches(key: SchemaKey): Boolean = {
     prefixMatches(key) && {
@@ -75,10 +107,10 @@ case class SchemaCriterion(
               }
               case Some(a) => revision match {
 
-                // If we are using revisionless SchemaVer, treat the expected revision as 0
-                case None => keyRevision == 0 && keyAddition <= a
+                // If our criterion is revision-less, use our default
+                case None => keyRevision == SchemaCriterion.DefaultRevision && keyAddition <= a
 
-                // If the acutal revision is less than the expected revision, pass;
+                // If the actual revision is less than the expected revision, pass;
                 // otherwise only pass if the revisions are the same and the expected
                 // addition exceeds the actual addition
                 case Some(r) => keyRevision < r || (keyRevision == r && keyAddition <= a)
@@ -91,7 +123,7 @@ case class SchemaCriterion(
 
   /**
    * Format as a schema URI, but the revision and addition
-   * may be replaced with "x".
+   * may be replaced with "*" wildcards.
    *
    * @return the String representation of this
    *         SchemaKey

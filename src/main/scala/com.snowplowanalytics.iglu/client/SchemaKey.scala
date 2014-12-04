@@ -78,6 +78,9 @@ case class SchemaKey(
   /**
    * Extract the model, revision, and addition of the SchemaVer
    *
+   * Note that we have to return an Option here because we
+   * previously designed versions to be stringly typed.
+   *
    * @return tuple containing the model, revision, and addition,
    *         converted to Ints
    */
