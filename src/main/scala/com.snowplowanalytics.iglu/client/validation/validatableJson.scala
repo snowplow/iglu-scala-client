@@ -144,7 +144,7 @@ object ValidatableJsonMethods {
    *
    * @param instance The self-describing JSON to
    *        verify and validate
-   * @param schemaKey Identifying the schema we
+   * @param schemaCriterion Identifying the schema we
    *        believe this JSON is described by
    * @param dataOnly Whether the returned JsonNode
    *        should be the data only, or the whole
@@ -153,13 +153,13 @@ object ValidatableJsonMethods {
    *         or a Failure boxing a NonEmptyList
    *         of ProcessingMessages
    */
-  def verifySchemaAndValidate(instance: JsonNode, schemaKey: SchemaKey, dataOnly: Boolean = false)(implicit resolver: Resolver): ValidatedNel[JsonNode] =
+  def verifySchemaAndValidate(instance: JsonNode, schemaCriterion: SchemaCriterion, dataOnly: Boolean = false)(implicit resolver: Resolver): ValidatedNel[JsonNode] =
     for {
       j  <- validateAsSelfDescribing(instance)
       s  =  j.get("schema").asText
       d  =  j.get("data")
       sk <- SchemaKey.parseNel(s)
-      m  <- if (sk == schemaKey) sk.success else s"Verifying schema as ${schemaKey} failed: found ${sk}".toProcessingMessageNel.fail
+      m  <- if (schemaCriterion.matches(sk)) sk.success else s"Verifying schema as ${schemaCriterion} failed: found ${sk}".toProcessingMessageNel.fail
       js <- resolver.lookupSchema(m)
       v  <- validateAgainstSchema(d, js)
     } yield if (dataOnly) d else instance
@@ -234,4 +234,7 @@ class ValidatableJsonNode(instance: JsonNode) {
 
   def verifySchemaAndValidate(schemaKey: SchemaKey, dataOnly: Boolean)(implicit resolver: Resolver): ValidatedNel[JsonNode] =
     VJM.verifySchemaAndValidate(instance, schemaKey, dataOnly)
+
+  def verifySchemaAndValidate(schemaCriterion: SchemaCriterion, dataOnly: Boolean)(implicit resolver: Resolver): ValidatedNel[JsonNode] =
+    VJM.verifySchemaAndValidate(instance, schemaCriterion, dataOnly)
 }

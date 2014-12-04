@@ -36,6 +36,8 @@ object SchemaKey {
 
   private val SchemaUriRegex = "^iglu:([a-zA-Z0-9-_.]+)/([a-zA-Z0-9-_]+)/([a-zA-Z0-9-_]+)/([0-9]+-[0-9]+-[0-9]+)$".r
 
+  private val ModelRevisionAdditionRegex = "([0-9]+)-([0-9]+)-([0-9]+)".r
+
   /**
    * Custom constructor for an Iglu SchemaKey from
    * an Iglu-format schema URI, which looks like:
@@ -54,6 +56,15 @@ object SchemaKey {
   }
 
   def parseNel(schemaUri: String): ValidatedNel[SchemaKey] = parse(schemaUri).toValidationNel
+
+  /**
+   * Implicit conversion from SchemaKey to SchemaCriterion
+   *
+   * @param instance the SchemaKey
+   * @return the corresponding SchemaCriterion
+   */
+  implicit def schemaKeyToSchemaCriterion(key: SchemaKey): SchemaCriterion =
+    SchemaCriterion(key.vendor, key.name, key.format, key.model, key.revision.some, key.addition.some)
 }
 
 /**
@@ -70,6 +81,19 @@ case class SchemaKey(
   val name: String,
   val format: String,
   val version: SchemaVer) {
+
+  lazy val (model, addition, revision) = getModelRevisionAddition
+
+  /**
+   * Extract the model, revision, and addition of the SchemaVer
+   *
+   * @return tuple containing the model, revision, and addition,
+   *         converted to Ints
+   */
+  def getModelRevisionAddition: (Int, Int, Int) = version match {
+    case SchemaKey.ModelRevisionAdditionRegex(m, r, a) => (m.toInt, r.toInt, a.toInt)
+    case _ => {"TODO"; ???}
+  }
 
   /**
    * Converts a SchemaKey into a Jackson JsonNode
