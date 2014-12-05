@@ -21,8 +21,6 @@ import Scalaz._
  */
 object SchemaCriterion {
 
-  private val DefaultRevision = 0
-
   /**
    * Constructs an exhaustive SchemaCriterion.
    *
