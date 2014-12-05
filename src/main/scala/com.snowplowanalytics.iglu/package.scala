@@ -67,8 +67,9 @@ package object client {
   /**
    * Type alias for a SchemaVer-based version.
    *
-   * We may update this in the future to be
-   * a full-fledged case class or similar.
+   * TODO: update this in the future to be
+   * a full-fledged case class or similar:
+   * https://github.com/snowplow/iglu-scala-client/issues/20
    */
   type SchemaVer = String
 
