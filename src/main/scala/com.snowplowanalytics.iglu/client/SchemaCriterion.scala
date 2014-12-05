@@ -26,9 +26,6 @@ object SchemaCriterion {
   /**
    * Constructs an exhaustive SchemaCriterion.
    *
-   * TODO: deprecate this when we deprecate
-   * revisions.
-   *
    * @return our constructed SchemaCriterion
    */
   def apply(vendor: String, name: String, format: String, model: Int, revision: Int, addition: Int): SchemaCriterion =
@@ -36,19 +33,16 @@ object SchemaCriterion {
 
   /**
    * Constructs a SchemaCriterion from everything
-   * except the soon-to-be-deprecated revision.
-   *
-   * WARNING: final argument is addition, not
-   * revision.
+   * except the addition.
    *
    * @return our constructed SchemaCriterion
    */
-  def apply(vendor: String, name: String, format: String, model: Int, addition: Int): SchemaCriterion =
-    SchemaCriterion(vendor, name, format, model, None, addition.some)
+  def apply(vendor: String, name: String, format: String, model: Int, revision: Int): SchemaCriterion =
+    SchemaCriterion(vendor, name, format, model, revision.some)
 
   /**
    * Constructs a SchemaCriterion which is agnostic
-   * of addition (and soon-to-be-deprecated revision).
+   * of addition and revision.
    * Restricts to model only.
    *
    * @return our constructed SchemaCriterion
@@ -58,10 +52,7 @@ object SchemaCriterion {
 }
 
 /**
- * Class to validate SchemaKeys. Note that until we
- * deprecate revision, a rather strange criterion
- * such as acme.de/click/jsonschema/1-*-1 would be
- * allowed in type terms.
+ * Class to validate SchemaKeys.
  */
 case class SchemaCriterion(
   val vendor: String,
@@ -100,22 +91,15 @@ case class SchemaCriterion(
       key.getModelRevisionAddition match {
         case None => false
         case Some((keyModel, keyRevision, keyAddition)) => {
-          keyModel == model && (addition match {
-              case None => revision match {
-                case None => true
-                case Some(r) => keyRevision <= r
-              }
-              case Some(a) => revision match {
 
-                // If our criterion is revision-less, use our default
-                case None => keyRevision == SchemaCriterion.DefaultRevision && keyAddition <= a
+          keyModel == model && (revision match {
+            case None => true
+            case Some(r) => addition match {
+              case None => keyRevision <= r
+              case Some(a) => keyRevision < r || (keyRevision == r && keyAddition <= a)
+            }
+          })
 
-                // If the actual revision is less than the expected revision, pass;
-                // otherwise only pass if the revisions are the same and the expected
-                // addition exceeds the actual addition
-                case Some(r) => keyRevision < r || (keyRevision == r && keyAddition <= a)
-              }
-            })
         }
       }
     }

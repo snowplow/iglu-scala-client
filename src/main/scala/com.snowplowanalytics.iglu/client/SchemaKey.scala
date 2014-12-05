@@ -38,8 +38,6 @@ object SchemaKey {
 
   private val ModelRevisionAdditionRegex = "([0-9]+)-([0-9]+)-([0-9]+)".r
 
-  private val ModelAdditionRegex = "([0-9]+)-([0-9]+)".r
-
   /**
    * Custom constructor for an Iglu SchemaKey from
    * an Iglu-format schema URI, which looks like:
@@ -86,9 +84,6 @@ case class SchemaKey(
    */
   def getModelRevisionAddition: Option[(Int, Int, Int)] = version match {
     case SchemaKey.ModelRevisionAdditionRegex(m, r, a) => (m.toInt, r.toInt, a.toInt).some
-
-    // If no revision is provided, default to 0
-    case SchemaKey.ModelAdditionRegex(m, a) => (m.toInt, 0, a.toInt).some
     case _ => None
   }
 

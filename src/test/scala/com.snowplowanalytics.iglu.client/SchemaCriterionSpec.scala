@@ -30,8 +30,7 @@ class SchemaCriterionSpec extends Specification with DataTables with ValidationM
   "This is a specification to test the SchemaCriterion class"                                                         ^
                                                                                                                      p^
   "If the payload, vendor, and format aren't identical, the schema should be rejected"                                ! e1^
-  "Correctly validate schemas with a revision" ! e2^
-  "Correctly validate schemas without a revision" ! e3^
+  "Correctly validate schemas" ! e2^
                                                                                                                       end
 
   def e1 = {
@@ -48,28 +47,10 @@ class SchemaCriterionSpec extends Specification with DataTables with ValidationM
     "Incorrect revision"                                !! (2, Some(3), None)    ! "2-4-0"     ! false             |
     "Correct model, revision, and addition"             !! (2, Some(3), Some(4)) ! "2-3-4"     ! true              |
     "Correct model and revision, higher addition"       !! (2, Some(3), Some(4)) ! "2-3-9"     ! false             |
-    "Correct model, lower revision, higher addition"    !! (2, Some(3), Some(4)) ! "2-0-9"     ! true              |
-    "No revision specified, actual revision = 0"        !! (2, None,    Some(4)) ! "2-0-3"     ! true              |
-    "No revision specified, actual revision != 0"       !! (2, None,    Some(4)) ! "2-1-3"     ! false             |>{
+    "Correct model, lower revision, higher addition"    !! (2, Some(3), Some(4)) ! "2-0-9"     ! true              |>{
       (_, criterion, version, expected) =>
         SchemaCriterion("com.snowplowanalytics.snowplow", "payload_data", "jsonschema", criterion._1, criterion._2, criterion._3)
           .matches(SchemaKey("com.snowplowanalytics.snowplow", "payload_data", "jsonschema", version))
           .must_==(expected)
     }
-
-  def e3 =
-    "SPEC NAME"                                         || "Criterion"           | "SchemaVer" | "EXPECTED OUTPUT" |
-    "Correct model"                                     !! (2, None,    None)    ! "2-4"       ! true              |
-    "Incorrect model"                                   !! (2, None,    None)    ! "1-0"       ! false             |
-    "Correct revision"                                  !! (2, Some(3), None)    ! "2-0"       ! true              |
-    "Correct revision and addition"                     !! (2, Some(3), None)    ! "2-9"       ! true              |
-    "Correct model, revision, and addition"             !! (2, Some(3), Some(4)) ! "2-4"       ! true              |
-    "Correct model and revision, higher addition"       !! (2, Some(0), Some(4)) ! "2-9"       ! false             |
-    "No revision specified, higher addition"            !! (2, None,    Some(4)) ! "2-9"       ! false             |>{
-      (_, criterion, version, expected) =>
-        SchemaCriterion("com.snowplowanalytics.snowplow", "payload_data", "jsonschema", criterion._1, criterion._2, criterion._3)
-          .matches(SchemaKey("com.snowplowanalytics.snowplow", "payload_data", "jsonschema", version))
-          .must_==(expected)
-    }
-
 }
