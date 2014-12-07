@@ -34,7 +34,9 @@ import ProcessingMessageMethods._
  */
 object SchemaKey {
 
-  private val SchemaUriRegex = "^iglu:([a-zA-Z0-9-_.]+)/([a-zA-Z0-9-_]+)/([a-zA-Z0-9-_]+)/([0-9]+-[0-9]+-[0-9]+)$".r
+  private val SchemaUriRegex = "^iglu:([a-zA-Z0-9-_.]+)/([a-zA-Z0-9-_]+)/([a-zA-Z0-9-_]+)/((?:[0-9]+-)?[0-9]+-[0-9]+)$".r
+
+  private val ModelRevisionAdditionRegex = "([0-9]+)-([0-9]+)-([0-9]+)".r
 
   /**
    * Custom constructor for an Iglu SchemaKey from
@@ -70,6 +72,20 @@ case class SchemaKey(
   val name: String,
   val format: String,
   val version: SchemaVer) {
+
+  /**
+   * Extract the model, revision, and addition of the SchemaVer
+   *
+   * Note that we have to return an Option here because we
+   * previously designed versions to be stringly typed.
+   *
+   * @return tuple containing the model, revision, and addition,
+   *         converted to Ints
+   */
+  def getModelRevisionAddition: Option[(Int, Int, Int)] = version match {
+    case SchemaKey.ModelRevisionAdditionRegex(m, r, a) => (m.toInt, r.toInt, a.toInt).some
+    case _ => None
+  }
 
   /**
    * Converts a SchemaKey into a Jackson JsonNode

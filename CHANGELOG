@@ -1,3 +1,8 @@
+Version 0.2.0 (2014-12-xx)
+--------------------------
+Added SchemaCriterion class for comparing schema versions (#21)
+Updated verifySchemaAndValidate methods to use SchemaCriterion (#23)
+
 Version 0.1.1 (2014-11-03)
 --------------------------
 Updated json4s dependency to 3.2.11, thanks @dominickendrick! (#5)

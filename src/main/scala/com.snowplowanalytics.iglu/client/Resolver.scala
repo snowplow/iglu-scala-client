@@ -50,7 +50,7 @@ import ProcessingMessageMethods._
  */
 object Resolver {
 
-  private val ConfigurationSchema = SchemaKey("com.snowplowanalytics.iglu", "resolver-config", "jsonschema", "1-0-0")
+  private val ConfigurationSchema = SchemaCriterion("com.snowplowanalytics.iglu", "resolver-config", "jsonschema", 1, 0, 0)
 
   /**
    * Constructs a Resolver instance from an arg array
