@@ -1,4 +1,4 @@
-Version 0.2.0 (2014-12-xx)
+Version 0.2.0 (2014-12-07)
 --------------------------
 Added SchemaCriterion class for comparing schema versions (#21)
 Updated verifySchemaAndValidate methods to use SchemaCriterion (#23)
