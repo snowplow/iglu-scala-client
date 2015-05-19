@@ -144,7 +144,7 @@ case class EmbeddedRepositoryRef(
       case ioe: IOException =>
         None.success // Schema not found
       case e: Throwable =>
-        s"Unknown problem reading and parsing ${schemaPath} in ${descriptor} Iglu repository ${config.name}: %s".format(ExceptionUtils.getRootCause(e).getMessage).fail.toProcessingMessage
+        s"Unknown problem reading and parsing ${schemaPath} in ${descriptor} Iglu repository ${config.name}: ${VE.getThrowableMessage(e)}".fail.toProcessingMessage
     }
   }
 }
