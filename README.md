@@ -6,6 +6,18 @@ Iglu Scala Client is used extensively in **[Snowplow] [snowplow-repo]** to valid
 
 ![scala-client-img] [scala-client-img]
 
+## Developer quickstart
+
+Assuming git, **[Vagrant] [vagrant-install]** and **[VirtualBox] [virtualbox-install]** installed:
+
+```bash
+ host> git clone https://github.com/snowplow/iglu-scala-client
+ host> cd iglu-scala-client
+ host> vagrant up && vagrant ssh
+guest> cd /vagrant
+guest> sbt compile
+```
+
 ## Find out more
 
 | **[Technical Docs] [techdocs]**     | **[Setup Guide] [setup]**     | **[Roadmap] [roadmap]**           | **[Contributing] [contributing]**           |
@@ -32,6 +44,9 @@ limitations under the License.
 
 [snowplow-repo]: https://github.com/snowplow/snowplow
 [snowplow-website]: http://snowplowanalytics.com
+
+[vagrant-install]: http://docs.vagrantup.com/v2/installation/index.html
+[virtualbox-install]: https://www.virtualbox.org/wiki/Downloads
 
 [techdocs-image]: https://d3i6fms1cm1j0i.cloudfront.net/github/images/techdocs.png
 [setup-image]: https://d3i6fms1cm1j0i.cloudfront.net/github/images/setup.png
