@@ -15,6 +15,7 @@ package repositories
 
 // Java
 import java.io.IOException
+import java.net.URL
 
 // Apache Commons
 import org.apache.commons.lang3.exception.ExceptionUtils
@@ -44,6 +45,8 @@ import utils.{ValidationExceptions => VE}
  * See below for the definition.
  */
 object EmbeddedRepositoryRef {
+
+  private val LeadingSlash = "^/+".r
 
   implicit val formats = DefaultFormats
 
@@ -100,6 +103,37 @@ object EmbeddedRepositoryRef {
       case me: MappingException => s"Could not extract connection.embedded.path from ${compact(render(config))}".fail.toProcessingMessage
     }
 
+  /**
+   * Loads a local resource. Adapted from:
+   * https://github.com/fge/jackson-coreutils/blob/9f01ffc94ae16addce7cb5ca00356b1c55d278dd/src/main/java/com/github/fge/jackson/JsonLoader.java#L74
+   *
+   * Re-implemented because Hadoop doesn't play
+   * nice with JsonLoader.fromResource (sigh).
+   *
+   * @param resource The resource to load
+   * @return the JsonNode at the resource, Option-boxed
+   */
+  def fromResource(resource: String): Option[JsonNode] = {
+
+    val thisClass = classOf[EmbeddedRepositoryRef]
+    val url: Option[URL] = Option(thisClass.getResource(resource)) match {
+      case u @ Some(_) => u
+      case None => {
+        val classLoader = Option(Thread.currentThread.getContextClassLoader) match {
+          case cl @ Some(_) => cl
+          case None => Option(thisClass.getClassLoader)
+        }
+
+        for {
+          cl   <- classLoader
+          path = LeadingSlash.replaceFirstIn(resource, "")
+          url  <- Option(cl.getResource(path))
+        } yield url
+      }
+    }
+
+    for (u <- url) yield JsonLoader.fromURL(u)
+  }
 }
 
 /**
@@ -137,7 +171,7 @@ case class EmbeddedRepositoryRef(
   def lookupSchema(schemaKey: SchemaKey): Validated[Option[JsonNode]] = {
     val schemaPath = s"${path}/schemas/${schemaKey.toPath}"
     try {
-      JsonLoader.fromResource(schemaPath).some.success
+      EmbeddedRepositoryRef.fromResource(schemaPath).success
     } catch {
       case jpe: JsonParseException => // Child of IOException so match first
         s"Problem parsing ${schemaPath} as JSON in ${descriptor} Iglu repository ${config.name}: %s".format(VE.stripInstanceEtc(jpe.getMessage)).fail.toProcessingMessage
