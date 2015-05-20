@@ -1,3 +1,9 @@
+Version 0.2.1 (2015-05-XX)
+--------------------------
+Re-implemented JsonLoader.fromResource to avoid Hadoop exceptions (#25)
+Made ExceptionUtils.getRootCause(e).getMessage calls safe (#24)
+Added dedicated Vagrant setup (#26)
+
 Version 0.2.0 (2014-12-07)
 --------------------------
 Added SchemaCriterion class for comparing schema versions (#21)
