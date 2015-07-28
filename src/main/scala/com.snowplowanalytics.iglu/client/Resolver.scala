@@ -179,7 +179,7 @@ case class Resolver(
      * @return the schema if found as Some JsonNode or None
      *         if not found, or cache is not enabled.
      */
-    def get(schemaKey: SchemaKey): Option[JsonNode] =
+    def get(schemaKey: SchemaKey): Option[ValidatedNel[JsonNode]] =
       for {
         l <- lru
         k <- l.get(schemaKey)
@@ -193,7 +193,7 @@ case class Resolver(
      * @param schema The provided schema
      * @return the same schema
      */
-    def store(schemaKey: SchemaKey, schema: JsonNode): JsonNode = {
+    def store(schemaKey: SchemaKey, schema: ValidatedNel[JsonNode]): ValidatedNel[JsonNode] = {
       for (l <- lru) {
         l.put(schemaKey, schema)
       }
@@ -231,10 +231,10 @@ case class Resolver(
     @tailrec def recurse(schemaKey: SchemaKey, errors: ProcessingMessages, tried: RepositoryRefs, remaining: RepositoryRefs): ValidatedNel[JsonNode] = {
       remaining match {
         case Nil =>
-          collectErrors(schemaKey, errors, tried).fail
+          cache.store(schemaKey, collectErrors(schemaKey, errors, tried).fail)
         case repo :: repos => {
           repo.lookupSchema(schemaKey) match {
-            case Success(Some(schema)) => cache.store(schemaKey, schema).success
+            case Success(Some(schema)) => cache.store(schemaKey, schema.success)
             case Success(None)         => recurse(schemaKey, errors, tried.::(repo), repos)
             case Failure(e)            => recurse(schemaKey, errors.::(e), tried.::(repo), repos)
           }
@@ -243,7 +243,7 @@ case class Resolver(
     }
 
     cache.get(schemaKey) match {
-      case Some(schema) => schema.success
+      case Some(schema) => schema
       case None         => recurse(schemaKey, Nil, Nil, prioritizeRepos(schemaKey))
     }
   }
