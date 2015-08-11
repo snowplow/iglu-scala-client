@@ -47,7 +47,7 @@ package object client {
   /**
    * Our LRU cache of schemas
    */
-  type SchemaLruMap = LruMap[SchemaKey, JsonNode]
+  type SchemaLruMap = LruMap[SchemaKey, ValidatedNel[JsonNode]]
 
   /**
    * Our List (possibly empty) of Iglu repositories

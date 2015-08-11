@@ -13,6 +13,9 @@
 package com.snowplowanalytics.iglu.client
 package utils
 
+// Apache Commons
+import org.apache.commons.lang3.exception.ExceptionUtils
+
 /**
  * Provides helpers around converting JVM
  * exceptions to Scalaz Validations.
@@ -41,4 +44,29 @@ object ValidationExceptions {
     .replaceAll("\\p{Cntrl}", "") // Any other control character
     .trim
   }
+
+  /**
+   * Get the message out of a Throwable's root cause
+   * (or failing that the Throwable itself) in a
+   * null-safe fashion.
+   *
+   * @param throwable The throwable to extract a message from
+   * @return the message from either the Throwable or
+   *         preferably its root cause, Option-boxed
+   */
+  def getThrowableMessage(throwable: Throwable): Option[String] = {
+
+    def getRootCauseIfExists(throwable: Throwable): Throwable =
+      Option(ExceptionUtils.getRootCause(throwable)) match {
+        case Some(root) => root
+        case None       => throwable
+      }
+
+    for {
+      t  <- Option(throwable)
+      rc =  getRootCauseIfExists(t)
+      m  <- Option(rc.getMessage)
+    } yield m
+  }
+
 }
