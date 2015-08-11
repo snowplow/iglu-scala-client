@@ -1,6 +1,8 @@
-Version 0.3.0 (2015-xx-xx)
+Version 0.3.0 (2015-08-11)
 --------------------------
 Started maintaining a cache for missing schemas (#30)
+Made ExceptionUtils.getRootCause(e).getMessage calls safe (#24)
+Added dedicated Vagrant setup (#26)
 
 Version 0.2.0 (2014-12-07)
 --------------------------
