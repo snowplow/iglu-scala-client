@@ -69,15 +69,23 @@ object ValidatableJsonMethods {
    *         ProcessingMessages
    */
   def validateAgainstSchema(instance: JsonNode, schema: JsonNode)(implicit resolver: Resolver): ValidatedNel[JsonNode] = {
-    val report = JsonSchemaValidator.validateUnchecked(schema, instance)
-    val msgs = report.iterator.toList
-    msgs match {
-      case x :: xs if !report.isSuccess => NonEmptyList[ProcessingMessage](x, xs: _*).fail
-      case Nil     if  report.isSuccess => instance.success
-      case _                            => throw new RuntimeException(s"Validation report success [$report.isSuccess] conflicts with message count [$msgs.length]")
+    val validatedReport = try {
+      JsonSchemaValidator.validateUnchecked(schema, instance).success
+    } catch {
+      case re: RuntimeException =>
+        s"Exception validating instance, possibly caused by malformed $schema field: [$re]"
+          .toProcessingMessageNel
+          .fail
+    }
+    validatedReport.flatMap { report =>
+      val msgs = report.iterator.toList
+      msgs match {
+        case x :: xs if !report.isSuccess => NonEmptyList[ProcessingMessage](x, xs: _*).fail
+        case Nil     if  report.isSuccess => instance.success
+        case _                            => throw new RuntimeException(s"Validation report success [$report.isSuccess] conflicts with message count [$msgs.length]")
+      }
     }
   }
-
 
   /**
    * Validates a self-describing JSON against
