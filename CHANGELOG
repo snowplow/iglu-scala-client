@@ -1,3 +1,9 @@
+Version 0.3.1 (2015-xx-xx)
+--------------------------
+Started handling RuntimeExceptions thrown by json-schema-validator (#33)
+Started using Travis image for master branch in README (#34)
+Prevented intermittent MatchError in SelfDescValidationSpec by running tests sequentially (#37)
+
 Version 0.3.0 (2015-08-11)
 --------------------------
 Started maintaining a cache for missing schemas (#30)
