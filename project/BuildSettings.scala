@@ -22,6 +22,7 @@ object BuildSettings {
     description   := "Scala client and resolver for Iglu schema repositories",
     scalaVersion  := "2.10.4",
     scalacOptions := Seq("-deprecation", "-encoding", "utf8"),
+    testOptions in Test += Tests.Argument("sequential"),
     parallelExecution in Test := false, // Parallel tests cause havoc with LRU cache
     resolvers     ++= Dependencies.resolutionRepos
   )
