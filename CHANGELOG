@@ -1,4 +1,4 @@
-Version 0.3.1 (2015-xx-xx)
+Version 0.3.1 (2015-09-30)
 --------------------------
 Started handling RuntimeExceptions thrown by json-schema-validator (#33)
 Started using Travis image for master branch in README (#34)
