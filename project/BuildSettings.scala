@@ -18,10 +18,11 @@ object BuildSettings {
   // Basic settings for our app
   lazy val basicSettings = Seq[Setting[_]](
     organization  := "com.snowplowanalytics",
-    version       := "0.3.0",
+    version       := "0.3.1",
     description   := "Scala client and resolver for Iglu schema repositories",
     scalaVersion  := "2.10.4",
     scalacOptions := Seq("-deprecation", "-encoding", "utf8"),
+    testOptions in Test += Tests.Argument("sequential"),
     parallelExecution in Test := false, // Parallel tests cause havoc with LRU cache
     resolvers     ++= Dependencies.resolutionRepos
   )

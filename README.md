@@ -1,4 +1,4 @@
-# Scala client for Iglu [![Build Status](https://travis-ci.org/snowplow/iglu-scala-client.png)](https://travis-ci.org/snowplow/iglu-scala-client)
+# Scala client for Iglu [![Build Status](https://travis-ci.org/snowplow/iglu-scala-client.png?branch=master)](https://travis-ci.org/snowplow/iglu-scala-client)
 
 A Scala client and resolver for **[Iglu schema repositories] [iglu-wiki]** from the team at **[Snowplow Analytics] [snowplow-website]**.
 
