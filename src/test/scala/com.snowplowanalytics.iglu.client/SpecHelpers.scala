@@ -12,9 +12,6 @@
  */
 package com.snowplowanalytics.iglu.client
 
-// Java
-import java.net.URL
-
 // JSON Schema
 import com.github.fge.jsonschema.core.report.{
   ProcessingMessage,
@@ -39,7 +36,7 @@ import repositories.{
 object SpecHelpers {
   
   val IgluCentral =
-    HttpRepositoryRef(RepositoryRefConfig("Iglu Central", 0, List("com.snowplowanalytics")), new URL("http://iglucentral.com"))
+    HttpRepositoryRef(RepositoryRefConfig("Iglu Central", 0, List("com.snowplowanalytics")), "http://iglucentral.com")
 
   val EmbeddedTest =
     EmbeddedRepositoryRef(RepositoryRefConfig("Iglu Test Embedded", 0, List("com.snowplowanalytics")), path = "/iglu-test-embedded") 

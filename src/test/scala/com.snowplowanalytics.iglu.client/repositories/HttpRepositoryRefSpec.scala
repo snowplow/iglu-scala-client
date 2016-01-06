@@ -13,9 +13,6 @@
 package com.snowplowanalytics.iglu.client
 package repositories
 
-// Java
-import java.net.URL
-
 // Scalaz
 import scalaz._
 import Scalaz._
@@ -53,7 +50,7 @@ class HttpRepositoryRefSpec extends Specification with DataTables with Validatio
   def e2 = {
     val expected = HttpRepositoryRef(
       config = RepositoryRefConfig("Acme Iglu Repo", 5, List("com.acme")),
-      uri = new URL("http://iglu.acme.com")
+      uri = "http://iglu.acme.com"
     )
     HttpRepositoryRef.parse(AcmeConfig) must beSuccessful(expected)
   }

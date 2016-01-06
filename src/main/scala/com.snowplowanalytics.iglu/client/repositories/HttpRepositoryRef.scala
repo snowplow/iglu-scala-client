@@ -102,9 +102,9 @@ object HttpRepositoryRef {
    * @return the path to the embedded repository on
    *         Success, or an error String on Failure
    */
-  private def extractUrl(config: JValue): Validated[URL] =
+  private def extractUrl(config: JValue): Validated[String] =
     try {
-      stringToUrl((config \ "connection" \ "http" \ "uri").extract[String])
+      (config \ "connection" \ "http" \ "uri").extract[String].success
     } catch {
       case me: MappingException => s"Could not extract connection.http.uri from ${compact(render(config))}".fail.toProcessingMessage
     }
@@ -143,7 +143,7 @@ object HttpRepositoryRef {
  */
 case class HttpRepositoryRef(
   override val config: RepositoryRefConfig,
-  uri: URL) extends RepositoryRef {
+  uri: String) extends RepositoryRef {
 
   /**
    * De-prioritize searching this class of repository because
@@ -171,7 +171,7 @@ case class HttpRepositoryRef(
   def lookupSchema(schemaKey: SchemaKey): Validated[Option[JsonNode]] = {
     try {
       for {
-        url <- HttpRepositoryRef.stringToUrl(s"${uri.toString}/schemas/${schemaKey.toPath}")
+        url <- HttpRepositoryRef.stringToUrl(s"$uri/schemas/${schemaKey.toPath}")
         sch = JsonLoader.fromURL(url).some
       } yield sch
     } catch {
