@@ -14,6 +14,7 @@ package com.snowplowanalytics.iglu.client
 package repositories
 
 // Java
+import java.io.FileNotFoundException
 import java.net.{
   URL,
   UnknownHostException,
@@ -27,6 +28,9 @@ import org.apache.commons.lang3.exception.ExceptionUtils
 import com.fasterxml.jackson.core.JsonParseException
 import com.fasterxml.jackson.databind.JsonNode
 import com.github.fge.jackson.JsonLoader
+
+// Scala
+import scala.util.control.NonFatal
 
 // Scalaz
 import scalaz._
@@ -98,9 +102,9 @@ object HttpRepositoryRef {
    * @return the path to the embedded repository on
    *         Success, or an error String on Failure
    */
-  private def extractUrl(config: JValue): Validated[URL] =
+  private def extractUrl(config: JValue): Validated[String] =
     try {
-      stringToUrl((config \ "connection" \ "http" \ "uri").extract[String])
+      (config \ "connection" \ "http" \ "uri").extract[String].success
     } catch {
       case me: MappingException => s"Could not extract connection.http.uri from ${compact(render(config))}".fail.toProcessingMessage
     }
@@ -139,7 +143,7 @@ object HttpRepositoryRef {
  */
 case class HttpRepositoryRef(
   override val config: RepositoryRefConfig,
-  uri: URL) extends RepositoryRef {
+  uri: String) extends RepositoryRef {
 
   /**
    * De-prioritize searching this class of repository because
@@ -167,15 +171,18 @@ case class HttpRepositoryRef(
   def lookupSchema(schemaKey: SchemaKey): Validated[Option[JsonNode]] = {
     try {
       for {
-        url <- HttpRepositoryRef.stringToUrl(s"${uri.toString}/schemas/${schemaKey.toPath}")
+        url <- HttpRepositoryRef.stringToUrl(s"$uri/schemas/${schemaKey.toPath}")
         sch = JsonLoader.fromURL(url).some
       } yield sch
     } catch {
+      // The most common failure case: the schema is not found in the repo
+      case fnf: FileNotFoundException => None.success
       case jpe: JsonParseException =>
         s"Problem parsing ${schemaKey} as JSON in ${descriptor} Iglu repository ${config.name}: %s".format(VE.stripInstanceEtc(jpe.getMessage)).fail.toProcessingMessage
       case uhe: UnknownHostException =>
         s"Unknown host issue fetching ${schemaKey} in ${descriptor} Iglu repository ${config.name}: ${uhe.getMessage}".fail.toProcessingMessage
-      case e: Throwable => None.success
+      case NonFatal(nfe) =>
+        s"Unexpected exception fetching $schemaKey in ${descriptor} Iglu repository ${config.name}: $nfe".fail.toProcessingMessage
     }
   }
 }

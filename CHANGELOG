@@ -1,3 +1,8 @@
+Version 0.3.2 (2016-01-07)
+--------------------------
+Made HttpRepositoryRef.uri a String to avoid the URL.toString method (#42)
+Stopped silently swallowing exceptions when looking up schemas (#41)
+
 Version 0.3.1 (2015-09-30)
 --------------------------
 Started handling RuntimeExceptions thrown by json-schema-validator (#33)
