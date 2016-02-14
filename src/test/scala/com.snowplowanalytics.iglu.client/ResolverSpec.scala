@@ -12,9 +12,6 @@
  */
 package com.snowplowanalytics.iglu.client
 
-// Java
-import java.net.URL
-
 // JSON Schema
 import com.github.fge.jsonschema.core.report.{
   ProcessingMessage,
@@ -33,7 +30,6 @@ import org.json4s.jackson.JsonMethods._
 // This project
 import repositories.{
   EmbeddedRepositoryRef,
-  HttpRepositoryRef,
   RepositoryRefConfig
 }
 import validation.ProcessingMessageMethods._
@@ -71,6 +67,7 @@ class ResolverSpec extends Specification with DataTables with ValidationMatchers
   "we can construct a Resolver from a valid resolver configuration JSON"             ! e2^
   "a Resolver should report its failed lookups when a JSON Schema can't be resolved" ! e3^
   "a Resolver should report issues with a corrupted JSON Schema"                     ! e4^
+  "a Resolver should report issues with invalid JSON Schema"                         ! e5^
                                                                                      end
 
   import ResolverSpec._
@@ -141,6 +138,24 @@ class ResolverSpec extends Specification with DataTables with ValidationMatchers
         List("Iglu Client Embedded [embedded]", "Iglu Test Embedded [embedded]")
       ),
       "Problem parsing /iglu-test-embedded/schemas/com.snowplowanalytics.iglu-test/corrupted_schema/jsonschema/1-0-0 as JSON in embedded Iglu repository Iglu Test Embedded: Unexpected end-of-input within/between OBJECT entries at [Source: java.io.BufferedInputStream@xxxxxx; line: 10, column: 316]".toProcessingMessage.toString
+    )
+
+    val actual = SpecHelpers.TestResolver.lookupSchema(schemaKey)
+    actual.leftMap(_.map(_.toString)) must beFailing(expected)
+  }
+
+  def e5 = {
+    val schemaKey = SchemaKey("com.snowplowanalytics.iglu-test", "invalid_schema", "jsonschema", "1-0-0")
+    val expected = NonEmptyList(
+      notFoundError(
+        "iglu:com.snowplowanalytics.iglu-test/invalid_schema/jsonschema/1-0-0",
+        List("Iglu Client Embedded [embedded]", "Iglu Test Embedded [embedded]")
+      ),
+      "array must have at least one element".toProcessingMessage
+        .put("domain", "syntax")
+        .put("schema", asJsonNode(parse("""{"loadingURI":"#","pointer":""}""")))
+        .put("keyword", "required")
+        .toString
     )
 
     val actual = SpecHelpers.TestResolver.lookupSchema(schemaKey)

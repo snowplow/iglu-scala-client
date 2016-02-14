@@ -21,7 +21,7 @@ object Dependencies {
     // Java
     val commonsLang     = "3.1"
     val jacksonDatabind = "2.2.3"
-    val jsonValidator   = "2.2.3"
+    val jsonValidator   = "2.2.6"
     // Scala
     val json4s          = "3.2.11" 
     val scalaz7         = "7.0.0"

@@ -40,6 +40,7 @@ import repositories.{
   EmbeddedRepositoryRef,
   HttpRepositoryRef
 }
+import validation.SchemaValidation.{ isValid, getErrors }
 import validation.ValidatableJsonMethods
 import validation.ProcessingMessageMethods
 import ProcessingMessageMethods._
@@ -113,7 +114,7 @@ object Resolver {
    * Extracts a List of RepositoryRefs from the
    * given JValue.
    *
-   * @param repositoriesConfig The JSON containing
+   * @param repositoriesConfigs The JSON containing
    *        all of the repository configurations
    * @return our assembled List of RepositoryRefs
    */
@@ -234,9 +235,14 @@ case class Resolver(
           cache.store(schemaKey, collectErrors(schemaKey, errors, tried).fail)
         case repo :: repos => {
           repo.lookupSchema(schemaKey) match {
-            case Success(Some(schema)) => cache.store(schemaKey, schema.success)
-            case Success(None)         => recurse(schemaKey, errors, tried.::(repo), repos)
-            case Failure(e)            => recurse(schemaKey, errors.::(e), tried.::(repo), repos)
+            case Success(Some(schema)) if isValid(schema) =>
+              cache.store(schemaKey, schema.success)
+            case Success(Some(schema)) =>
+              recurse(schemaKey, errors ++ getErrors(schema), tried.::(repo), repos)
+            case Success(None) =>
+              recurse(schemaKey, errors, tried.::(repo), repos)
+            case Failure(e) =>
+              recurse(schemaKey, errors.::(e), tried.::(repo), repos)
           }
         }
       }
