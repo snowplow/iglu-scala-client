@@ -34,7 +34,7 @@ import ProcessingMessageMethods._
  */
 object SchemaKey {
 
-  private val SchemaUriRegex = "^iglu:([a-zA-Z0-9-_.]+)/([a-zA-Z0-9-_]+)/([a-zA-Z0-9-_]+)/((?:[0-9]+-)?[0-9]+-[0-9]+)$".r
+  private val SchemaUriRegex = "^iglu:([a-zA-Z0-9-_.]+)/([a-zA-Z0-9-_]+)/([a-zA-Z0-9-_]+)/([0-9]+-[0-9]+-[0-9]+)$".r
 
   private val ModelRevisionAdditionRegex = "([0-9]+)-([0-9]+)-([0-9]+)".r
 
@@ -42,7 +42,7 @@ object SchemaKey {
    * Custom constructor for an Iglu SchemaKey from
    * an Iglu-format schema URI, which looks like:
    *
-   * iglu://com.snowplowanalytics.snowplow/mobile_context/jsonschema/1-0-0
+   * iglu:com.snowplowanalytics.snowplow/mobile_context/jsonschema/1-0-0
    *
    * @param schemaUri An Iglu-format schema URI
    * @return a Validation-boxed SchemaKey for
@@ -52,7 +52,7 @@ object SchemaKey {
     case SchemaUriRegex(vnd, n, f, ver) =>
       SchemaKey(vnd, n, f, ver).success
     case _ =>
-      s"${schemaUri} is not a valid Iglu-format schema URI".toProcessingMessage.fail
+      s"${schemaUri} is not a valid Iglu-format schema URI".toProcessingMessage.failure
   }
 
   def parseNel(schemaUri: String): ValidatedNel[SchemaKey] = parse(schemaUri).toValidationNel

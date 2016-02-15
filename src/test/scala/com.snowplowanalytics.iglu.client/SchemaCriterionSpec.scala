@@ -31,6 +31,7 @@ class SchemaCriterionSpec extends Specification with DataTables with ValidationM
                                                                                                                      p^
   "If the payload, vendor, and format aren't identical, the schema should be rejected"                                ! e1^
   "Correctly validate schemas" ! e2^
+  "Parse schema criterion" ! e3^
                                                                                                                       end
 
   def e1 = {
@@ -53,4 +54,11 @@ class SchemaCriterionSpec extends Specification with DataTables with ValidationM
           .matches(SchemaKey("com.snowplowanalytics.snowplow", "payload_data", "jsonschema", version))
           .must_==(expected)
     }
+
+  def e3 = {
+    val criterion = SchemaCriterion.parse("iglu:com.snowplowanalytics.snowplow/mobile_context/jsonschema/1-0-*")
+    criterion must beSuccessful(SchemaCriterion("com.snowplowanalytics.snowplow", "mobile_context", "jsonschema", 1, Some(0), None))
+
+  }
+
 }
