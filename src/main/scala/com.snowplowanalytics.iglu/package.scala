@@ -23,7 +23,7 @@ import scalaz._
 import Scalaz._
 
 // LRU
-import com.twitter.util.LruMap
+import com.twitter.util.SynchronizedLruMap
 
 // This project
 import client.repositories.RepositoryRef
@@ -47,7 +47,7 @@ package object client {
   /**
    * Our LRU cache of schemas
    */
-  type SchemaLruMap = LruMap[SchemaKey, SchemaLookup]
+  type SchemaLruMap = SynchronizedLruMap[SchemaKey, SchemaLookup]
 
   /**
    * Aggregated lookup failures for single schema
