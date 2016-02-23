@@ -19,18 +19,17 @@ import Scalaz._
 
 // This project
 import ValidatableJsonMethods._
-import validation.ProcessingMessageMethods._
 
 // Specs2
 import org.specs2.Specification
 import org.specs2.scalaz.ValidationMatchers
 
-class SchemaValidationSpec extends Specification with ValidationMatchers { def is =
+class SchemaValidationSpec extends Specification with ValidationMatchers { def is = s2"""
 
-  "This is a specification to test Schema Validation"                                                  ^
-    p^
-    "validating a correct self-desc JSON should return the JSON in a Success"                                                  ! e1^
-    end
+  This is a specification to test Schema Validation
+
+  validating a correct self-desc JSON should return the JSON in a Success  $e1
+  """
 
   implicit val resolver = SpecHelpers.TestResolver
 

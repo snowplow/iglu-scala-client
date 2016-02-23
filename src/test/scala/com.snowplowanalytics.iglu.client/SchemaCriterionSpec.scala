@@ -13,9 +13,6 @@
 package com.snowplowanalytics.iglu.client
 package validation
 
-// Jackson
-import com.github.fge.jackson.JsonLoader
-
 // Scalaz
 import scalaz._
 import Scalaz._
@@ -25,14 +22,14 @@ import org.specs2.Specification
 import org.specs2.matcher.DataTables
 import org.specs2.scalaz.ValidationMatchers
 
-class SchemaCriterionSpec extends Specification with DataTables with ValidationMatchers { def is =
+class SchemaCriterionSpec extends Specification with DataTables with ValidationMatchers { def is = s2"""
 
-  "This is a specification to test the SchemaCriterion class"                                                         ^
-                                                                                                                     p^
-  "If the payload, vendor, and format aren't identical, the schema should be rejected"                                ! e1^
-  "Correctly validate schemas" ! e2^
-  "Parse schema criterion" ! e3^
-                                                                                                                      end
+  This is a specification to test the SchemaCriterion class
+
+  if the payload, vendor, and format aren't identical, the schema should be rejected  $e1
+  correctly validate schemas  $e2
+  parse schema criterion  $e3
+  """
 
   def e1 = {
     val actual = SchemaKey("wrong", "payload_data", "jsonschema", "2-3-4")
@@ -58,7 +55,6 @@ class SchemaCriterionSpec extends Specification with DataTables with ValidationM
   def e3 = {
     val criterion = SchemaCriterion.parse("iglu:com.snowplowanalytics.snowplow/mobile_context/jsonschema/1-0-*")
     criterion must beSuccessful(SchemaCriterion("com.snowplowanalytics.snowplow", "mobile_context", "jsonschema", 1, Some(0), None))
-
   }
 
 }

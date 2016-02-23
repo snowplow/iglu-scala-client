@@ -25,14 +25,14 @@ import org.specs2.Specification
 import org.specs2.matcher.DataTables
 import org.specs2.scalaz.ValidationMatchers
 
-class RawValidationSpec extends Specification with DataTables with ValidationMatchers { def is =
+class RawValidationSpec extends Specification with DataTables with ValidationMatchers { def is = s2"""
 
-  "This is a specification to test the basic ValidatableJsonNode functionality"         ^
-                                                                                       p^
-  "a JsonNode should be pimped to a ValidatableJsonNode as needed"                      ! e1^
-  "JsonNodes that pass explicit validation should be wrapped in a Success"              ! e2^
-  "JsonNodes that fail explicit validation should wrap ProcessageMessages in a Failure" ! e3^  
-                                                                                        end
+  This is a specification to test the basic ValidatableJsonNode functionality
+
+  a JsonNode should be pimped to a ValidatableJsonNode as needed  $e1
+  JsonNodes that pass explicit validation should be wrapped in a Success  $e2
+  JsonNodes that fail explicit validation should wrap ProcessageMessages in a Failure  $e3
+  """
 
   val SimpleSchema = JsonLoader.fromResource("/raw-jsonschema/beer-schema.json")
 

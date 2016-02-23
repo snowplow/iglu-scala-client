@@ -25,21 +25,21 @@ import validation.ProcessingMessageMethods._
 import org.specs2.Specification
 import org.specs2.scalaz.ValidationMatchers
 
-class SelfDescValidationSpec extends Specification with ValidationMatchers { def is =
+class SelfDescValidationSpec extends Specification with ValidationMatchers { def is = s2"""
 
-  "This is a specification to test validation of self-describing JsonNodes"                                                  ^
-                                                                                                                            p^
-  "validating a correct self-desc JSON should return the JSON in a Success"                                                  ! e1^
-  "validating a correct self-desc JSON should return only the JSON's data field in a Success if requested"                   ! e2^
-  "validating an incorrect self-desc JSON should return the validation errors in a Failure"                                  ! e3^
-  "validating & identifying a correct self-desc JSON should return the JSON & the identified SchemaCriterion"                ! e4^
-  "validating & identifying a correct self-desc JSON should return only the JSON's data field & identified key if requested" ! e5^
-  "validating & identifying an incorrect self-desc JSON should return the validation errors in a Failure"                    ! e6^
-  "verifying & validating a correct self-desc JSON vs the correct schema should return the JSON in a Success"                ! e7^
-  "verifying & validating a correct self-desc JSON vs the correct schema should return the JSON's data field in a Success"   ! e8^
-  "verifying a correct self-desc JSON vs the incorrect schema should return an error message in a Failure"                   ! e9^
-  "verifying an incorrect self-desc JSON vs the incorrect schema should return an error message in a Failure"                ! e10^
-                                                                                                                             end
+  This is a specification to test validation of self-describing JsonNodes
+
+  validating a correct self-desc JSON should return the JSON in a Success  $e1
+  validating a correct self-desc JSON should return only the JSON's data field in a Success if requested  $e2
+  validating an incorrect self-desc JSON should return the validation errors in a Failure  $e3
+  validating & identifying a correct self-desc JSON should return the JSON & the identified SchemaCriterion  $e4
+  validating & identifying a correct self-desc JSON should return only the JSON's data field & identified key if requested  $e5
+  validating & identifying an incorrect self-desc JSON should return the validation errors in a Failure  $e6
+  verifying & validating a correct self-desc JSON vs the correct schema should return the JSON in a Success  $e7
+  verifying & validating a correct self-desc JSON vs the correct schema should return the JSON's data field in a Success  $e8
+  verifying a correct self-desc JSON vs the incorrect schema should return an error message in a Failure  $e9
+  verifying an incorrect self-desc JSON vs the incorrect schema should return an error message in a Failure  $e10
+  """
 
   implicit val resolver = SpecHelpers.TestResolver
 

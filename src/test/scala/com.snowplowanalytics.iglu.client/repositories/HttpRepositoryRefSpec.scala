@@ -22,15 +22,15 @@ import org.specs2.Specification
 import org.specs2.matcher.DataTables
 import org.specs2.scalaz.ValidationMatchers
 
-class HttpRepositoryRefSpec extends Specification with DataTables with ValidationMatchers { def is =
+class HttpRepositoryRefSpec extends Specification with DataTables with ValidationMatchers { def is = s2"""
 
-  "This is a specification to test an HTTP-based RepositoryRef"                                            ^
-                                                                                                          p^
-  "a JSON configuration for an HTTP-based RepositoryRef should be recognized as such"                      ! e1^
-  "a JSON configuration can be used to construct an HTTP-based RepositoryRef"                              ! e2^
-  "retrieving an existent JSON Schema from an HTTP-based RepositoryRef should work"                        ! e3^
-  "requesting a non-existent JSON Schema from an HTTP-based RepositoryRef should return None"              ! e4^
-                                                                                                           end
+  This is a specification to test an HTTP-based RepositoryRef
+
+  a JSON configuration for an HTTP-based RepositoryRef should be recognized as such  $e1
+  a JSON configuration can be used to construct an HTTP-based RepositoryRef  $e2
+  retrieving an existent JSON Schema from an HTTP-based RepositoryRef should work  $e3
+  requesting a non-existent JSON Schema from an HTTP-based RepositoryRef should return None  $e4
+  """
 
   val AcmeConfig = SpecHelpers.asJValue(
        """|{

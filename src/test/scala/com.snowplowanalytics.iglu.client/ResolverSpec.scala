@@ -63,19 +63,19 @@ object ResolverSpec {
       .toString
 }
 
-class ResolverSpec extends Specification with DataTables with ValidationMatchers with Mockito { def is =
+class ResolverSpec extends Specification with DataTables with ValidationMatchers with Mockito { def is = s2"""
 
-  "This is a specification to test the Resolver functionality"                       ^
-                                                                                    p^
-  "our prioritizeRepos algorithm should sort repository refs in priority order"      ! e1^
-  "we can construct a Resolver from a valid resolver configuration JSON"             ! e2^
-  "a Resolver should report its failed lookups when a JSON Schema can't be resolved" ! e3^
-  "a Resolver should report issues with a corrupted JSON Schema"                     ! e4^
-  "a Resolver should report issues with invalid JSON Schema"                         ! e5^
-  "a Resolver should retry after non-404 errors"                                     ! e6^
-  "a Resolver should give up after 3rd retry"                                        ! e7^
-  "a Resolver should accumulate errors from all repositories"                        ! e8^
-                                                                                     end
+  This is a specification to test the Resolver functionality
+
+  our prioritizeRepos algorithm should sort repository refs in priority order  $e1
+  we can construct a Resolver from a valid resolver configuration JSON  $e2
+  a Resolver should report its failed lookups when a JSON Schema can't be resolved  $e3
+  a Resolver should report issues with a corrupted JSON Schema  $e4
+  a Resolver should report issues with invalid JSON Schema  $e5
+  a Resolver should retry after non-404 errors  $e6
+  a Resolver should give up after 3rd retry  $e7
+  a Resolver should accumulate errors from all repositories  $e8
+  """
 
   import ResolverSpec._
 
