@@ -1,4 +1,7 @@
-# Scala client for Iglu [![Build Status](https://travis-ci.org/snowplow/iglu-scala-client.png?branch=master)](https://travis-ci.org/snowplow/iglu-scala-client)
+# Scala client for Iglu
+
+
+[ ![Build Status] [travis-image] ] [travis] [ ![Release] [release-image] ] [releases] [ ![License] [license-image] ] [license]
 
 A Scala client and resolver for **[Iglu schema repositories] [iglu-wiki]** from the team at **[Snowplow Analytics] [snowplow-website]**.
 
@@ -101,4 +104,11 @@ limitations under the License.
 [roadmap]: https://github.com/snowplow/iglu/wiki/Product-roadmap
 [contributing]: https://github.com/snowplow/iglu/wiki/Contributing
 
+[travis]: https://travis-ci.org/snowplow/iglu-scala-client
+[travis-image]: https://travis-ci.org/snowplow/iglu-scala-client.png?branch=master
+
+[releases]: https://github.com/snowplow/scala-weather/releases
+[release-image]: http://img.shields.io/badge/release-0.4.0-blue.svg?style=flat
+
 [license]: http://www.apache.org/licenses/LICENSE-2.0
+[license-image]: http://img.shields.io/badge/license-Apache--2-blue.svg?style=flat
