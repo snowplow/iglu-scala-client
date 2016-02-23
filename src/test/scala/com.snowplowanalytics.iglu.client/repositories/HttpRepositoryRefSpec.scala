@@ -30,6 +30,7 @@ class HttpRepositoryRefSpec extends Specification with DataTables with Validatio
   a JSON configuration can be used to construct an HTTP-based RepositoryRef  $e2
   retrieving an existent JSON Schema from an HTTP-based RepositoryRef should work  $e3
   requesting a non-existent JSON Schema from an HTTP-based RepositoryRef should return None  $e4
+  a JSON configuration can be used to construct an HttpRepositoryRef with apikey  $e5
   """
 
   val AcmeConfig = SpecHelpers.asJValue(
@@ -42,6 +43,20 @@ class HttpRepositoryRefSpec extends Specification with DataTables with Validatio
                 |"uri": "http://iglu.acme.com"
               |}
             |}
+          |}""".stripMargin.replaceAll("[\n\r]","")
+      )
+
+  val AcmeConfigWithAuth = SpecHelpers.asJValue(
+       """|{
+          |"name": "Acme Secret Iglu Repo",
+          |"priority": 3,
+          |"vendorPrefixes": [ "com.acme" ],
+          |"connection": {
+          |  "http": {
+          |    "apikey": "de305d54-75b4-431b-adb2-eb6b9e546014",
+          |    "uri": "http://iglu.acme.com"
+          |  }
+          |}
           |}""".stripMargin.replaceAll("[\n\r]","")
       )
 
@@ -101,4 +116,12 @@ class HttpRepositoryRefSpec extends Specification with DataTables with Validatio
     SpecHelpers.IgluCentral.lookupSchema(schemaKey) must beSuccessful(None)
   }
 
+  def e5 = {
+    val expected = HttpRepositoryRef(
+      config = RepositoryRefConfig("Acme Secret Iglu Repo", 3, List("com.acme")),
+      uri = "http://iglu.acme.com",
+      Some("de305d54-75b4-431b-adb2-eb6b9e546014")
+    )
+    HttpRepositoryRef.parse(AcmeConfigWithAuth) must beSuccessful(expected)
+  }
 }

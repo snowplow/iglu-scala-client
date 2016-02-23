@@ -27,7 +27,9 @@ import org.apache.commons.lang3.exception.ExceptionUtils
 // Jackson
 import com.fasterxml.jackson.core.JsonParseException
 import com.fasterxml.jackson.databind.JsonNode
-import com.github.fge.jackson.JsonLoader
+
+// Json Schema
+import com.github.fge.jackson.JsonNodeReader
 
 // Scala
 import scala.util.control.NonFatal
@@ -37,9 +39,7 @@ import scalaz._
 import Scalaz._
 
 // json4s
-import org.json4s.scalaz.JsonScalaz._
 import org.json4s._
-import org.json4s.JsonDSL._
 import org.json4s.jackson.JsonMethods._
 
 // This project
@@ -54,6 +54,32 @@ import utils.{ValidationExceptions => VE}
 object HttpRepositoryRef {
 
   implicit val formats = DefaultFormats
+
+  private lazy val reader = new JsonNodeReader()
+
+  /**
+   * Helper class to extract HTTP URI and api key from config JSON
+   */
+  private[client] case class HttpConnection(uri: String, apikey: Option[String])
+
+  /**
+   * Read a JsonNode from an URL using optional apikey
+   * This method is just a copy of [[com.github.fge.jackson.JsonLoader.fromURL]]
+   * with added optional header, so it is unsafe as well and throws same exceptions
+   *
+   * @param url the URL to fetch the JSON document from
+   * @param apikey optional apikey UUID to aunthenticate in Iglu HTTP repo
+   * @return The document at that URL
+   */
+  private def getFromUrl(url: URL, apikey: Option[String]): JsonNode = {
+    val connection = url.openConnection()
+    apikey match {
+      case Some(key) => connection.setRequestProperty("apikey", key)
+      case None => ()
+    }
+    reader.fromInputStream(connection.getInputStream)
+  }
+
 
   /**
    * Sniffs a config JSON to determine if this is
@@ -90,23 +116,24 @@ object HttpRepositoryRef {
   def parse(config: JValue): ValidatedNel[HttpRepositoryRef] = {
     
     val conf = RepositoryRefConfig.parse(config)
-    val url  = extractUrl(config)
-    (conf |@| url.toValidationNel) { HttpRepositoryRef(_, _) }
+    val http  = extractUrl(config)
+
+    (conf |@| http.toValidationNel) { (c, h) => HttpRepositoryRef(c, h.uri, h.apikey) }
   }
 
   /**
    * Returns the path to this embedded repository.
    *
-   * @param ref The JSON containing the configuration
+   * @param config The JSON containing the configuration
    *        for this repository reference
    * @return the path to the embedded repository on
    *         Success, or an error String on Failure
    */
-  private def extractUrl(config: JValue): Validated[String] =
+  private def extractUrl(config: JValue): Validated[HttpConnection] =
     try {
-      (config \ "connection" \ "http" \ "uri").extract[String].success
+      (config \ "connection" \ "http").extract[HttpConnection].success
     } catch {
-      case me: MappingException => s"Could not extract connection.http.uri from ${compact(render(config))}".fail.toProcessingMessage
+      case me: MappingException => s"Could not extract connection.http from ${compact(render(config))}".fail.toProcessingMessage
     }
 
   /**
@@ -143,7 +170,7 @@ object HttpRepositoryRef {
  */
 case class HttpRepositoryRef(
   override val config: RepositoryRefConfig,
-  uri: String) extends RepositoryRef {
+  uri: String, apikey: Option[String] = None) extends RepositoryRef {
 
   /**
    * De-prioritize searching this class of repository because
@@ -172,7 +199,7 @@ case class HttpRepositoryRef(
     try {
       for {
         url <- HttpRepositoryRef.stringToUrl(s"$uri/schemas/${schemaKey.toPath}")
-        sch = JsonLoader.fromURL(url).some
+        sch = HttpRepositoryRef.getFromUrl(url, apikey).some
       } yield sch
     } catch {
       // The most common failure case: the schema is not found in the repo
