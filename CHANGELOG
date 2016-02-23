@@ -1,3 +1,15 @@
+Version 0.4.0 (2016-02-29)
+--------------------------
+Added authentication support to HttpRepositoryRef (#12)
+Added Scala 2.11 support (#29)
+Added release and license buttons to README (#32)
+Added schema lookup retry for n times in case of non-404 error (#38)
+Added instructions on installing the library to README (#40)
+Added parse method for SchemaCriterion (#45)
+Added test for invalid schema (#47)
+Fixed OpenJDK build in Travis CI (#49)
+Switched to using SynchronizedLruMap (#28)
+
 Version 0.3.2 (2016-01-07)
 --------------------------
 Made HttpRepositoryRef.uri a String to avoid the URL.toString method (#42)
