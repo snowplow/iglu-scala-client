@@ -25,16 +25,16 @@ import org.specs2.Specification
 import org.specs2.matcher.DataTables
 import org.specs2.scalaz.ValidationMatchers
 
-class EmbeddedRepositoryRefSpec extends Specification with DataTables with ValidationMatchers { def is =
+class EmbeddedRepositoryRefSpec extends Specification with DataTables with ValidationMatchers { def is = s2"""
 
-  "This is a specification to test an embedded RepositoryRef"                                              ^
-                                                                                                          p^
-  "a JSON configuration for an embedded RepositoryRef should be recognized as such"                        ! e1^
-  "a JSON configuration can be used to construct an embedded RepositoryRef"                                ! e2^
-  "retrieving an existent JSON Schema from an embedded RepositoryRef should work"                          ! e3^
-  "requesting a non-existent JSON Schema from an embedded RepositoryRef should return None"                ! e4^
-  "requesting a corrupted JSON Schema from an embedded RepositoryRef should return an appropriate Failure" ! e5^
-                                                                                                           end
+  This is a specification to test an embedded RepositoryRef
+
+  a JSON configuration for an embedded RepositoryRef should be recognized as such  $e1
+  a JSON configuration can be used to construct an embedded RepositoryRef  $e2
+  retrieving an existent JSON Schema from an embedded RepositoryRef should work  $e3
+  requesting a non-existent JSON Schema from an embedded RepositoryRef should return None  $e4
+  requesting a corrupted JSON Schema from an embedded RepositoryRef should return an appropriate Failure  $e5
+  """
 
   val AcmeConfig = SpecHelpers.asJValue(
      """|{

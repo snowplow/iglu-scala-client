@@ -16,10 +16,40 @@ package com.snowplowanalytics.iglu.client
 import scalaz._
 import Scalaz._
 
+// This project
+import validation.ProcessingMessageMethods._
+
 /**
  * Companion object containing alternative constructor for a SchemaCriterion.
  */
 object SchemaCriterion {
+
+  private val SchemaCriterionRegex = "^iglu:([a-zA-Z0-9-_.]+)/([a-zA-Z0-9-_]+)/([a-zA-Z0-9-_]+)/([0-9]+)-([0-9]+|\\*)-([0-9]+|\\*)$".r
+
+  /**
+   * Try to parse string into SchemaCriterion
+   * an Iglu-format for schema URI wildcard, which looks like:
+   *
+   * iglu:com.snowplowanalytics.snowplow/mobile_context/jsonschema/1-*-*
+   * iglu:com.snowplowanalytics.snowplow/mobile_context/jsonschema/1-0-*
+   * iglu:com.snowplowanalytics.snowplow/mobile_context/jsonschema/1-0-0
+   *
+   * @param schemaCriterion An Iglu-format schema URI
+   * @return a Validation-boxed SchemaCriterion for
+   *         Success, and an error String on Failure
+   */
+  def parse(schemaCriterion: String): Validated[SchemaCriterion] = schemaCriterion match {
+    case SchemaCriterionRegex(vnd, n, f, mod, "*", _) =>
+      SchemaCriterion(vnd, n, f, mod.toInt, None, None).success
+    case SchemaCriterionRegex(vnd, n, f, mod, add, "*") =>
+      SchemaCriterion(vnd, n, f, mod.toInt, add.toInt.some, None).success
+    case SchemaCriterionRegex(vnd, n, f, mod, rev, add) =>
+      SchemaCriterion(vnd, n, f, mod.toInt, rev.toInt.some, add.toInt.some).success
+    case _ =>
+      s"${schemaCriterion} is not a valid Iglu-format schema criterion".toProcessingMessage.failure
+  }
+
+  def parseNel(schemaCriterion: String): ValidatedNel[SchemaCriterion] = parse(schemaCriterion).toValidationNel
 
   /**
    * Constructs an exhaustive SchemaCriterion.

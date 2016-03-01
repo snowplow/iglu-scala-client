@@ -29,10 +29,10 @@ import scalaz._
 import Scalaz._
 
 // json4s
-import org.json4s.scalaz.JsonScalaz._
 import org.json4s._
 import org.json4s.JsonDSL._
 import org.json4s.jackson.JsonMethods._
+import org.json4s.scalaz.JsonScalaz._
 
 // This project
 import repositories.{
@@ -40,6 +40,7 @@ import repositories.{
   EmbeddedRepositoryRef,
   HttpRepositoryRef
 }
+import validation.SchemaValidation.{ isValid, getErrors }
 import validation.ValidatableJsonMethods
 import validation.ProcessingMessageMethods
 import ProcessingMessageMethods._
@@ -50,7 +51,25 @@ import ProcessingMessageMethods._
  */
 object Resolver {
 
-  private val ConfigurationSchema = SchemaCriterion("com.snowplowanalytics.iglu", "resolver-config", "jsonschema", 1, 0, 0)
+  private val ConfigurationSchema = SchemaCriterion("com.snowplowanalytics.iglu", "resolver-config", "jsonschema", 1, 0, 1)
+
+  /**
+   * Helper class responsible for aggregating repository lookup errors
+   * Using to aggregate all errors for single schema for single repo during all retries
+   *
+   * @param errors set of all errors happened during all attempts
+   * @param attempts amount of undertaken attempts
+   * @param unrecoverable indicates whether among failures were unrecoverable ones (like invalid schema)
+   */
+  private[client] case class RepoError(errors: Set[ProcessingMessage], attempts: Int, unrecoverable: Boolean)
+
+  /**
+   * Semigroup instance helping to aggregate repository errors
+   */
+  private[client] implicit object RepoErrorSemigroup extends Semigroup[RepoError] {
+    def append(a: RepoError, b: => RepoError): RepoError =
+      RepoError(a.errors |+| b.errors, a.attempts.max(b.attempts) + 1, a.unrecoverable || b.unrecoverable)
+  }
 
   /**
    * Constructs a Resolver instance from an arg array
@@ -113,7 +132,7 @@ object Resolver {
    * Extracts a List of RepositoryRefs from the
    * given JValue.
    *
-   * @param repositoriesConfig The JSON containing
+   * @param repositoryConfigs The JSON containing
    *        all of the repository configurations
    * @return our assembled List of RepositoryRefs
    */
@@ -146,6 +165,98 @@ object Resolver {
     }
   }
 
+  /**
+   * Tail-recursive function to find our schema in one
+   * of our repositories.
+   *
+   * @param schemaKey The SchemaKey uniquely identifying
+   *                  this schema in Iglu
+   * @param remaining A List of repositories we have to look in
+   *                  (not-tried yet or with non-404 error)
+   * @param tried A Map of repositories with their accumulated errors
+   *              we have looked in fruitlessly so far
+   * @return either a Success-boxed schema (as a JsonNode),
+   *         or a Failure-boxing of Map of repositories with all their
+   *         accumulated errors
+   */
+  @tailrec def traverseRepos(schemaKey: SchemaKey, remaining: RepositoryRefs, tried: RepoFailuresMap): SchemaLookup = {
+    remaining match {
+      case Nil => tried.failure
+      case repo :: repos => {
+        repo.lookupSchema(schemaKey) match {
+          case Success(Some(schema)) if isValid(schema) => schema.success
+          case Success(Some(schema)) =>
+            val error = RepoError(getErrors(schema).toSet, 1, true).some
+            traverseRepos(schemaKey, repos, Map(repo -> error) |+| tried)
+          case Success(None) =>
+            val error = none[RepoError]
+            traverseRepos(schemaKey, repos, Map(repo -> error) |+| tried)
+          case Failure(e) =>
+            val error = RepoError(Set(e), 1, false).some
+            traverseRepos(schemaKey, repos, Map(repo -> error) |+| tried)
+        }
+      }
+    }
+  }
+
+  /**
+   * Re-sorts RepositoryRefs into the optimal order for querying
+   * (optimal = minimizing unsafe I/O).
+   *
+   * @param schemaKey SchemaKey uniquely identifying
+   *        the schema in Iglu
+   * @param repositoryRefs list of repository refs to be sorted
+   * @return the prioritized List of RepositoryRefs.
+   *         Pragmatically sorted to minimize lookups.
+   */
+  private[client] def prioritizeRepos(schemaKey: SchemaKey, repositoryRefs: RepositoryRefs) =
+    repositoryRefs.sortBy(r =>
+      (!r.vendorMatched(schemaKey), r.classPriority, r.config.instancePriority)
+    )
+
+
+  /**
+   * Get from Map of repository failures only those repository which
+   * were failed with recoverable errors (like timeout or accidental server segfault)
+   * AND retried less than `requiredAttempts` times
+   *
+   * @param failuresMap Map of repositories to their aggregated errors
+   * @return repository refs which still need to be requested
+   */
+  private[client] def getReposForRetry(failuresMap: RepoFailuresMap, requiredAttempts: Int): RepositoryRefs = {
+    val errorsToRetry = failuresMap.filter {
+      case (_, Some(RepoError(_, attempts, unrecoverable))) =>
+        attempts < requiredAttempts && !unrecoverable
+      case (_, None) => false
+    }
+    errorsToRetry.keys.toList
+  }
+
+  /**
+   * Collects together the errors for a failed lookup into a NonEmptyList
+   * There always be at least notFound error
+   *
+   * @param schemaKey The SchemaKey uniquely identifying this schema in Iglu
+   * @param tried a map of all tried repositories with their accumulated errors
+   * @return a NonEmptyList of ProcessingMessages
+   */
+  private[client] def collectErrors(schemaKey: SchemaKey, tried: RepoFailuresMap): ProcessingMessageNel = {
+    val failures = tried.toList
+      .collect { case (_, Some(error)) => error }
+      .flatMap { _.errors.toList }
+
+    // TODO: consider adding amount of undertaken attempts to message
+    val repos = prioritizeRepos(schemaKey, tried.keys.toList)
+      .reverse  // TODO: remove this legacy order, pre-0.4.0 errors were queued LIFO
+      .map(repo => s"${repo.config.name} [${repo.descriptor}]")
+
+    val notFound = new ProcessingMessage()
+      .setLogLevel(LogLevel.ERROR)
+      .setMessage(s"Could not find schema with key ${schemaKey} in any repository, tried:")
+      .put("repositories", asJsonNode(repos))
+
+    NonEmptyList(notFound, failures: _*)
+  }
 }
 
 /**
@@ -161,6 +272,7 @@ case class Resolver(
   cacheSize: Int = 500,
   repos: RepositoryRefs
 ) {
+  import Resolver._
   
   private[client] val allRepos = Bootstrap.Repo :: repos
 
@@ -179,7 +291,7 @@ case class Resolver(
      * @return the schema if found as Some JsonNode or None
      *         if not found, or cache is not enabled.
      */
-    def get(schemaKey: SchemaKey): Option[ValidatedNel[JsonNode]] =
+    def get(schemaKey: SchemaKey): Option[SchemaLookup] =
       for {
         l <- lru
         k <- l.get(schemaKey)
@@ -193,7 +305,7 @@ case class Resolver(
      * @param schema The provided schema
      * @return the same schema
      */
-    def store(schemaKey: SchemaKey, schema: ValidatedNel[JsonNode]): ValidatedNel[JsonNode] = {
+    def store(schemaKey: SchemaKey, schema: SchemaLookup): SchemaLookup = {
       for (l <- lru) {
         l.put(schemaKey, schema)
       }
@@ -204,48 +316,28 @@ case class Resolver(
   /**
    * Tries to find the given schema in any of the
    * provided repository refs.
+   * If any of repositories gives non-non-found error,
+   * lookup will retried 3 times
    *
    * @param schemaKey The SchemaKey uniquely identifying
    *        the schema in Iglu
+   * @param attempts number of attempts to retry after non-404 errors
    * @return a Validation boxing either the Schema's
    *         JsonNode on Success, or an error String
    *         on Failure 
    */
-  def lookupSchema(schemaKey: SchemaKey): ValidatedNel[JsonNode] = {
-
-  /**
-   * Tail-recursive function to find our schema in one
-   * of our repositories.
-   *
-   * @param schemaKey The SchemaKey uniquely identifying
-   *        this schema in Iglu
-   * @param errors A List of error messages collected so
-   *        far
-   * @param tried A List of repositories we have looked
-   *        in fruitlessly so far
-   * @param remaining A List of repositories we still
-   *        have to look in
-   * @return either a Success-boxed schema (as a JsonNode),
-   *         or a Failure-boxing Nel of ProcessingMessages
-   */
-    @tailrec def recurse(schemaKey: SchemaKey, errors: ProcessingMessages, tried: RepositoryRefs, remaining: RepositoryRefs): ValidatedNel[JsonNode] = {
-      remaining match {
-        case Nil =>
-          cache.store(schemaKey, collectErrors(schemaKey, errors, tried).fail)
-        case repo :: repos => {
-          repo.lookupSchema(schemaKey) match {
-            case Success(Some(schema)) => cache.store(schemaKey, schema.success)
-            case Success(None)         => recurse(schemaKey, errors, tried.::(repo), repos)
-            case Failure(e)            => recurse(schemaKey, errors.::(e), tried.::(repo), repos)
-          }
-        }
+  def lookupSchema(schemaKey: SchemaKey, attempts: Int = 3): ValidatedNel[JsonNode] = {
+    val result = cache.get(schemaKey) match {
+      case Some(schema) => schema match {
+        case Success(schema) => schema.success
+        case Failure(serverErrors) =>
+          val reposForRetry = getReposForRetry(serverErrors, attempts)
+          traverseRepos(schemaKey, Resolver.prioritizeRepos(schemaKey, reposForRetry), serverErrors)
       }
+      case None => traverseRepos(schemaKey, prioritizeRepos(schemaKey, allRepos), Map())
     }
 
-    cache.get(schemaKey) match {
-      case Some(schema) => schema
-      case None         => recurse(schemaKey, Nil, Nil, prioritizeRepos(schemaKey))
-    }
+    cache.store(schemaKey, result).leftMap(collectErrors(schemaKey, _))
   }
 
   /**
@@ -283,43 +375,4 @@ case class Resolver(
       case Success(schema) => schema
       case Failure(err)    => throw new RuntimeException(s"Unsafe schema lookup failed: ${err}")
     }
-
-  /**
-   * Collects together the errors for a failed
-   * lookup into a NonEmptyList.
-   *
-   * @param schemaKey The SchemaKey uniquely identifying
-   *        this schema in Iglu
-   * @param errors A (possibly empty) List of error
-   *        messages
-   * @param tried A (never empty) List of repositories
-   *        we looked up our SchemaKey in
-   * @return a NonEmptyList of ProcessingMessages
-   */
-  // TODO: tried really ought to be a Nel
-  private[client] def collectErrors(schemaKey: SchemaKey, errors: ProcessingMessages, tried: RepositoryRefs): ProcessingMessageNel = {
-
-    val repos = tried.map(t => s"${t.config.name} [${t.descriptor}]")
-    val notFound = new ProcessingMessage()
-                     .setLogLevel(LogLevel.ERROR)
-                     .setMessage(s"Could not find schema with key ${schemaKey} in any repository, tried:")
-                     .put("repositories", asJsonNode(repos))
-
-    NonEmptyList[ProcessingMessage](notFound, errors: _*)
-  }
-
-  /**
-   * Re-sorts our Nel of RepositoryRefs into the
-   * optimal order for querying (optimal =
-   * minimizing unsafe I/O).
-   *
-   * @param schemaKey SchemaKey uniquely identifying
-   *        the schema in Iglu
-   * @return the prioritized List of RepositoryRefs.
-   *         Pragmatically sorted to minimize lookups.
-   */
-  private[client] def prioritizeRepos(schemaKey: SchemaKey): RepositoryRefs =
-    allRepos.sortBy(r =>
-      (!r.vendorMatched(schemaKey), r.classPriority, r.config.instancePriority)
-    )
 }

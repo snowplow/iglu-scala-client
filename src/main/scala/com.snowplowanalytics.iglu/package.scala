@@ -23,11 +23,11 @@ import scalaz._
 import Scalaz._
 
 // LRU
-import com.twitter.util.LruMap
+import com.twitter.util.SynchronizedLruMap
 
 // This project
-import client.SchemaKey
 import client.repositories.RepositoryRef
+import client.Resolver.RepoError
 
 /**
  * Scala package object to hold types,
@@ -47,7 +47,27 @@ package object client {
   /**
    * Our LRU cache of schemas
    */
-  type SchemaLruMap = LruMap[SchemaKey, ValidatedNel[JsonNode]]
+  type SchemaLruMap = SynchronizedLruMap[SchemaKey, SchemaLookup]
+
+  /**
+   * Aggregated lookup failures for single schema
+   * Can be Some(ServerError) if repo returned error like timeout
+   * or None if repository doesn't contain schema for sure
+   */
+  type LookupFailure = Option[RepoError]
+
+  /**
+   * Map of all repositories to its aggregated state of failure
+   * None as value means repository already responded with `not-found`,
+   * meaning all previous 500-like failures could probably been discarded
+   */
+  type RepoFailuresMap = Map[RepositoryRef, LookupFailure]
+
+  /**
+   * Validated schema lookup result containing, JsonNode in case of Success or
+   * Map of all currently failed repositories in case of Failure
+   */
+  type SchemaLookup = Validation[RepoFailuresMap, JsonNode]
 
   /**
    * Our List (possibly empty) of Iglu repositories
