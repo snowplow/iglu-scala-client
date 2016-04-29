@@ -40,7 +40,10 @@ object IgluScalaClientBuild extends Build {
         // Scala (test only)
         Libraries.specs2,
         Libraries.scalazSpecs2,
-        Libraries.mockito
+        Libraries.mockito,
+        // hadoop hdfs
+        Libraries.hadoopCommon,
+        Libraries.hadoopHdfs
       )
     )
 }

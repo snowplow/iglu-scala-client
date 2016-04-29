@@ -30,6 +30,7 @@ object Dependencies {
     val specs2          = "2.3.13" // Downgrade to prevent issues in job tests. WAS: "2.3.11"
     val scalazSpecs2    = "0.2"
     val mockito         = "1.10.19"
+    val hadoop          = "2.2.0"
   }
 
   object Libraries {
@@ -42,6 +43,9 @@ object Dependencies {
     val json4sScalaz     = "org.json4s"                 %% "json4s-scalaz"           % V.json4s
     val scalaz7          = "org.scalaz"                 %% "scalaz-core"             % V.scalaz7
     val collUtils        = "com.twitter"                %% "util-collection"         % V.collUtils
+    // hadoop hdfs
+    val hadoopCommon     = "org.apache.hadoop"         %  "hadoop-common"            % V.hadoop
+    val hadoopHdfs     = "org.apache.hadoop"         %  "hadoop-hdfs"                % V.hadoop
     // Scala (test only)
     val specs2           = "org.specs2"                 %% "specs2"                  % V.specs2          % "test"
     val scalazSpecs2     = "org.typelevel"              %% "scalaz-specs2"           % V.scalazSpecs2    % "test"
