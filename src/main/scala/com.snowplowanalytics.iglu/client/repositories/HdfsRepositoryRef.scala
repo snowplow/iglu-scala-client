@@ -42,10 +42,9 @@ import ProcessingMessageMethods._
 import utils.{ValidationExceptions => VE}
 
 // Hadoop
-import org.apache.hadoop.fs._;
-import org.apache.hadoop.conf._;
-import org.apache.hadoop.io._;
-import org.apache.hadoop.util._;
+import org.apache.hadoop.conf.Configuration
+import org.apache.hadoop.fs.{FileSystem, Path}
+
 
 /**
  * Helpers for constructing an HdfsRepository.
