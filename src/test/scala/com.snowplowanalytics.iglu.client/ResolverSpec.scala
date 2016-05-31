@@ -33,6 +33,7 @@ import com.fasterxml.jackson.databind.JsonNode
 import repositories.{
   EmbeddedRepositoryRef,
   HttpRepositoryRef,
+  HdfsRepositoryRef,
   RepositoryRefConfig
 }
 import validation.ProcessingMessageMethods._
@@ -49,10 +50,12 @@ object ResolverSpec {
 
     private val embedRef: (String, Int) => EmbeddedRepositoryRef = (prefix, priority) =>
       EmbeddedRepositoryRef(RepositoryRefConfig("An embedded repo", priority, List(prefix)), "/embed-path")
-
+    private val hdfsRef: (String, Int) => HdfsRepositoryRef = (prefix, priority) =>
+      HdfsRepositoryRef(RepositoryRefConfig("An hdfs repo", priority, List(prefix)), "/hdfs-path")
     val one   = embedRef("com.acme", 0)
     val two   = embedRef("de.acompany.snowplow", 40)
     val three = embedRef("de.acompany.snowplow", 100)
+    val four = hdfsRef("de.acompany.snowplow", 200)
   }
 
   def notFoundError(schemaKey: String, repos: List[String]): String =
@@ -75,6 +78,7 @@ class ResolverSpec extends Specification with DataTables with ValidationMatchers
   a Resolver should retry after non-404 errors  $e6
   a Resolver should give up after 3rd retry  $e7
   a Resolver should accumulate errors from all repositories  $e8
+  a Resolver should accumulate errors from all repositories  $e9
   """
 
   import ResolverSpec._
@@ -267,5 +271,40 @@ class ResolverSpec extends Specification with DataTables with ValidationMatchers
         error1.toString, error2.toString, error3.toString, error4.toString
       )
     } and(there was 2.times(httpRep1).lookupSchema(schemaKey))
+  }
+
+  def e9 = {
+
+    val config =
+      s"""|{
+            |"schema": "iglu:com.snowplowanalytics.iglu/resolver-config/jsonschema/1-1-0",
+            |"data": {
+              |"cacheSize": 500,
+              |"repositories": [
+                |{
+                  |"name": "Iglu Central",
+                  |"priority": 0,
+                  |"vendorPrefixes": [ "com.snowplowanalytics" ],
+                  |"connection": {
+                    |"http": {
+                      |"uri": "http://iglucentral.com"
+                    |}
+                  |}
+                |}, {
+                  |"name": "An hdfs repo",
+                  |"priority": 200,
+                  |"vendorPrefixes": [ "de.acompany.snowplow" ],
+                  |"connection": {
+                    |"hdfs": {
+                      |"path": "/hdfs-path"
+                    |}
+                  |}
+                |}
+              |]
+            |}
+          |}""".stripMargin.replaceAll("[\n\r]","")
+
+    val expected = Resolver(cacheSize = 500, SpecHelpers.IgluCentral, Repos.four)
+    Resolver.parse(SpecHelpers.asJsonNode(config)) must beSuccessful(expected)
   }
 }

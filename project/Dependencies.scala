@@ -44,8 +44,10 @@ object Dependencies {
     val scalaz7          = "org.scalaz"                 %% "scalaz-core"             % V.scalaz7
     val collUtils        = "com.twitter"                %% "util-collection"         % V.collUtils
     // hadoop hdfs
-    val hadoopCommon     = "org.apache.hadoop"         %  "hadoop-common"            % V.hadoop
-    val hadoopHdfs     = "org.apache.hadoop"         %  "hadoop-hdfs"                % V.hadoop
+    val hadoopCommon     = "org.apache.hadoop"         %  "hadoop-common"            % V.hadoop		 % "provided"
+    val hadoopHdfs       = "org.apache.hadoop"         %  "hadoop-hdfs"              % V.hadoop		 % "provided"
+    val hadoopCommonTest = "org.apache.hadoop"         %  "hadoop-common"            % V.hadoop		 % "test"
+    val hadoopHdfsTest   = "org.apache.hadoop"         %  "hadoop-hdfs"              % V.hadoop		 % "test"
     // Scala (test only)
     val specs2           = "org.specs2"                 %% "specs2"                  % V.specs2          % "test"
     val scalazSpecs2     = "org.typelevel"              %% "scalaz-specs2"           % V.scalazSpecs2    % "test"

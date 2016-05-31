@@ -38,7 +38,8 @@ import org.json4s.scalaz.JsonScalaz._
 import repositories.{
   RepositoryRef,
   EmbeddedRepositoryRef,
-  HttpRepositoryRef
+  HttpRepositoryRef,
+  HdfsRepositoryRef
 }
 import validation.SchemaValidation.{ isValid, getErrors }
 import validation.ValidatableJsonMethods
@@ -51,7 +52,7 @@ import ProcessingMessageMethods._
  */
 object Resolver {
 
-  private val ConfigurationSchema = SchemaCriterion("com.snowplowanalytics.iglu", "resolver-config", "jsonschema", 1, 0, 1)
+  private val ConfigurationSchema = SchemaCriterion("com.snowplowanalytics.iglu", "resolver-config", "jsonschema", 1, 1, 0)
 
   /**
    * Helper class responsible for aggregating repository lookup errors
@@ -160,6 +161,8 @@ object Resolver {
       EmbeddedRepositoryRef.parse(rc)
     } else if (HttpRepositoryRef.isHttp(rc)) {
       HttpRepositoryRef.parse(rc)
+    } else if (HdfsRepositoryRef.isHdfs(rc)) {
+      HdfsRepositoryRef.parse(rc)
     } else {
       s"Configuration unrecognizable as either embedded or HTTP repository".fail.toProcessingMessageNel
     }
