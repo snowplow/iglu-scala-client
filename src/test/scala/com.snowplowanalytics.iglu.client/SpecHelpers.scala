@@ -30,6 +30,7 @@ import org.json4s.jackson.JsonMethods.{
 import repositories.{
   EmbeddedRepositoryRef,
   HttpRepositoryRef,
+  HdfsRepositoryRef,
   RepositoryRefConfig
 }
 
@@ -40,6 +41,8 @@ object SpecHelpers {
 
   val EmbeddedTest =
     EmbeddedRepositoryRef(RepositoryRefConfig("Iglu Test Embedded", 0, List("com.snowplowanalytics")), path = "/iglu-test-embedded") 
+  val HdfsTest =
+    HdfsRepositoryRef(RepositoryRefConfig("Iglu Test Embedded", 0, List("com.snowplowanalytics")), path = "src/test/resources/iglu-test-embedded") 
 
   val TestResolver = Resolver(cacheSize = 10, EmbeddedTest)
 
