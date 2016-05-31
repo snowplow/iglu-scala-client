@@ -78,7 +78,7 @@ class ResolverSpec extends Specification with DataTables with ValidationMatchers
   a Resolver should retry after non-404 errors  $e6
   a Resolver should give up after 3rd retry  $e7
   a Resolver should accumulate errors from all repositories  $e8
-  a Resolver should accumulate errors from all repositories  $e9
+  we can construct a Resolver from a valid hdfs resolver configuration JSON  $e9
   """
 
   import ResolverSpec._
