@@ -15,6 +15,7 @@ package validation
 
 // Scala
 import scala.collection.JavaConverters.asScalaIteratorConverter
+import scala.util.control.NonFatal
 
 // jackson
 import com.fasterxml.jackson.databind.JsonNode
@@ -36,10 +37,19 @@ object SchemaValidation {
    * @param schema JSON Schema
    * @return list of Processing Messages with log level above warning
    */
-  def getErrors(schema: JsonNode): List[ProcessingMessage] =
-    validator.validateSchema(schema).iterator.asScala
-      .filter(r => (r.getLogLevel == LogLevel.ERROR) || (r.getLogLevel == LogLevel.FATAL))
-      .toList
+  def getErrors(schema: JsonNode): List[ProcessingMessage] = {
+    try {
+      validator.validateSchema(schema).iterator.asScala
+        .filter(r => (r.getLogLevel == LogLevel.ERROR) || (r.getLogLevel == LogLevel.FATAL))
+        .toList
+    } catch {
+      case NonFatal(e) =>
+        val fatalMessage = new ProcessingMessage()
+          .setLogLevel(LogLevel.FATAL)
+          .setMessage(s"JSON Schema is invalid.\n$schema\nCheck that it conforms iglu format. Full stack-trace:\n${e.getStackTrace}")
+        List(fatalMessage)
+    }
+  }
 
   /**
    * Validate JSON Schema against it's own Schema

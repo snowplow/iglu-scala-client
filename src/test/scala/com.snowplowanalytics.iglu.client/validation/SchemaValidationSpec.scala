@@ -13,10 +13,6 @@
 package com.snowplowanalytics.iglu.client
 package validation
 
-// Scalaz
-import scalaz._
-import Scalaz._
-
 // This project
 import ValidatableJsonMethods._
 
@@ -29,6 +25,7 @@ class SchemaValidationSpec extends Specification with ValidationMatchers { def i
   This is a specification to test Schema Validation
 
   validating a correct self-desc JSON should return the JSON in a Success  $e1
+  validating a correct self-desc JSON with JSON Schema with incorrect $$schema property should return Failure $e2
   """
 
   implicit val resolver = SpecHelpers.TestResolver
@@ -37,7 +34,14 @@ class SchemaValidationSpec extends Specification with ValidationMatchers { def i
     """{"schema": "iglu:com.snowplowanalytics.iglu-test/stock-item/jsonschema/1-0-0", "data": { "id": "123-12", "name": "t-shirt", "price": 29.99 } }"""
   )
 
+  val validJsonWithInvalidSchema = SpecHelpers.asJsonNode(
+    """{"schema": "iglu:com.snowplowanalytics.iglu-test/invalid-protocol/jsonschema/1-0-0", "data": { "id": 0 } }"""
+
+  )
+
   def e1 = validJson.validate(false) must beSuccessful(validJson)
+
+  def e2 = validJsonWithInvalidSchema.validate(false) must beFailing
 
 }
 
