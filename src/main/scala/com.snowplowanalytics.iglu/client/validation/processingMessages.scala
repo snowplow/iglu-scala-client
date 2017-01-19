@@ -13,6 +13,9 @@
 package com.snowplowanalytics.iglu.client
 package validation
 
+// Scala
+import scala.language.implicitConversions
+
 // JSON Schema
 import com.github.fge.jsonschema.core.report.{
   ProcessingMessage,

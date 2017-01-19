@@ -13,10 +13,6 @@
 import sbt._
 
 object Dependencies {
-  val resolutionRepos = Seq(
-    "Twitter Maven Repo" at "http://maven.twttr.com/" // For Twitter's util functions
-  )
-
   object V {
     // Java
     val commonsLang     = "3.1"
