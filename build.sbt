@@ -18,6 +18,8 @@ lazy val root = (project in file("."))
     description         := "Scala client and resolver for Iglu schema repositories"
   )
   .settings(BuildSettings.buildSettings)
+  .settings(BuildSettings.publishSettings)
+  .settings(BuildSettings.mavenCentralExtras)
   .settings(
     libraryDependencies ++= Seq(
       // Java
