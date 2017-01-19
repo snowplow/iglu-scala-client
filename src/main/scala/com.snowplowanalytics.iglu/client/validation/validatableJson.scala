@@ -78,12 +78,12 @@ object ValidatableJsonMethods {
       case re: RuntimeException =>
         s"Exception validating instance, possibly caused by malformed $schema field: [$re]"
           .toProcessingMessageNel
-          .fail
+          .failure
     }
     validatedReport.flatMap { report =>
       val msgs = report.iterator.toList
       msgs match {
-        case x :: xs if !report.isSuccess => NonEmptyList[ProcessingMessage](x, xs: _*).fail
+        case x :: xs if !report.isSuccess => NonEmptyList[ProcessingMessage](x, xs: _*).failure
         case Nil     if  report.isSuccess => instance.success
         case _                            => throw new RuntimeException(s"Validation report success [$report.isSuccess] conflicts with message count [$msgs.length]")
       }
@@ -170,7 +170,7 @@ object ValidatableJsonMethods {
       s  =  j.get("schema").asText
       d  =  j.get("data")
       sk <- SchemaKey.parseNel(s)
-      m  <- if (schemaCriterion.matches(sk)) sk.success else s"Verifying schema as ${schemaCriterion} failed: found ${sk}".toProcessingMessageNel.fail
+      m  <- if (schemaCriterion.matches(sk)) sk.success else s"Verifying schema as $schemaCriterion failed: found $sk".toProcessingMessageNel.failure
       js <- resolver.lookupSchema(m)
       v  <- validateAgainstSchema(d, js)
     } yield if (dataOnly) d else instance

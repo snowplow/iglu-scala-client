@@ -116,7 +116,7 @@ object Resolver {
         val json = fromJsonNode(node)
         val cacheSize = field[Int]("cacheSize")(json).leftMap(_.map(_.toString.toProcessingMessage))
         val repositoryRefs: ValidatedNel[RepositoryRefs] = (field[List[JValue]]("repositories")(json)).fold(
-          f => f.map(_.toString.toProcessingMessage).fail,
+          f => f.map(_.toString.toProcessingMessage).failure,
           s => getRepositoryRefs(s)
         )
         (cacheSize |@| repositoryRefs) {
@@ -124,7 +124,7 @@ object Resolver {
         }
       }
       case Failure(err) =>
-        (err.<::("Resolver configuration failed JSON Schema validation".toProcessingMessage)).fail[Resolver]
+        (err.<::("Resolver configuration failed JSON Schema validation".toProcessingMessage)).failure[Resolver]
     }
   }
 
@@ -161,7 +161,7 @@ object Resolver {
     } else if (HttpRepositoryRef.isHttp(rc)) {
       HttpRepositoryRef.parse(rc)
     } else {
-      s"Configuration unrecognizable as either embedded or HTTP repository".fail.toProcessingMessageNel
+      s"Configuration unrecognizable as either embedded or HTTP repository".failure.toProcessingMessageNel
     }
   }
 

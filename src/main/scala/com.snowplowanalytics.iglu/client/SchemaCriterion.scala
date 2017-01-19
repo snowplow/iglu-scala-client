@@ -46,7 +46,7 @@ object SchemaCriterion {
     case SchemaCriterionRegex(vnd, n, f, mod, rev, add) =>
       SchemaCriterion(vnd, n, f, mod.toInt, rev.toInt.some, add.toInt.some).success
     case _ =>
-      s"${schemaCriterion} is not a valid Iglu-format schema criterion".toProcessingMessage.failure
+      s"$schemaCriterion is not a valid Iglu-format schema criterion".toProcessingMessage.failure
   }
 
   def parseNel(schemaCriterion: String): ValidatedNel[SchemaCriterion] = parse(schemaCriterion).toValidationNel
