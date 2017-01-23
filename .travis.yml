@@ -18,3 +18,7 @@ deploy:
   on:
     condition: '"${TRAVIS_SCALA_VERSION}" == "2.11.8" && "${TRAVIS_JDK_VERSION}" == "oraclejdk7"' 
     tags: true
+env:
+  global:
+  - secure: Qf1FGe4SzvvSr5mQzKzTVfdz5jjyKrFp6nCa8QDm1Uj+spuL4v17szzfhHdJqy5ELqowrf97z2ciESjBjajzrh5cdLpLqmMICMjbWEWDCVh3LQPXTxc4/Bv1sw4DY/saQUw2vt46K/O89oP2tKBruYjwLpgPnPUgnWZ284P5P4M=
+  - secure: R3N94P7noue7/K2KOLjfxNVZV6Eft2emrU0zfh/qbkAwW6CF6w3gjVxRJwBzOhrsy5W4SU7r18Dft9/YS1QQOKw5HuBGNKnVytJxhkHPRB7EE/KrDnlQ0uHK9LAlQnwQzb74+iyQv6ONcrCF1M7xEnnkst8buZp4zoB8JXUA8bM=
