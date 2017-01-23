@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2016 Snowplow Analytics Ltd. All rights reserved.
+ * Copyright (c) 2014-2017 Snowplow Analytics Ltd. All rights reserved.
  *
  * This program is licensed to you under the Apache License Version 2.0,
  * and you may not use this file except in compliance with the Apache License Version 2.0.
@@ -14,18 +14,18 @@ package com.snowplowanalytics.iglu.client
 package validation
 
 // Json4s
-import org.json4s.jackson.JsonMethods.fromJsonNode
+import org.json4s.jackson.JsonMethods.parse
 
 // This project
-import ValidatableJsonMethods._
+import ValidatableJValue._
 
 // Specs2
 import org.specs2.Specification
 import org.specs2.scalaz.ValidationMatchers
 
-class SchemaValidationSpec extends Specification with ValidationMatchers { def is = s2"""
+class SchemaJValueValidationSpec extends Specification with ValidationMatchers { def is = s2"""
 
-  This is a specification to test Schema Validation
+  This is a specification to test Schema Validation with json4s AST
 
   validating a correct self-desc JSON should return the JSON in a Success $e1
   validating a correct self-desc JSON with JSON Schema with incorrect $$schema property should return Failure $e2
@@ -33,21 +33,15 @@ class SchemaValidationSpec extends Specification with ValidationMatchers { def i
 
   implicit val resolver = SpecHelpers.TestResolver
 
-  val validJson = SpecHelpers.asJsonNode(
+  val validJson = parse(
     """{"schema": "iglu:com.snowplowanalytics.iglu-test/stock-item/jsonschema/1-0-0", "data": { "id": "123-12", "name": "t-shirt", "price": 29.99 } }"""
   )
 
-  val validJsonWithInvalidSchema = SpecHelpers.asJsonNode(
+  val validJsonWithInvalidSchema = parse(
     """{"schema": "iglu:com.snowplowanalytics.iglu-test/invalid-protocol/jsonschema/1-0-0", "data": { "id": 0 } }"""
   )
-
-  val validJValue = fromJsonNode(validJson)
-
-  val validJValueWithInvalidSchema = fromJsonNode(validJsonWithInvalidSchema)
 
   def e1 = validJson.validate(false) must beSuccessful(validJson)
 
   def e2 = validJsonWithInvalidSchema.validate(false) must beFailing
-
 }
-

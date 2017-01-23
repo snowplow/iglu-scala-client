@@ -14,27 +14,16 @@ package com.snowplowanalytics.iglu.client
 package validation
 
 // Scala
-import scala.language.implicitConversions
+import scala.collection.JavaConversions._
 
 // Jackson
-import com.github.fge.jackson.JsonLoader
 import com.fasterxml.jackson.databind.JsonNode
 
 // JSON Schema
 import com.github.fge.jsonschema.SchemaVersion
 import com.github.fge.jsonschema.cfg.ValidationConfiguration
-import com.github.fge.jsonschema.main.{
-  JsonSchemaFactory,
-  JsonValidator
-}
-import com.github.fge.jsonschema.core.report.{
-  ListReportProvider,
-  ProcessingMessage,
-  LogLevel
-}
-
-// Scala
-import scala.collection.JavaConversions._
+import com.github.fge.jsonschema.core.report.{ListReportProvider, LogLevel, ProcessingMessage}
+import com.github.fge.jsonschema.main.{JsonSchemaFactory, JsonValidator}
 
 // Scalaz
 import scalaz._
@@ -43,34 +32,11 @@ import Scalaz._
 // This project
 import ProcessingMessageMethods._
 
-object ValidatableJsonMethods {
+
+object ValidatableJsonMethods extends Validatable[JsonNode] {
 
   private[validation] lazy val JsonSchemaValidator = getJsonSchemaValidator(SchemaVersion.DRAFTV4)
 
-  /**
-   * Implicit to pimp a JsonNode to our
-   * Scalaz Validation-friendly version.
-   *
-   * @param instance A JsonNode
-   * @return the pimped ValidatableJsonNode
-   */
-  implicit def pimpJsonNode(instance: JsonNode) = new ValidatableJsonNode(instance)
-
-  /**
-   * Validates a JSON against a given
-   * JSON Schema. On Success, simply
-   * passes through the original JSON.
-   * On Failure, return a NonEmptyList
-   * of failure messages.
-   *
-   * @param instance The JSON to validate
-   * @param schema The JSON Schema to
-   *        validate the JSON against
-   * @return either Success boxing the
-   *         JsonNode, or a Failure boxing
-   *         a NonEmptyList of
-   *         ProcessingMessages
-   */
   def validateAgainstSchema(instance: JsonNode, schema: JsonNode)(implicit resolver: Resolver): ValidatedNel[JsonNode] = {
     val validatedReport = try {
       JsonSchemaValidator.validateUnchecked(schema, instance).success
@@ -90,51 +56,15 @@ object ValidatableJsonMethods {
     }
   }
 
-  /**
-   * Validates a self-describing JSON against
-   * its specified JSON Schema.
-   *
-   * IMPORTANT: currently the exact version of
-   * the JSON Schema (i.e. MODEL-REVISION-ADDITION)
-   * must be resolvable thru Iglu.
-   *
-   * @param instance The self-describing JSON
-   *         to validate
-   * @param dataOnly Whether the returned JsonNode
-   *        should be the data only, or the whole
-   *        JSON (schema + data)
-   * @return either Success boxing the JsonNode
-   *         or a Failure boxing a NonEmptyList
-   *         of ProcessingMessages
-   */
   def validate(instance: JsonNode, dataOnly: Boolean = false)(implicit resolver: Resolver): ValidatedNel[JsonNode] =
     for {
       j  <- validateAsSelfDescribing(instance)
       s  =  j.get("schema").asText
       d  =  j.get("data")
       js <- resolver.lookupSchema(s)
-      v  <- validateAgainstSchema(d, js)
+      _  <- validateAgainstSchema(d, js)
     } yield if (dataOnly) d else instance
 
-  /**
-   * The same as validate(), but on Success returns
-   * a tuple containing the SchemaKey as well as
-   * the JsonNode.
-   *
-   * IMPORTANT: currently the exact version of
-   * the JSON Schema (i.e. MODEL-REVISION-ADDITION)
-   * must be resolvable thru Iglu.
-   *
-   * @param instance The self-describing JSON
-   *         to validate
-   * @param dataOnly Whether the returned JsonNode
-   *        should be the data only, or the whole
-   *        JSON (schema + data)
-   * @return either Success boxing a Tuple2 of the
-   *         JSON's SchemaKey plus its JsonNode,
-   *         or a Failure boxing a NonEmptyList
-   *         of ProcessingMessages
-   */
   def validateAndIdentifySchema(instance: JsonNode, dataOnly: Boolean = false)(implicit resolver: Resolver): ValidatedNel[JsonSchemaPair] =
     for {
       j  <- validateAsSelfDescribing(instance)
@@ -142,28 +72,9 @@ object ValidatableJsonMethods {
       d  =  j.get("data")
       sk <- SchemaKey.parseNel(s)
       js <- resolver.lookupSchema(sk)
-      v  <- validateAgainstSchema(d, js)
+      _  <- validateAgainstSchema(d, js)
     } yield if (dataOnly) (sk, d) else (sk, instance)
 
-  /**
-   * Verify that this JSON is of the expected schema,
-   * then validate it against the schema.
-   *
-   * IMPORTANT: currently the exact version of
-   * the JSON Schema (i.e. MODEL-REVISION-ADDITION)
-   * must be resolvable thru Iglu.
-   *
-   * @param instance The self-describing JSON to
-   *        verify and validate
-   * @param schemaCriterion Identifying the schema we
-   *        believe this JSON is described by
-   * @param dataOnly Whether the returned JsonNode
-   *        should be the data only, or the whole
-   *        JSON (schema + data)
-   * @return either Success boxing the JsonNode
-   *         or a Failure boxing a NonEmptyList
-   *         of ProcessingMessages
-   */
   def verifySchemaAndValidate(instance: JsonNode, schemaCriterion: SchemaCriterion, dataOnly: Boolean = false)(implicit resolver: Resolver): ValidatedNel[JsonNode] =
     for {
       j  <- validateAsSelfDescribing(instance)
@@ -172,7 +83,7 @@ object ValidatableJsonMethods {
       sk <- SchemaKey.parseNel(s)
       m  <- if (schemaCriterion.matches(sk)) sk.success else s"Verifying schema as $schemaCriterion failed: found $sk".toProcessingMessageNel.failure
       js <- resolver.lookupSchema(m)
-      v  <- validateAgainstSchema(d, js)
+      _  <- validateAgainstSchema(d, js)
     } yield if (dataOnly) d else instance
 
   /**
@@ -209,40 +120,20 @@ object ValidatableJsonMethods {
    * @return a JsonValidator
    */
   private[validation] def getJsonSchemaValidator(version: SchemaVersion): JsonValidator = {
-    
+
     // Override the ReportProvider so we never throw Exceptions and only collect ERRORS+
     val rep = new ListReportProvider(LogLevel.ERROR, LogLevel.NONE)
     val cfg = ValidationConfiguration
-                .newBuilder
-                .setDefaultVersion(version)
-                .freeze
+      .newBuilder
+      .setDefaultVersion(version)
+      .freeze
     val fac = JsonSchemaFactory
-                .newBuilder
-                .setReportProvider(rep)
-                .setValidationConfiguration(cfg)
-                .freeze
-    
+      .newBuilder
+      .setReportProvider(rep)
+      .setValidationConfiguration(cfg)
+      .freeze
+
     fac.getValidator
   }
 }
 
-/**
- * A pimped JsonNode which supports validation
- * using JSON Schema.
- */
-class ValidatableJsonNode(instance: JsonNode) {
-
-  import validation.{ValidatableJsonMethods => VJM}
-
-  def validateAgainstSchema(schema: JsonNode)(implicit resolver: Resolver): ValidatedNel[JsonNode] = 
-    VJM.validateAgainstSchema(instance, schema)
-
-  def validate(dataOnly: Boolean)(implicit resolver: Resolver): ValidatedNel[JsonNode] =
-    VJM.validate(instance, dataOnly)
-
-  def validateAndIdentifySchema(dataOnly: Boolean)(implicit resolver: Resolver): ValidatedNel[JsonSchemaPair] =
-    VJM.validateAndIdentifySchema(instance, dataOnly)
-
-  def verifySchemaAndValidate(schemaCriterion: SchemaCriterion, dataOnly: Boolean)(implicit resolver: Resolver): ValidatedNel[JsonNode] =
-    VJM.verifySchemaAndValidate(instance, schemaCriterion, dataOnly)
-}
