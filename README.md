@@ -10,17 +10,12 @@ Iglu Scala Client is used extensively in **[Snowplow] [snowplow-repo]** to valid
 
 ## Installation
 
-The latest version of Iglu Scala Client is 0.4.0, which is cross-built against Scala 2.10.x and 2.11.x.
+The latest version of Iglu Scala Client is 0.5.0, which is cross-built against Scala 2.10.x and 2.11.x.
 
 If you're using SBT, add the following lines to your build file:
 
 ```scala
-// Resolvers
-val snowplowRepo = "Snowplow Repo" at "http://maven.snplow.com/releases/"
-val sonatypeRepo = "Sonatype" at "https://oss.sonatype.org/content/repositories/releases"
-
-// Dependency
-val igluClient = "com.snowplowanalytics" %% "iglu-scala-client" % "0.4.0"
+val igluClient = "com.snowplowanalytics" %% "iglu-scala-client" % "0.5.0"
 ```
 
 Note the double percent (`%%`) between the group and artifactId. That'll ensure you get the right package for your Scala version.
@@ -70,7 +65,7 @@ guest> sbt compile
 
 ## Copyright and license
 
-Iglu Scala Client is copyright 2014 Snowplow Analytics Ltd.
+Iglu Scala Client is copyright 2014-2017 Snowplow Analytics Ltd.
 
 Licensed under the **[Apache License, Version 2.0] [license]** (the "License");
 you may not use this software except in compliance with the License.
@@ -106,8 +101,8 @@ limitations under the License.
 [travis]: https://travis-ci.org/snowplow/iglu-scala-client
 [travis-image]: https://travis-ci.org/snowplow/iglu-scala-client.png?branch=master
 
-[releases]: https://github.com/snowplow/scala-weather/releases
-[release-image]: http://img.shields.io/badge/release-0.4.0-blue.svg?style=flat
+[releases]: https://github.com/snowplow/iglu-scala-client/releases
+[release-image]: http://img.shields.io/badge/release-0.5.0-blue.svg?style=flat
 
 [license]: http://www.apache.org/licenses/LICENSE-2.0
 [license-image]: http://img.shields.io/badge/license-Apache--2-blue.svg?style=flat
