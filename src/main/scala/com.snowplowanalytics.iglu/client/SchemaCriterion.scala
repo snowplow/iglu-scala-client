@@ -32,6 +32,7 @@ object SchemaCriterion {
    *
    * iglu:com.snowplowanalytics.snowplow/mobile_context/jsonschema/1-*-*
    * iglu:com.snowplowanalytics.snowplow/mobile_context/jsonschema/1-0-*
+   * iglu:com.snowplowanalytics.snowplow/mobile_context/jsonschema/1-*-0
    * iglu:com.snowplowanalytics.snowplow/mobile_context/jsonschema/1-0-0
    *
    * @param schemaCriterion An Iglu-format schema URI
@@ -39,10 +40,12 @@ object SchemaCriterion {
    *         Success, and an error String on Failure
    */
   def parse(schemaCriterion: String): Validated[SchemaCriterion] = schemaCriterion match {
-    case SchemaCriterionRegex(vnd, n, f, mod, "*", _) =>
+    case SchemaCriterionRegex(vnd, n, f, mod, "*", add) if add == "*" =>
       SchemaCriterion(vnd, n, f, mod.toInt, None, None).success
-    case SchemaCriterionRegex(vnd, n, f, mod, add, "*") =>
-      SchemaCriterion(vnd, n, f, mod.toInt, add.toInt.some, None).success
+    case SchemaCriterionRegex(vnd, n, f, mod, "*", add) =>
+      SchemaCriterion(vnd, n, f, mod.toInt, None, add.toInt.some).success
+    case SchemaCriterionRegex(vnd, n, f, mod, rev, "*") =>
+      SchemaCriterion(vnd, n, f, mod.toInt, rev.toInt.some, None).success
     case SchemaCriterionRegex(vnd, n, f, mod, rev, add) =>
       SchemaCriterion(vnd, n, f, mod.toInt, rev.toInt.some, add.toInt.some).success
     case _ =>
@@ -83,12 +86,12 @@ object SchemaCriterion {
  * Class to validate SchemaKeys.
  */
 case class SchemaCriterion(
-  val vendor: String,
-  val name: String,
-  val format: String,
-  val model: Int,
-  val revision: Option[Int] = None,
-  val addition: Option[Int] = None) {
+  vendor: String,
+  name: String,
+  format: String,
+  model: Int,
+  revision: Option[Int] = None,
+  addition: Option[Int] = None) {
 
   lazy val versionString = "%s-%s-%s".format(model, revision.getOrElse("*"), addition.getOrElse("*"))
 
@@ -118,17 +121,17 @@ case class SchemaCriterion(
     prefixMatches(key) && {
       key.getModelRevisionAddition match {
         case None => false
-        case Some((keyModel, keyRevision, keyAddition)) => {
-
+        case Some((keyModel, keyRevision, keyAddition)) =>
           keyModel == model && (revision match {
-            case None => true
+            case None => addition match {
+              case Some(a) => a == keyAddition
+              case None => true
+            }
             case Some(r) => addition match {
               case None => keyRevision <= r
               case Some(a) => keyRevision < r || (keyRevision == r && keyAddition <= a)
             }
           })
-
-        }
       }
     }
   }

@@ -29,6 +29,7 @@ class SchemaCriterionSpec extends Specification with DataTables with ValidationM
   if the payload, vendor, and format aren't identical, the schema should be rejected  $e1
   correctly validate schemas  $e2
   parse schema criterion  $e3
+  parse schema criterion with known ADDITION and unknown REVISION $e4
   """
 
   def e1 = {
@@ -40,6 +41,7 @@ class SchemaCriterionSpec extends Specification with DataTables with ValidationM
     "SPEC NAME"                                         || "Criterion"           | "SchemaVer" | "EXPECTED OUTPUT" |
     "Correct model"                                     !! (2, None,    None)    ! "2-3-4"     ! true              |
     "Incorrect model version"                           !! (2, None,    None)    ! "1-0-0"     ! false             |
+    "Correct revision, incorrect addition"              !! (2, None, Some(1))    ! "2-3-0"     ! false              |
     "Correct revision"                                  !! (2, Some(3), None)    ! "2-3-0"     ! true              |
     "Correct revision and addition"                     !! (2, Some(3), None)    ! "2-0-9"     ! true              |
     "Incorrect revision"                                !! (2, Some(3), None)    ! "2-4-0"     ! false             |
@@ -55,6 +57,11 @@ class SchemaCriterionSpec extends Specification with DataTables with ValidationM
   def e3 = {
     val criterion = SchemaCriterion.parse("iglu:com.snowplowanalytics.snowplow/mobile_context/jsonschema/1-0-*")
     criterion must beSuccessful(SchemaCriterion("com.snowplowanalytics.snowplow", "mobile_context", "jsonschema", 1, Some(0), None))
+  }
+
+  def e4 = {
+    val criterion = SchemaCriterion.parse("iglu:com.snowplowanalytics.snowplow/mobile_context/jsonschema/1-*-3")
+    criterion must beSuccessful(SchemaCriterion("com.snowplowanalytics.snowplow", "mobile_context", "jsonschema", 1, None, Some(3)))
   }
 
 }
