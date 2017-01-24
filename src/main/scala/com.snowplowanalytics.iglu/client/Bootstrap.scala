@@ -27,7 +27,7 @@ import repositories.{
 object Bootstrap {
 
   // Keep this up-to-date
-  private[client] val EmbeddedSchemaCount = 2
+  private[client] val EmbeddedSchemaCount = 4
 
   // Our embedded JSON Schema repository.
   lazy val Repo = {
@@ -40,5 +40,5 @@ object Bootstrap {
   }
 
   // A Resolver which only looks at our embedded repo.
-  lazy val Resolver = UrResolver(cacheSize = EmbeddedSchemaCount, Nil)
+  lazy val Resolver = UrResolver(cacheSize = EmbeddedSchemaCount, repos = Nil, cacheTtl = None)
 }
