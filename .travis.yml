@@ -1,8 +1,7 @@
 language: scala
 scala:
-   - 2.10.0
-   - 2.10.4
-   - 2.11.7
+   - 2.10.6
+   - 2.11.8
 jdk:
   - oraclejdk7
   - openjdk7
@@ -10,3 +9,18 @@ addons:
   # Fix OpenJDK builds
   # https://github.com/travis-ci/travis-ci/issues/5227
   hostname: short-hostname
+script:
+- sbt test
+deploy:
+  skip_cleanup: true
+  provider: script
+  script: ./.travis/deploy.sh $TRAVIS_TAG
+  on:
+    condition: '"${TRAVIS_SCALA_VERSION}" == "2.11.8" && "${TRAVIS_JDK_VERSION}" == "oraclejdk7"' 
+    tags: true
+env:
+  global:
+  - secure: Qf1FGe4SzvvSr5mQzKzTVfdz5jjyKrFp6nCa8QDm1Uj+spuL4v17szzfhHdJqy5ELqowrf97z2ciESjBjajzrh5cdLpLqmMICMjbWEWDCVh3LQPXTxc4/Bv1sw4DY/saQUw2vt46K/O89oP2tKBruYjwLpgPnPUgnWZ284P5P4M=
+  - secure: R3N94P7noue7/K2KOLjfxNVZV6Eft2emrU0zfh/qbkAwW6CF6w3gjVxRJwBzOhrsy5W4SU7r18Dft9/YS1QQOKw5HuBGNKnVytJxhkHPRB7EE/KrDnlQ0uHK9LAlQnwQzb74+iyQv6ONcrCF1M7xEnnkst8buZp4zoB8JXUA8bM=
+  - secure: jh4RLrx+HoTmzgfvsxle8hWdAsz6m5M0qvaBu3VAGPnrM4NmRPyfyb08btlN+qLJOTEBilZGIKh+cYSE8NRJHXR+8iAKHikop8rOh6HqwaEl8A7SFy/Nx6RMys3Cy3yX5AVLHhgpu4absok4QlVplYhn2aK6EbYsM0VS1uyOztQ=
+  - secure: ZdJH16Iz79TTwPCha92BuekZP07QsLAxMqaG4liH45ncK4TE+xfEE0lAmt2SqonPodXDbx94cFwjTEum0xFsEOp1ASsz393i265+qVKT+WwumpMe1/4Ta9UF6bAZMBQSeikgW7Qnh7uN2DVUKJ9LNrCg3xlBReWeqJC/1AjD+TM=

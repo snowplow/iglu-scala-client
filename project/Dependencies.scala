@@ -13,10 +13,6 @@
 import sbt._
 
 object Dependencies {
-  val resolutionRepos = Seq(
-    "Twitter Maven Repo" at "http://maven.twttr.com/" // For Twitter's util functions
-  )
-
   object V {
     // Java
     val commonsLang     = "3.1"
@@ -24,7 +20,7 @@ object Dependencies {
     val jsonValidator   = "2.2.3"
     // Scala
     val json4s          = "3.2.11"
-    val scalaz7         = "7.0.0"
+    val scalaz7         = "7.0.9"
     val collUtils       = "6.20.0"
     // Scala (test only)
     val specs2          = "2.3.13" // Downgrade to prevent issues in job tests. WAS: "2.3.11"

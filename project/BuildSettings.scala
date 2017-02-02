@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014 Snowplow Analytics Ltd. All rights reserved.
+ * Copyright (c) 2014-2017 Snowplow Analytics Ltd. All rights reserved.
  *
  * This program is licensed to you under the Apache License Version 2.0,
  * and you may not use this file except in compliance with the Apache License Version 2.0.
@@ -10,37 +10,65 @@
  * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the Apache License Version 2.0 for the specific language governing permissions and limitations there under.
  */
+
+// SBT
 import sbt._
 import Keys._
 
+// Bintray plugin
+import bintray.BintrayPlugin._
+import bintray.BintrayKeys._
+
 object BuildSettings {
 
-  // Basic settings for our app
-  lazy val basicSettings = Seq[Setting[_]](
+  lazy val buildSettings = Seq[Setting[_]](
     organization  := "com.snowplowanalytics",
-    version       := "0.4.0",
-    description   := "Scala client and resolver for Iglu schema repositories",
-    scalaVersion  := "2.10.4",
-    crossScalaVersions :=  Seq("2.10.4", "2.11.7"),
-    scalacOptions := Seq("-deprecation", "-encoding", "utf8"),
-    testOptions in Test += Tests.Argument("sequential"),
-    parallelExecution in Test := false, // Parallel tests cause havoc with LRU cache
-    resolvers     ++= Dependencies.resolutionRepos
+    scalaVersion  := "2.10.6",
+    crossScalaVersions  := Seq("2.10.6", "2.11.8"),
+    scalacOptions := Seq(
+      "-deprecation",
+      "-encoding", "UTF-8",
+      "-feature",
+      "-unchecked",
+      "-Ywarn-dead-code",
+      "-Ywarn-inaccessible",
+      "-Ywarn-nullary-override",
+      "-Ywarn-nullary-unit",
+      "-Ywarn-numeric-widen",
+      "-Ywarn-value-discard"
+    ),
+
+    scalacOptions in (Compile, console) ~= (_ filterNot (_ == "-Xfatal-warnings")),
+    scalacOptions in (Test, console) := (scalacOptions in (Compile, console)).value,
+
+    // force scala version
+    // http://stackoverflow.com/questions/27809280/suppress-sbt-eviction-warnings
+    ivyScala := ivyScala.value map { _.copy(overrideScalaVersion = true) },
+
+    parallelExecution in Test := false // possible race bugs
   )
 
-  // Publish settings
-  // TODO: update with ivy credentials etc when we start using Nexus
-  lazy val publishSettings = Seq[Setting[_]](
-    // Enables publishing to maven repo
-    publishMavenStyle := true,
 
-    publishTo <<= version { version =>
-      val basePath = "target/repo/%s".format {
-        if (version.trim.endsWith("SNAPSHOT")) "snapshots/" else "releases/"
-      }
-      Some(Resolver.file("Local Maven repository", file(basePath)) transactional())
-    }
+  // Bintray publishing settings
+  lazy val publishSettings = bintraySettings ++ Seq[Setting[_]](
+    licenses += ("Apache-2.0", url("http://www.apache.org/licenses/LICENSE-2.0.html")),
+    bintrayOrganization := Some("snowplow"),
+    bintrayRepository := "snowplow-maven"
   )
 
-  lazy val buildSettings = basicSettings ++ publishSettings
+  // Maven Central publishing settings
+  lazy val mavenCentralExtras = Seq[Setting[_]](
+    pomIncludeRepository := { x => false },
+    homepage := Some(url("http://snowplowanalytics.com")),
+    scmInfo := Some(ScmInfo(url("https://github.com/snowplow/iglu-scala-client"), "scm:git@github.com:snowplow/iglu-scala-client.git")),
+    pomExtra := (
+      <developers>
+        <developer>
+          <name>Snowplow Analytics Ltd</name>
+          <email>support@snowplowanalytics.com</email>
+          <organization>Snowplow Analytics Ltd</organization>
+          <organizationUrl>http://snowplowanalytics.com</organizationUrl>
+        </developer>
+      </developers>)
+  )
 }

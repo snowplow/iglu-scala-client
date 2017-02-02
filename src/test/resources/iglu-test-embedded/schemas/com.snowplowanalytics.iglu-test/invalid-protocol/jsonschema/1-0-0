@@ -1,0 +1,17 @@
+{
+    "$schema": "iglu:com.acme/some-invalid-protocol/jsonschema",
+    "self": {
+        "vendor": "com.acme",
+        "name": "invalid-protocol",
+        "format": "jsonschema",
+        "version": "1-0-0"
+    },
+    "type": "object",
+    "properties": {
+        "id": {
+            "description": "The unique identifier for a product",
+            "type": "integer"
+        }
+    },
+    "required": ["id"]
+}

@@ -133,7 +133,7 @@ object HttpRepositoryRef {
     try {
       (config \ "connection" \ "http").extract[HttpConnection].success
     } catch {
-      case me: MappingException => s"Could not extract connection.http from ${compact(render(config))}".fail.toProcessingMessage
+      case me: MappingException => s"Could not extract connection.http from ${compact(render(config))}".failure.toProcessingMessage
     }
 
   /**
@@ -156,10 +156,10 @@ object HttpRepositoryRef {
     (try {
       (new URL(url)).success
     } catch {
-      case npe: NullPointerException => "Provided URL was null".fail
-      case mue: MalformedURLException => "Provided URL string [%s] is malformed: [%s]".format(url, mue.getMessage).fail
-      case iae: IllegalArgumentException => "Provided URL string [%s] violates RFC 2396: [%s]".format(url, ExceptionUtils.getRootCause(iae).getMessage).fail
-      case e: Throwable => "Unexpected error creating URL from string [%s]: [%s]".format(url, e.getMessage).fail
+      case npe: NullPointerException => "Provided URL was null".failure
+      case mue: MalformedURLException => "Provided URL string [%s] is malformed: [%s]".format(url, mue.getMessage).failure
+      case iae: IllegalArgumentException => "Provided URL string [%s] violates RFC 2396: [%s]".format(url, ExceptionUtils.getRootCause(iae).getMessage).failure
+      case e: Throwable => "Unexpected error creating URL from string [%s]: [%s]".format(url, e.getMessage).failure
     }).toProcessingMessage
 
 }
@@ -205,11 +205,11 @@ case class HttpRepositoryRef(
       // The most common failure case: the schema is not found in the repo
       case fnf: FileNotFoundException => None.success
       case jpe: JsonParseException =>
-        s"Problem parsing ${schemaKey} as JSON in ${descriptor} Iglu repository ${config.name}: %s".format(VE.stripInstanceEtc(jpe.getMessage)).fail.toProcessingMessage
+        s"Problem parsing ${schemaKey} as JSON in ${descriptor} Iglu repository ${config.name}: %s".format(VE.stripInstanceEtc(jpe.getMessage)).failure.toProcessingMessage
       case uhe: UnknownHostException =>
-        s"Unknown host issue fetching ${schemaKey} in ${descriptor} Iglu repository ${config.name}: ${uhe.getMessage}".fail.toProcessingMessage
+        s"Unknown host issue fetching ${schemaKey} in ${descriptor} Iglu repository ${config.name}: ${uhe.getMessage}".failure.toProcessingMessage
       case NonFatal(nfe) =>
-        s"Unexpected exception fetching $schemaKey in ${descriptor} Iglu repository ${config.name}: $nfe".fail.toProcessingMessage
+        s"Unexpected exception fetching $schemaKey in ${descriptor} Iglu repository ${config.name}: $nfe".failure.toProcessingMessage
     }
   }
 }

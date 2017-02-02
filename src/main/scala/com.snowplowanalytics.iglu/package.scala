@@ -47,7 +47,7 @@ package object client {
   /**
    * Our LRU cache of schemas
    */
-  type SchemaLruMap = SynchronizedLruMap[SchemaKey, SchemaLookup]
+  type SchemaLruMap = SynchronizedLruMap[SchemaKey, SchemaLookupStamped]
 
   /**
    * Aggregated lookup failures for single schema
@@ -64,10 +64,16 @@ package object client {
   type RepoFailuresMap = Map[RepositoryRef, LookupFailure]
 
   /**
-   * Validated schema lookup result containing, JsonNode in case of Success or
-   * Map of all currently failed repositories in case of Failure
+   * Validated schema lookup result containing, cache result which is
+   * JsonNode in case of Success or Map of all currently failed repositories
+   * in case of Failure
    */
   type SchemaLookup = Validation[RepoFailuresMap, JsonNode]
+
+  /**
+   * Schema lookup result associated with timestamp (in seconds) it was stored at
+   */
+  type SchemaLookupStamped = (Int, SchemaLookup)
 
   /**
    * Our List (possibly empty) of Iglu repositories

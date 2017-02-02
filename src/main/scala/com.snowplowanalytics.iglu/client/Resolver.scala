@@ -51,7 +51,7 @@ import ProcessingMessageMethods._
  */
 object Resolver {
 
-  private val ConfigurationSchema = SchemaCriterion("com.snowplowanalytics.iglu", "resolver-config", "jsonschema", 1, 0, 1)
+  private val ConfigurationSchema = SchemaCriterion("com.snowplowanalytics.iglu", "resolver-config", "jsonschema", 1, 0, 2)
 
   /**
    * Helper class responsible for aggregating repository lookup errors
@@ -111,20 +111,19 @@ object Resolver {
 
     // Check it passes validation
     config.verifySchemaAndValidate(ConfigurationSchema, dataOnly = true) match {
-      case Success(node) => {
-
+      case Success(node) =>
         val json = fromJsonNode(node)
         val cacheSize = field[Int]("cacheSize")(json).leftMap(_.map(_.toString.toProcessingMessage))
+        val cacheTtl = field[Option[Int]]("cacheTtl")(json).leftMap(_.map(_.toString.toProcessingMessage))
         val repositoryRefs: ValidatedNel[RepositoryRefs] = (field[List[JValue]]("repositories")(json)).fold(
-          f => f.map(_.toString.toProcessingMessage).fail,
+          f => f.map(_.toString.toProcessingMessage).failure,
           s => getRepositoryRefs(s)
         )
-        (cacheSize |@| repositoryRefs) {
-          Resolver(_, _)
+        (cacheSize |@| repositoryRefs |@| cacheTtl) {
+          Resolver(_, _, _)
         }
-      }
       case Failure(err) =>
-        (err.<::("Resolver configuration failed JSON Schema validation".toProcessingMessage)).fail[Resolver]
+        err.<::("Resolver configuration failed JSON Schema validation".toProcessingMessage).failure[Resolver]
     }
   }
 
@@ -161,7 +160,7 @@ object Resolver {
     } else if (HttpRepositoryRef.isHttp(rc)) {
       HttpRepositoryRef.parse(rc)
     } else {
-      s"Configuration unrecognizable as either embedded or HTTP repository".fail.toProcessingMessageNel
+      s"Configuration unrecognizable as either embedded or HTTP repository".failure.toProcessingMessageNel
     }
   }
 
@@ -252,11 +251,17 @@ object Resolver {
 
     val notFound = new ProcessingMessage()
       .setLogLevel(LogLevel.ERROR)
-      .setMessage(s"Could not find schema with key ${schemaKey} in any repository, tried:")
+      .setMessage(s"Could not find schema with key $schemaKey in any repository, tried:")
       .put("repositories", asJsonNode(repos))
 
     NonEmptyList(notFound, failures: _*)
   }
+
+  /**
+   * Get Unix epoch timestamp in seconds
+   */
+  private def currentSeconds: Int =
+    (System.currentTimeMillis() / 1000).toInt
 }
 
 /**
@@ -270,7 +275,8 @@ object Resolver {
  */
 case class Resolver(
   cacheSize: Int = 500,
-  repos: RepositoryRefs
+  repos: RepositoryRefs,
+  cacheTtl: Option[Int] = None
 ) {
   import Resolver._
   
@@ -294,7 +300,8 @@ case class Resolver(
     def get(schemaKey: SchemaKey): Option[SchemaLookup] =
       for {
         l <- lru
-        k <- l.get(schemaKey)
+        (t, k) <- l.get(schemaKey)
+        if isViable(t)
       } yield k
 
     /**
@@ -307,9 +314,24 @@ case class Resolver(
      */
     def store(schemaKey: SchemaKey, schema: SchemaLookup): SchemaLookup = {
       for (l <- lru) {
-        l.put(schemaKey, schema)
+        l.put(schemaKey, (currentSeconds, schema))
       }
       schema
+    }
+
+    /**
+     * Check if cached value is still valid based on resolver's `cacheTtl`
+     *
+     * @param storedTstamp timestamp when value was saved
+     * @return true if
+     */
+    private def isViable(storedTstamp: Int): Boolean = {
+      cacheTtl match {
+        case None => true
+        case Some(ttl) =>
+          if (currentSeconds - storedTstamp < ttl) true
+          else false
+      }
     }
   }
 
@@ -373,6 +395,6 @@ case class Resolver(
   def unsafeLookupSchema(schemaKey: SchemaKey): JsonNode =
     lookupSchema(schemaKey) match {
       case Success(schema) => schema
-      case Failure(err)    => throw new RuntimeException(s"Unsafe schema lookup failed: ${err}")
+      case Failure(err)    => throw new RuntimeException(s"Unsafe schema lookup failed: $err")
     }
 }
