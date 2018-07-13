@@ -21,7 +21,7 @@ object Dependencies {
     // Scala
     val json4s          = "3.2.11"
     val scalaz7         = "7.0.9"
-    val collUtils       = "6.20.0"
+    val collUtils       = "18.7.0"
     // Scala (test only)
     val specs2          = "2.3.13" // Downgrade to prevent issues in job tests. WAS: "2.3.11"
     val scalazSpecs2    = "0.2"
