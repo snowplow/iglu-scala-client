@@ -41,10 +41,6 @@ object BuildSettings {
     scalacOptions in (Compile, console) ~= (_ filterNot (_ == "-Xfatal-warnings")),
     scalacOptions in (Test, console) := (scalacOptions in (Compile, console)).value,
 
-    // force scala version
-    // http://stackoverflow.com/questions/27809280/suppress-sbt-eviction-warnings
-    ivyScala := ivyScala.value map { _.copy(overrideScalaVersion = true) },
-
     parallelExecution in Test := false // possible race bugs
   )
 
