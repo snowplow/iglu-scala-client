@@ -23,8 +23,8 @@ object BuildSettings {
 
   lazy val buildSettings = Seq[Setting[_]](
     organization  := "com.snowplowanalytics",
-    scalaVersion  := "2.11.8",
-    crossScalaVersions  := Seq("2.11.8"),
+    scalaVersion  := "2.11.12",
+    crossScalaVersions  := Seq("2.11.12"),
     scalacOptions := Seq(
       "-deprecation",
       "-encoding", "UTF-8",
