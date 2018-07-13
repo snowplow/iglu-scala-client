@@ -25,7 +25,8 @@ import org.specs2.Specification
 import org.specs2.matcher.DataTables
 import org.specs2.scalaz.ValidationMatchers
 
-class EmbeddedRepositoryRefSpec extends Specification with DataTables with ValidationMatchers { def is = s2"""
+class EmbeddedRepositoryRefSpec extends Specification with DataTables with ValidationMatchers {
+  def is = s2"""
 
   This is a specification to test an embedded RepositoryRef
 
@@ -37,7 +38,7 @@ class EmbeddedRepositoryRefSpec extends Specification with DataTables with Valid
   """
 
   val AcmeConfig = SpecHelpers.asJValue(
-     """|{
+    """|{
           |"name": "Acme Embedded",
           |"priority": 100,
           |"vendorPrefixes": [ "uk.co.acme", "de.acme" ],
@@ -46,8 +47,8 @@ class EmbeddedRepositoryRefSpec extends Specification with DataTables with Valid
               |"path": "/acme-embedded-new"
             |}
           |}
-        |}""".stripMargin.replaceAll("[\n\r]","")
-    )
+        |}""".stripMargin.replaceAll("[\n\r]", "")
+  )
 
   def e1 = EmbeddedRepositoryRef.isEmbedded(AcmeConfig) must beTrue
 
@@ -60,7 +61,8 @@ class EmbeddedRepositoryRefSpec extends Specification with DataTables with Valid
   }
 
   def e3 = {
-    val schemaKey = SchemaKey("com.snowplowanalytics.iglu-test", "stock-item", "jsonschema", "1-0-0")
+    val schemaKey =
+      SchemaKey("com.snowplowanalytics.iglu-test", "stock-item", "jsonschema", "1-0-0")
     val expected =
       """{
         |"$schema":"http://iglucentral.com/schemas/com.snowplowanalytics.self-desc/schema/jsonschema/1-0-0#",
@@ -85,9 +87,10 @@ class EmbeddedRepositoryRefSpec extends Specification with DataTables with Valid
         |},
         |"required":["id","name","price"],
         |"additionalProperties":false
-      |}""".stripMargin.replaceAll("[\n\r]","")
+      |}""".stripMargin.replaceAll("[\n\r]", "")
 
-    SpecHelpers.EmbeddedTest.lookupSchema(schemaKey).map(_.map(_.toString)) must beSuccessful(Some(expected))
+    SpecHelpers.EmbeddedTest.lookupSchema(schemaKey).map(_.map(_.toString)) must beSuccessful(
+      Some(expected))
   }
 
   def e4 = {
@@ -96,9 +99,12 @@ class EmbeddedRepositoryRefSpec extends Specification with DataTables with Valid
   }
 
   def e5 = {
-    val schemaKey = SchemaKey("com.snowplowanalytics.iglu-test", "corrupted_schema", "jsonschema", "1-0-0")
-    val expected = "Problem parsing /iglu-test-embedded/schemas/com.snowplowanalytics.iglu-test/corrupted_schema/jsonschema/1-0-0 as JSON in embedded Iglu repository Iglu Test Embedded: Unexpected end-of-input within/between OBJECT entries at [Source: java.io.BufferedInputStream@xxxxxx; line: 10, column: 316]".toProcessingMessage.toString
-    SpecHelpers.EmbeddedTest.lookupSchema(schemaKey).leftMap(_.toString) must beFailing(expected.toString)
+    val schemaKey =
+      SchemaKey("com.snowplowanalytics.iglu-test", "corrupted_schema", "jsonschema", "1-0-0")
+    val expected =
+      "Problem parsing /iglu-test-embedded/schemas/com.snowplowanalytics.iglu-test/corrupted_schema/jsonschema/1-0-0 as JSON in embedded Iglu repository Iglu Test Embedded: Unexpected end-of-input within/between OBJECT entries at [Source: java.io.BufferedInputStream@xxxxxx; line: 10, column: 316]".toProcessingMessage.toString
+    SpecHelpers.EmbeddedTest.lookupSchema(schemaKey).leftMap(_.toString) must beFailing(
+      expected.toString)
   }
 
 }

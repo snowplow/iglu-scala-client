@@ -13,33 +13,27 @@
 package com.snowplowanalytics.iglu.client
 
 // JSON Schema
-import com.github.fge.jsonschema.core.report.{
-  ProcessingMessage,
-  LogLevel
-}
+import com.github.fge.jsonschema.core.report.{LogLevel, ProcessingMessage}
 
 // json4s
 import org.json4s._
 import org.json4s.JsonDSL._
-import org.json4s.jackson.JsonMethods.{
-  parse,
-  asJsonNode => ajn
-}
+import org.json4s.jackson.JsonMethods.{parse, asJsonNode => ajn}
 
 // This project
-import repositories.{
-  EmbeddedRepositoryRef,
-  HttpRepositoryRef,
-  RepositoryRefConfig
-}
+import repositories.{EmbeddedRepositoryRef, HttpRepositoryRef, RepositoryRefConfig}
 
 object SpecHelpers {
-  
+
   val IgluCentral =
-    HttpRepositoryRef(RepositoryRefConfig("Iglu Central", 0, List("com.snowplowanalytics")), "http://iglucentral.com")
+    HttpRepositoryRef(
+      RepositoryRefConfig("Iglu Central", 0, List("com.snowplowanalytics")),
+      "http://iglucentral.com")
 
   val EmbeddedTest =
-    EmbeddedRepositoryRef(RepositoryRefConfig("Iglu Test Embedded", 0, List("com.snowplowanalytics")), path = "/iglu-test-embedded") 
+    EmbeddedRepositoryRef(
+      RepositoryRefConfig("Iglu Test Embedded", 0, List("com.snowplowanalytics")),
+      path = "/iglu-test-embedded")
 
   val TestResolver = Resolver(cacheSize = 10, EmbeddedTest)
 
@@ -49,26 +43,33 @@ object SpecHelpers {
   def asJsonNode(str: String) =
     ajn(asJValue(str))
 
-  def asProcessingMessage(message: String, schema: String, instance: String, keyword: String, foundExpected: Option[(String, String)], requiredMissing: Option[(String, String)], unwanted: Option[String]) = {
+  def asProcessingMessage(
+    message: String,
+    schema: String,
+    instance: String,
+    keyword: String,
+    foundExpected: Option[(String, String)],
+    requiredMissing: Option[(String, String)],
+    unwanted: Option[String]) = {
 
     val pm = new ProcessingMessage()
-                   .setLogLevel(LogLevel.ERROR)
-                   .setMessage(message)
-                   .put("schema",   asJsonNode(schema))
-                   .put("instance", asJsonNode(instance))
-                   .put("domain",  "validation")
-                   .put("keyword",  keyword)
+      .setLogLevel(LogLevel.ERROR)
+      .setMessage(message)
+      .put("schema", asJsonNode(schema))
+      .put("instance", asJsonNode(instance))
+      .put("domain", "validation")
+      .put("keyword", keyword)
 
     foundExpected match {
       case Some(Tuple2(found, expected)) =>
-        pm.put("found",    found)
+        pm.put("found", found)
         pm.put("expected", asJsonNode(expected))
       case _ =>
     }
     requiredMissing match {
       case Some(Tuple2(required, missing)) =>
         pm.put("required", asJsonNode(required))
-        pm.put("missing",  asJsonNode(missing))
+        pm.put("missing", asJsonNode(missing))
       case _ =>
     }
     for (unw <- unwanted) {

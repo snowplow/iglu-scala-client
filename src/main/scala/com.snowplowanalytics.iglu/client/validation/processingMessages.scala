@@ -17,10 +17,7 @@ package validation
 import scala.language.implicitConversions
 
 // JSON Schema
-import com.github.fge.jsonschema.core.report.{
-  ProcessingMessage,
-  LogLevel
-}
+import com.github.fge.jsonschema.core.report.{LogLevel, ProcessingMessage}
 
 // Scalaz
 import scalaz._
@@ -39,9 +36,11 @@ object ProcessingMessageMethods {
    * @param instance A JsonNode
    * @return the pimped ValidatableJsonNode
    */
-  implicit def pimpValidation[A](validation: Validation[String, A]) = new ProcMsgValidation[A](validation)
+  implicit def pimpValidation[A](validation: Validation[String, A]) =
+    new ProcMsgValidation[A](validation)
 
-  implicit def pimpValidationNel[A](validation: ValidationNel[String, A]) = new ProcMsgValidationNel[A](validation)
+  implicit def pimpValidationNel[A](validation: ValidationNel[String, A]) =
+    new ProcMsgValidationNel[A](validation)
 
   implicit def pimpString(str: String) = new ProcMsgString(str)
 
@@ -108,7 +107,9 @@ class ProcMsgValidationNel[+A](validation: ValidationNel[String, A]) {
  */
 class ProcMsgString(str: String) {
 
-  def toProcessingMessage: ProcessingMessage = ProcessingMessageMethods.toProcMsg(str, LogLevel.ERROR)
+  def toProcessingMessage: ProcessingMessage =
+    ProcessingMessageMethods.toProcMsg(str, LogLevel.ERROR)
 
-  def toProcessingMessageNel: ProcessingMessageNel = ProcessingMessageMethods.toProcMsgNel(str, LogLevel.ERROR)
+  def toProcessingMessageNel: ProcessingMessageNel =
+    ProcessingMessageMethods.toProcMsgNel(str, LogLevel.ERROR)
 }

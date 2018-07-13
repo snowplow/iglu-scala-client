@@ -14,10 +14,7 @@ package com.snowplowanalytics.iglu.client
 
 // This project
 import com.snowplowanalytics.iglu.client.{Resolver => UrResolver}
-import repositories.{
-  RepositoryRefConfig,
-  EmbeddedRepositoryRef
-}
+import repositories.{EmbeddedRepositoryRef, RepositoryRefConfig}
 
 /**
  * Bootstrap object contains our embedded JSON
@@ -36,7 +33,7 @@ object Bootstrap {
       instancePriority = 0,
       vendorPrefixes = Nil
     )
-    EmbeddedRepositoryRef(config, path = "/iglu-client-embedded")    
+    EmbeddedRepositoryRef(config, path = "/iglu-client-embedded")
   }
 
   // A Resolver which only looks at our embedded repo.
