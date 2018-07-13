@@ -52,7 +52,8 @@ object RepositoryRefConfig {
   // TODO: convert the Scalaz Error sub-types to
   // ProcessingMessages more cleanly (not just via toString)
   def parse(config: JValue): ValidatedNel[RepositoryRefConfig] =
-    (field[String]("name")(config) |@| field[Int]("priority")(config) |@| field[List[String]]("vendorPrefixes")(config)) {
+    (field[String]("name")(config) |@| field[Int]("priority")(config) |@| field[List[String]](
+      "vendorPrefixes")(config)) {
       RepositoryRefConfig(_, _, _)
     }.leftMap(_.map(_.toString.toProcessingMessage))
 }
@@ -64,7 +65,7 @@ case class RepositoryRefConfig(
   name: String,
   instancePriority: Int,
   vendorPrefixes: List[String]
-  )
+)
 
 /**
  * Common behavior for all RepositoryRef classes.
@@ -98,7 +99,7 @@ trait RepositoryRef {
    *        the schema in Iglu
    * @return a Validation boxing either the Schema's
    *         JsonNode on Success, or an error String
-   *         on Failure 
+   *         on Failure
    */
   def lookupSchema(schemaKey: SchemaKey): Validated[Option[JsonNode]]
 
@@ -113,7 +114,8 @@ trait RepositoryRef {
    */
   def unsafeLookupSchema(schemaKey: SchemaKey): JsonNode = {
     def exception(msg: ProcessingMessage) =
-      new RuntimeException(s"Unsafe lookup of schema ${schemaKey} in ${descriptor} Iglu repository ${config.name} failed: ${msg}")
+      new RuntimeException(
+        s"Unsafe lookup of schema ${schemaKey} in ${descriptor} Iglu repository ${config.name} failed: ${msg}")
 
     lookupSchema(schemaKey) match {
       case Success(Some(schema)) => schema

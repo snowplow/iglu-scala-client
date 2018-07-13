@@ -13,9 +13,9 @@
 
 lazy val root = (project in file("."))
   .settings(
-    name                := "iglu-scala-client",
-    version             := "0.5.0",
-    description         := "Scala client and resolver for Iglu schema repositories"
+    name := "iglu-scala-client",
+    version := "0.5.0",
+    description := "Scala client and resolver for Iglu schema repositories"
   )
   .settings(BuildSettings.buildSettings)
   .settings(BuildSettings.publishSettings)
@@ -35,5 +35,6 @@ lazy val root = (project in file("."))
       Dependencies.Libraries.specs2,
       Dependencies.Libraries.scalazSpecs2,
       Dependencies.Libraries.mockito
-    )
+    ),
+    scalafmtOnCompile := true
   )

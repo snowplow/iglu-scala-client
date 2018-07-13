@@ -39,14 +39,18 @@ object SchemaValidation {
    */
   def getErrors(schema: JsonNode): List[ProcessingMessage] = {
     try {
-      validator.validateSchema(schema).iterator.asScala
+      validator
+        .validateSchema(schema)
+        .iterator
+        .asScala
         .filter(r => (r.getLogLevel == LogLevel.ERROR) || (r.getLogLevel == LogLevel.FATAL))
         .toList
     } catch {
       case NonFatal(e) =>
         val fatalMessage = new ProcessingMessage()
           .setLogLevel(LogLevel.FATAL)
-          .setMessage(s"JSON Schema is invalid.\n$schema\nCheck that it conforms iglu format. Full stack-trace:\n${e.getStackTrace}")
+          .setMessage(
+            s"JSON Schema is invalid.\n$schema\nCheck that it conforms iglu format. Full stack-trace:\n${e.getStackTrace}")
         List(fatalMessage)
     }
   }
@@ -63,4 +67,3 @@ object SchemaValidation {
     getErrors(schema).isEmpty
 
 }
-
