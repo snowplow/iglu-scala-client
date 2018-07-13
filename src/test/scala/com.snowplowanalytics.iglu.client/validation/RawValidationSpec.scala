@@ -25,7 +25,8 @@ import org.specs2.Specification
 import org.specs2.matcher.DataTables
 import org.specs2.scalaz.ValidationMatchers
 
-class RawValidationSpec extends Specification with DataTables with ValidationMatchers { def is = s2"""
+class RawValidationSpec extends Specification with DataTables with ValidationMatchers {
+  def is = s2"""
 
   This is a specification to test the basic ValidatableJsonNode functionality
 
@@ -45,30 +46,44 @@ class RawValidationSpec extends Specification with DataTables with ValidationMat
   }
 
   def e2 =
-    foreach(Seq(
-      """{"country": "AQ", "beers": []}""",
-      """{"country":"GR","beers":["Fix","Mythos"]}""",
-      """{"country": "fr","beers": ["Jenlain"]}"""
-    )) {
-      str: String => {
+    foreach(
+      Seq(
+        """{"country": "AQ", "beers": []}""",
+        """{"country":"GR","beers":["Fix","Mythos"]}""",
+        """{"country": "fr","beers": ["Jenlain"]}"""
+      )) { str: String =>
+      {
         val json = SpecHelpers.asJsonNode(str)
         json.validateAgainstSchema(SimpleSchema) must beSuccessful(json)
       }
     }
 
   def e3 =
-    "SPEC NAME"          || "IN JSON"                                        | "OUT MESSAGE"                                                                                 | "OUT SCHEMA"                                                 | "OUT INSTANCE"               | "OUT KEYWORD" | "OUT FOUND & EXPECTED"              | "OUT REQUIRED & MISSING"                           |
-    "numeric country"    !! """{"country": 123, "beers": []}"""              ! """instance type (integer) does not match any allowed primitive type (allowed: ["string"])""" ! """{"loadingURI":"#","pointer":"/properties/country"}"""     ! """{"pointer":"/country"}""" ! "type"        ! Some(("integer", """["string"]""")) ! None                                               |
-    "missing beers"      !! """{"country": "cy"}"""                          ! """object has missing required properties (["beers"])"""                                      ! """{"loadingURI":"#","pointer":""}"""                        ! """{"pointer":""}"""         ! "required"    ! None                                ! Some(("""["beers","country"]""", """["beers"]""")) |
-    "heterogenous beers" !! """{"country": "GB", "beers": ["ale", false]}""" ! """instance type (boolean) does not match any allowed primitive type (allowed: ["string"])""" ! """{"loadingURI":"#","pointer":"/properties/beers/items"}""" ! """{"pointer":"/beers/1"}""" ! "type"        ! Some(("boolean", """["string"]""")) ! None                                               |> {
+    "SPEC NAME" || "IN JSON" | "OUT MESSAGE" | "OUT SCHEMA" | "OUT INSTANCE" | "OUT KEYWORD" | "OUT FOUND & EXPECTED" | "OUT REQUIRED & MISSING" |
+      "numeric country" !! """{"country": 123, "beers": []}""" ! """instance type (integer) does not match any allowed primitive type (allowed: ["string"])""" ! """{"loadingURI":"#","pointer":"/properties/country"}""" ! """{"pointer":"/country"}""" ! "type" ! Some(
+        ("integer", """["string"]""")) ! None |
+      "missing beers" !! """{"country": "cy"}""" ! """object has missing required properties (["beers"])""" ! """{"loadingURI":"#","pointer":""}""" ! """{"pointer":""}""" ! "required" ! None ! Some(
+        ("""["beers","country"]""", """["beers"]""")) |
+      "heterogenous beers" !! """{"country": "GB", "beers": ["ale", false]}""" ! """instance type (boolean) does not match any allowed primitive type (allowed: ["string"])""" ! """{"loadingURI":"#","pointer":"/properties/beers/items"}""" ! """{"pointer":"/beers/1"}""" ! "type" ! Some(
+        ("boolean", """["string"]""")) ! None |> {
 
-      (_, input, message, schema, instance, keyword, foundExpected, requiredMissing) => {
-        val json = SpecHelpers.asJsonNode(input)
-        json.validateAgainstSchema(SimpleSchema) must beLike {
-          case Failure(NonEmptyList(head, tail @ _*)) if tail.isEmpty =>
-            head.toString must_== SpecHelpers.asProcessingMessage(message, schema, instance, keyword, foundExpected, requiredMissing, None).toString
+      (_, input, message, schema, instance, keyword, foundExpected, requiredMissing) =>
+        {
+          val json = SpecHelpers.asJsonNode(input)
+          json.validateAgainstSchema(SimpleSchema) must beLike {
+            case Failure(NonEmptyList(head, tail @ _*)) if tail.isEmpty =>
+              head.toString must_== SpecHelpers
+                .asProcessingMessage(
+                  message,
+                  schema,
+                  instance,
+                  keyword,
+                  foundExpected,
+                  requiredMissing,
+                  None)
+                .toString
+          }
         }
-      }
     }
 
 }
