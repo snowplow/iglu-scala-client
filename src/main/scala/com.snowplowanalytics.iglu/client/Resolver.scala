@@ -16,10 +16,7 @@ package com.snowplowanalytics.iglu.client
 import com.fasterxml.jackson.databind.JsonNode
 
 // JSON Schema
-import com.github.fge.jsonschema.core.report.{
-  ProcessingMessage,
-  LogLevel
-}
+import com.github.fge.jsonschema.core.report.{LogLevel, ProcessingMessage}
 
 // Scala
 import scala.annotation.tailrec
@@ -35,12 +32,8 @@ import org.json4s.jackson.JsonMethods._
 import org.json4s.scalaz.JsonScalaz._
 
 // This project
-import repositories.{
-  RepositoryRef,
-  EmbeddedRepositoryRef,
-  HttpRepositoryRef
-}
-import validation.SchemaValidation.{ isValid, getErrors }
+import repositories.{EmbeddedRepositoryRef, HttpRepositoryRef, RepositoryRef}
+import validation.SchemaValidation.{getErrors, isValid}
 import validation.ValidatableJsonMethods
 import validation.ProcessingMessageMethods
 import ProcessingMessageMethods._
@@ -51,7 +44,8 @@ import ProcessingMessageMethods._
  */
 object Resolver {
 
-  private val ConfigurationSchema = SchemaCriterion("com.snowplowanalytics.iglu", "resolver-config", "jsonschema", 1, 0, 2)
+  private val ConfigurationSchema =
+    SchemaCriterion("com.snowplowanalytics.iglu", "resolver-config", "jsonschema", 1, 0, 2)
 
   /**
    * Helper class responsible for aggregating repository lookup errors
@@ -61,14 +55,20 @@ object Resolver {
    * @param attempts amount of undertaken attempts
    * @param unrecoverable indicates whether among failures were unrecoverable ones (like invalid schema)
    */
-  private[client] case class RepoError(errors: Set[ProcessingMessage], attempts: Int, unrecoverable: Boolean)
+  private[client] case class RepoError(
+    errors: Set[ProcessingMessage],
+    attempts: Int,
+    unrecoverable: Boolean)
 
   /**
    * Semigroup instance helping to aggregate repository errors
    */
   private[client] implicit object RepoErrorSemigroup extends Semigroup[RepoError] {
     def append(a: RepoError, b: => RepoError): RepoError =
-      RepoError(a.errors |+| b.errors, a.attempts.max(b.attempts) + 1, a.unrecoverable || b.unrecoverable)
+      RepoError(
+        a.errors |+| b.errors,
+        a.attempts.max(b.attempts) + 1,
+        a.unrecoverable || b.unrecoverable)
   }
 
   /**
@@ -104,7 +104,7 @@ object Resolver {
 
     // We can use the bootstrap Resolver for working
     // with JSON Schemas here.
-    implicit val resolver = Bootstrap.Resolver
+    implicit val resolver     = Bootstrap.Resolver
     implicit lazy val formats = org.json4s.DefaultFormats
 
     import ValidatableJsonMethods._
@@ -112,18 +112,22 @@ object Resolver {
     // Check it passes validation
     config.verifySchemaAndValidate(ConfigurationSchema, dataOnly = true) match {
       case Success(node) =>
-        val json = fromJsonNode(node)
+        val json      = fromJsonNode(node)
         val cacheSize = field[Int]("cacheSize")(json).leftMap(_.map(_.toString.toProcessingMessage))
-        val cacheTtl = field[Option[Int]]("cacheTtl")(json).leftMap(_.map(_.toString.toProcessingMessage))
-        val repositoryRefs: ValidatedNel[RepositoryRefs] = (field[List[JValue]]("repositories")(json)).fold(
-          f => f.map(_.toString.toProcessingMessage).failure,
-          s => getRepositoryRefs(s)
-        )
+        val cacheTtl =
+          field[Option[Int]]("cacheTtl")(json).leftMap(_.map(_.toString.toProcessingMessage))
+        val repositoryRefs: ValidatedNel[RepositoryRefs] =
+          (field[List[JValue]]("repositories")(json)).fold(
+            f => f.map(_.toString.toProcessingMessage).failure,
+            s => getRepositoryRefs(s)
+          )
         (cacheSize |@| repositoryRefs |@| cacheTtl) {
           Resolver(_, _, _)
         }
       case Failure(err) =>
-        err.<::("Resolver configuration failed JSON Schema validation".toProcessingMessage).failure[Resolver]
+        err
+          .<::("Resolver configuration failed JSON Schema validation".toProcessingMessage)
+          .failure[Resolver]
     }
   }
 
@@ -135,7 +139,8 @@ object Resolver {
    *        all of the repository configurations
    * @return our assembled List of RepositoryRefs
    */
-  private[client] def getRepositoryRefs(repositoryConfigs: List[JValue]): ValidatedNel[RepositoryRefs] =
+  private[client] def getRepositoryRefs(
+    repositoryConfigs: List[JValue]): ValidatedNel[RepositoryRefs] =
     repositoryConfigs.map { conf =>
       buildRepositoryRef(conf)
     }.sequence
@@ -178,7 +183,10 @@ object Resolver {
    *         or a Failure-boxing of Map of repositories with all their
    *         accumulated errors
    */
-  @tailrec def traverseRepos(schemaKey: SchemaKey, remaining: RepositoryRefs, tried: RepoFailuresMap): SchemaLookup = {
+  @tailrec def traverseRepos(
+    schemaKey: SchemaKey,
+    remaining: RepositoryRefs,
+    tried: RepoFailuresMap): SchemaLookup = {
     remaining match {
       case Nil => tried.failure
       case repo :: repos => {
@@ -210,9 +218,7 @@ object Resolver {
    */
   private[client] def prioritizeRepos(schemaKey: SchemaKey, repositoryRefs: RepositoryRefs) =
     repositoryRefs.sortBy(r =>
-      (!r.vendorMatched(schemaKey), r.classPriority, r.config.instancePriority)
-    )
-
+      (!r.vendorMatched(schemaKey), r.classPriority, r.config.instancePriority))
 
   /**
    * Get from Map of repository failures only those repository which
@@ -222,7 +228,9 @@ object Resolver {
    * @param failuresMap Map of repositories to their aggregated errors
    * @return repository refs which still need to be requested
    */
-  private[client] def getReposForRetry(failuresMap: RepoFailuresMap, requiredAttempts: Int): RepositoryRefs = {
+  private[client] def getReposForRetry(
+    failuresMap: RepoFailuresMap,
+    requiredAttempts: Int): RepositoryRefs = {
     val errorsToRetry = failuresMap.filter {
       case (_, Some(RepoError(_, attempts, unrecoverable))) =>
         attempts < requiredAttempts && !unrecoverable
@@ -239,15 +247,17 @@ object Resolver {
    * @param tried a map of all tried repositories with their accumulated errors
    * @return a NonEmptyList of ProcessingMessages
    */
-  private[client] def collectErrors(schemaKey: SchemaKey, tried: RepoFailuresMap): ProcessingMessageNel = {
+  private[client] def collectErrors(
+    schemaKey: SchemaKey,
+    tried: RepoFailuresMap): ProcessingMessageNel = {
     val failures = tried.toList
       .collect { case (_, Some(error)) => error }
       .flatMap { _.errors.toList }
 
     // TODO: consider adding amount of undertaken attempts to message
-    val repos = prioritizeRepos(schemaKey, tried.keys.toList)
-      .reverse  // TODO: remove this legacy order, pre-0.4.0 errors were queued LIFO
-      .map(repo => s"${repo.config.name} [${repo.descriptor}]")
+    val repos =
+      prioritizeRepos(schemaKey, tried.keys.toList).reverse // TODO: remove this legacy order, pre-0.4.0 errors were queued LIFO
+        .map(repo => s"${repo.config.name} [${repo.descriptor}]")
 
     val notFound = new ProcessingMessage()
       .setLogLevel(LogLevel.ERROR)
@@ -279,7 +289,7 @@ case class Resolver(
   cacheTtl: Option[Int] = None
 ) {
   import Resolver._
-  
+
   private[client] val allRepos = Bootstrap.Repo :: repos
 
   /**
@@ -287,7 +297,8 @@ case class Resolver(
    */
   object cache {
 
-    private val lru: Option[SchemaLruMap] = if (cacheSize > 0) Some(new SchemaLruMap(cacheSize)) else None
+    private val lru: Option[SchemaLruMap] =
+      if (cacheSize > 0) Some(new SchemaLruMap(cacheSize)) else None
 
     /**
      * Looks up the given schema key in the cache.
@@ -299,7 +310,7 @@ case class Resolver(
      */
     def get(schemaKey: SchemaKey): Option[SchemaLookup] =
       for {
-        l <- lru
+        l      <- lru
         (t, k) <- l.get(schemaKey)
         if isViable(t)
       } yield k
@@ -346,16 +357,20 @@ case class Resolver(
    * @param attempts number of attempts to retry after non-404 errors
    * @return a Validation boxing either the Schema's
    *         JsonNode on Success, or an error String
-   *         on Failure 
+   *         on Failure
    */
   def lookupSchema(schemaKey: SchemaKey, attempts: Int = 3): ValidatedNel[JsonNode] = {
     val result = cache.get(schemaKey) match {
-      case Some(schema) => schema match {
-        case Success(schema) => schema.success
-        case Failure(serverErrors) =>
-          val reposForRetry = getReposForRetry(serverErrors, attempts)
-          traverseRepos(schemaKey, Resolver.prioritizeRepos(schemaKey, reposForRetry), serverErrors)
-      }
+      case Some(schema) =>
+        schema match {
+          case Success(schema) => schema.success
+          case Failure(serverErrors) =>
+            val reposForRetry = getReposForRetry(serverErrors, attempts)
+            traverseRepos(
+              schemaKey,
+              Resolver.prioritizeRepos(schemaKey, reposForRetry),
+              serverErrors)
+        }
       case None => traverseRepos(schemaKey, prioritizeRepos(schemaKey, allRepos), Map())
     }
 

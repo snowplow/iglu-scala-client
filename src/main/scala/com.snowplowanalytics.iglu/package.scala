@@ -41,7 +41,7 @@ package object client {
   /**
    * Helpful archetypes
    */
-  type Validated[A] = Validation[ProcessingMessage, A]
+  type Validated[A]    = Validation[ProcessingMessage, A]
   type ValidatedNel[A] = ValidationNel[ProcessingMessage, A]
 
   /**

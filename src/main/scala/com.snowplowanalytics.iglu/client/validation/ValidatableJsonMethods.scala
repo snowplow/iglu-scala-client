@@ -32,56 +32,62 @@ import Scalaz._
 // This project
 import ProcessingMessageMethods._
 
-
 object ValidatableJsonMethods extends Validatable[JsonNode] {
 
   private[validation] lazy val JsonSchemaValidator = getJsonSchemaValidator(SchemaVersion.DRAFTV4)
 
-  def validateAgainstSchema(instance: JsonNode, schema: JsonNode)(implicit resolver: Resolver): ValidatedNel[JsonNode] = {
+  def validateAgainstSchema(instance: JsonNode, schema: JsonNode)(
+    implicit resolver: Resolver): ValidatedNel[JsonNode] = {
     val validatedReport = try {
       JsonSchemaValidator.validateUnchecked(schema, instance).success
     } catch {
       case re: RuntimeException =>
-        s"Exception validating instance, possibly caused by malformed $schema field: [$re]"
-          .toProcessingMessageNel
-          .failure
+        s"Exception validating instance, possibly caused by malformed $schema field: [$re]".toProcessingMessageNel.failure
     }
     validatedReport.flatMap { report =>
       val msgs = report.iterator.toList
       msgs match {
         case x :: xs if !report.isSuccess => NonEmptyList[ProcessingMessage](x, xs: _*).failure
-        case Nil     if  report.isSuccess => instance.success
-        case _                            => throw new RuntimeException(s"Validation report success [$report.isSuccess] conflicts with message count [$msgs.length]")
+        case Nil if report.isSuccess      => instance.success
+        case _ =>
+          throw new RuntimeException(
+            s"Validation report success [$report.isSuccess] conflicts with message count [$msgs.length]")
       }
     }
   }
 
-  def validate(instance: JsonNode, dataOnly: Boolean = false)(implicit resolver: Resolver): ValidatedNel[JsonNode] =
+  def validate(instance: JsonNode, dataOnly: Boolean = false)(
+    implicit resolver: Resolver): ValidatedNel[JsonNode] =
     for {
-      j  <- validateAsSelfDescribing(instance)
-      s  =  j.get("schema").asText
-      d  =  j.get("data")
+      j <- validateAsSelfDescribing(instance)
+      s = j.get("schema").asText
+      d = j.get("data")
       js <- resolver.lookupSchema(s)
       _  <- validateAgainstSchema(d, js)
     } yield if (dataOnly) d else instance
 
-  def validateAndIdentifySchema(instance: JsonNode, dataOnly: Boolean = false)(implicit resolver: Resolver): ValidatedNel[JsonSchemaPair] =
+  def validateAndIdentifySchema(instance: JsonNode, dataOnly: Boolean = false)(
+    implicit resolver: Resolver): ValidatedNel[JsonSchemaPair] =
     for {
-      j  <- validateAsSelfDescribing(instance)
-      s  =  j.get("schema").asText
-      d  =  j.get("data")
+      j <- validateAsSelfDescribing(instance)
+      s = j.get("schema").asText
+      d = j.get("data")
       sk <- SchemaKey.parseNel(s)
       js <- resolver.lookupSchema(sk)
       _  <- validateAgainstSchema(d, js)
     } yield if (dataOnly) (sk, d) else (sk, instance)
 
-  def verifySchemaAndValidate(instance: JsonNode, schemaCriterion: SchemaCriterion, dataOnly: Boolean = false)(implicit resolver: Resolver): ValidatedNel[JsonNode] =
+  def verifySchemaAndValidate(
+    instance: JsonNode,
+    schemaCriterion: SchemaCriterion,
+    dataOnly: Boolean = false)(implicit resolver: Resolver): ValidatedNel[JsonNode] =
     for {
-      j  <- validateAsSelfDescribing(instance)
-      s  =  j.get("schema").asText
-      d  =  j.get("data")
+      j <- validateAsSelfDescribing(instance)
+      s = j.get("schema").asText
+      d = j.get("data")
       sk <- SchemaKey.parseNel(s)
-      m  <- if (schemaCriterion.matches(sk)) sk.success else s"Verifying schema as $schemaCriterion failed: found $sk".toProcessingMessageNel.failure
+      m <- if (schemaCriterion.matches(sk)) sk.success
+      else s"Verifying schema as $schemaCriterion failed: found $sk".toProcessingMessageNel.failure
       js <- resolver.lookupSchema(m)
       _  <- validateAgainstSchema(d, js)
     } yield if (dataOnly) d else instance
@@ -107,9 +113,9 @@ object ValidatableJsonMethods extends Validatable[JsonNode] {
    *         a NonEmptyList of
    *         ProcessingMessages
    */
-  private[validation] def validateAsSelfDescribing(instance: JsonNode)(implicit resolver: Resolver): ValidatedNel[JsonNode] = {
+  private[validation] def validateAsSelfDescribing(instance: JsonNode)(
+    implicit resolver: Resolver): ValidatedNel[JsonNode] =
     validateAgainstSchema(instance, getSelfDescribingSchema)
-  }
 
   /**
    * Factory for retrieving a JSON Schema
@@ -123,12 +129,10 @@ object ValidatableJsonMethods extends Validatable[JsonNode] {
 
     // Override the ReportProvider so we never throw Exceptions and only collect ERRORS+
     val rep = new ListReportProvider(LogLevel.ERROR, LogLevel.NONE)
-    val cfg = ValidationConfiguration
-      .newBuilder
+    val cfg = ValidationConfiguration.newBuilder
       .setDefaultVersion(version)
       .freeze
-    val fac = JsonSchemaFactory
-      .newBuilder
+    val fac = JsonSchemaFactory.newBuilder
       .setReportProvider(rep)
       .setValidationConfiguration(cfg)
       .freeze
@@ -136,4 +140,3 @@ object ValidatableJsonMethods extends Validatable[JsonNode] {
     fac.getValidator
   }
 }
-

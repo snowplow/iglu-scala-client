@@ -21,7 +21,7 @@ import org.apache.commons.lang3.exception.ExceptionUtils
  * exceptions to Scalaz Validations.
  */
 object ValidationExceptions {
-  
+
   /**
    * Strips the instance information from a Jackson
    * parsing exception message:
@@ -39,10 +39,10 @@ object ValidationExceptions {
    */
   def stripInstanceEtc(message: String): String = {
     message
-    .replaceAll("@[0-9a-z]+;", "@xxxxxx;")
-    .replaceAll("\\t", "    ")
-    .replaceAll("\\p{Cntrl}", "") // Any other control character
-    .trim
+      .replaceAll("@[0-9a-z]+;", "@xxxxxx;")
+      .replaceAll("\\t", "    ")
+      .replaceAll("\\p{Cntrl}", "") // Any other control character
+      .trim
   }
 
   /**
@@ -63,9 +63,9 @@ object ValidationExceptions {
       }
 
     for {
-      t  <- Option(throwable)
-      rc =  getRootCauseIfExists(t)
-      m  <- Option(rc.getMessage)
+      t <- Option(throwable)
+      rc = getRootCauseIfExists(t)
+      m <- Option(rc.getMessage)
     } yield m
   }
 
