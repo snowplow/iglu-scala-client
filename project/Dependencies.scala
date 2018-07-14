@@ -23,7 +23,7 @@ object Dependencies {
     val scalaz7         = "7.0.9"
     val collUtils       = "6.20.0"
     // Scala (test only)
-    val specs2          = "2.3.13" // Downgrade to prevent issues in job tests. WAS: "2.3.11"
+    val specs2          = "4.3.3"
     val scalazSpecs2    = "0.2"
     val mockito         = "1.10.19"
   }
@@ -39,7 +39,7 @@ object Dependencies {
     val scalaz7          = "org.scalaz"                 %% "scalaz-core"             % V.scalaz7
     val collUtils        = "com.twitter"                %% "util-collection"         % V.collUtils
     // Scala (test only)
-    val specs2           = "org.specs2"                 %% "specs2"                  % V.specs2          % "test"
+    val specs2           = "org.specs2"                 %% "specs2-core"             % V.specs2          % "test"
     val scalazSpecs2     = "org.typelevel"              %% "scalaz-specs2"           % V.scalazSpecs2    % "test"
     val mockito          = "org.mockito"                % "mockito-core"             % V.mockito         % "test"
   }
