@@ -23,7 +23,8 @@ import ValidatableJsonMethods._
 import org.specs2.Specification
 import org.specs2.scalaz.ValidationMatchers
 
-class SchemaValidationSpec extends Specification with ValidationMatchers { def is = s2"""
+class SchemaValidationSpec extends Specification with ValidationMatchers {
+  def is = s2"""
 
   This is a specification to test Schema Validation
 
@@ -50,4 +51,3 @@ class SchemaValidationSpec extends Specification with ValidationMatchers { def i
   def e2 = validJsonWithInvalidSchema.validate(false) must beFailing
 
 }
-

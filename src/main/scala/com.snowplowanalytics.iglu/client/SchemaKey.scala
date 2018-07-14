@@ -34,7 +34,8 @@ import ProcessingMessageMethods._
  */
 object SchemaKey {
 
-  private val SchemaUriRegex = "^iglu:([a-zA-Z0-9-_.]+)/([a-zA-Z0-9-_]+)/([a-zA-Z0-9-_]+)/([0-9]+-[0-9]+-[0-9]+)$".r
+  private val SchemaUriRegex =
+    "^iglu:([a-zA-Z0-9-_.]+)/([a-zA-Z0-9-_]+)/([a-zA-Z0-9-_]+)/([0-9]+-[0-9]+-[0-9]+)$".r
 
   private val ModelRevisionAdditionRegex = "([0-9]+)-([0-9]+)-([0-9]+)".r
 
@@ -84,7 +85,7 @@ case class SchemaKey(
    */
   def getModelRevisionAddition: Option[(Int, Int, Int)] = version match {
     case SchemaKey.ModelRevisionAdditionRegex(m, r, a) => (m.toInt, r.toInt, a.toInt).some
-    case _ => None
+    case _                                             => None
   }
 
   /**
@@ -105,10 +106,10 @@ case class SchemaKey(
    * @return the SchemaKey as a JValue
    */
   def toJValue: JValue =
-    ("vendor"  -> vendor) ~
-    ("name"    -> name) ~
-    ("format"  -> format) ~
-    ("version" -> version)
+    ("vendor"    -> vendor) ~
+      ("name"    -> name) ~
+      ("format"  -> format) ~
+      ("version" -> version)
 
   /**
    * Converts a SchemaKey into a path which is compatible

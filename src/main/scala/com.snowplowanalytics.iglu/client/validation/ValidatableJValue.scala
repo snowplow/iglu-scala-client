@@ -15,26 +15,31 @@ package validation
 
 // Json4s
 import org.json4s.JValue
-import org.json4s.jackson.JsonMethods.{ asJsonNode, fromJsonNode }
-
+import org.json4s.jackson.JsonMethods.{asJsonNode, fromJsonNode}
 
 object ValidatableJValue extends Validatable[JValue] {
 
-  def validateAgainstSchema(instance: JValue, schema: JValue)(implicit resolver: Resolver): ValidatedNel[JValue] = {
-    ValidatableJsonMethods.validateAgainstSchema(asJsonNode(instance), asJsonNode(schema)).map(fromJsonNode)
-  }
+  def validateAgainstSchema(instance: JValue, schema: JValue)(
+    implicit resolver: Resolver): ValidatedNel[JValue] =
+    ValidatableJsonMethods
+      .validateAgainstSchema(asJsonNode(instance), asJsonNode(schema))
+      .map(fromJsonNode)
 
-  def validate(instance: JValue, dataOnly: Boolean = false)(implicit resolver: Resolver): ValidatedNel[JValue] = {
+  def validate(instance: JValue, dataOnly: Boolean = false)(
+    implicit resolver: Resolver): ValidatedNel[JValue] =
     ValidatableJsonMethods.validate(asJsonNode(instance), dataOnly)(resolver).map(fromJsonNode)
-  }
 
-  def validateAndIdentifySchema(instance: JValue, dataOnly: Boolean = false)(implicit resolver: Resolver): ValidatedNel[(SchemaKey, JValue)] = {
-    ValidatableJsonMethods.validateAndIdentifySchema(asJsonNode(instance), dataOnly)(resolver).map { case (key, json) =>
-      (key, fromJsonNode(json))
+  def validateAndIdentifySchema(instance: JValue, dataOnly: Boolean = false)(
+    implicit resolver: Resolver): ValidatedNel[(SchemaKey, JValue)] = {
+    ValidatableJsonMethods.validateAndIdentifySchema(asJsonNode(instance), dataOnly)(resolver).map {
+      case (key, json) =>
+        (key, fromJsonNode(json))
     }
   }
 
-  def verifySchemaAndValidate(json: JValue, schemaCriterion: SchemaCriterion, dataOnly: Boolean)(implicit resolver: Resolver): ValidatedNel[JValue] = {
-    ValidatableJsonMethods.verifySchemaAndValidate(asJsonNode(json), schemaCriterion, dataOnly)(resolver).map(fromJsonNode)
-  }
+  def verifySchemaAndValidate(json: JValue, schemaCriterion: SchemaCriterion, dataOnly: Boolean)(
+    implicit resolver: Resolver): ValidatedNel[JValue] =
+    ValidatableJsonMethods
+      .verifySchemaAndValidate(asJsonNode(json), schemaCriterion, dataOnly)(resolver)
+      .map(fromJsonNode)
 }

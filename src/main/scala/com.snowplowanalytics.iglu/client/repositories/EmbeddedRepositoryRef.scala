@@ -97,7 +97,8 @@ object EmbeddedRepositoryRef {
     try {
       (config \ "connection" \ "embedded" \ "path").extract[String].success
     } catch {
-      case me: MappingException => s"Could not extract connection.embedded.path from ${compact(render(config))}".failure.toProcessingMessage
+      case me: MappingException =>
+        s"Could not extract connection.embedded.path from ${compact(render(config))}".failure.toProcessingMessage
     }
 
 }
@@ -107,9 +108,8 @@ object EmbeddedRepositoryRef {
  * inside the calling code, e.g. inside the jar's
  * resources folder.
  */
-case class EmbeddedRepositoryRef(
-  override val config: RepositoryRefConfig,
-  path: String) extends RepositoryRef {
+case class EmbeddedRepositoryRef(override val config: RepositoryRefConfig, path: String)
+    extends RepositoryRef {
 
   /**
    * Prioritize searching this class of repository because
@@ -131,7 +131,7 @@ case class EmbeddedRepositoryRef(
    *        the schema in Iglu
    * @return a Validation boxing either the Schema's
    *         JsonNode on Success, or an error String
-   *         on Failure 
+   *         on Failure
    */
   // TODO: would be nice to abstract out failure.toProcessingMessage, and scrubbing
   def lookupSchema(schemaKey: SchemaKey): Validated[Option[JsonNode]] = {
@@ -140,11 +140,15 @@ case class EmbeddedRepositoryRef(
       JsonLoader.fromResource(schemaPath).some.success
     } catch {
       case jpe: JsonParseException => // Child of IOException so match first
-        s"Problem parsing ${schemaPath} as JSON in ${descriptor} Iglu repository ${config.name}: %s".format(VE.stripInstanceEtc(jpe.getMessage)).failure.toProcessingMessage
+        s"Problem parsing ${schemaPath} as JSON in ${descriptor} Iglu repository ${config.name}: %s"
+          .format(VE.stripInstanceEtc(jpe.getMessage))
+          .failure
+          .toProcessingMessage
       case ioe: IOException =>
         None.success // Schema not found
       case e: Throwable =>
-        s"Unknown problem reading and parsing ${schemaPath} in ${descriptor} Iglu repository ${config.name}: ${VE.getThrowableMessage(e)}".failure.toProcessingMessage
+        s"Unknown problem reading and parsing ${schemaPath} in ${descriptor} Iglu repository ${config.name}: ${VE
+          .getThrowableMessage(e)}".failure.toProcessingMessage
     }
   }
 }

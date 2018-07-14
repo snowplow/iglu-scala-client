@@ -15,11 +15,7 @@ package repositories
 
 // Java
 import java.io.FileNotFoundException
-import java.net.{
-  URL,
-  UnknownHostException,
-  MalformedURLException
-}
+import java.net.{MalformedURLException, URL, UnknownHostException}
 
 // Apache Commons
 import org.apache.commons.lang3.exception.ExceptionUtils
@@ -75,11 +71,10 @@ object HttpRepositoryRef {
     val connection = url.openConnection()
     apikey match {
       case Some(key) => connection.setRequestProperty("apikey", key)
-      case None => ()
+      case None      => ()
     }
     reader.fromInputStream(connection.getInputStream)
   }
-
 
   /**
    * Sniffs a config JSON to determine if this is
@@ -114,11 +109,13 @@ object HttpRepositoryRef {
    *         repository
    */
   def parse(config: JValue): ValidatedNel[HttpRepositoryRef] = {
-    
-    val conf = RepositoryRefConfig.parse(config)
-    val http  = extractUrl(config)
 
-    (conf |@| http.toValidationNel) { (c, h) => HttpRepositoryRef(c, h.uri, h.apikey) }
+    val conf = RepositoryRefConfig.parse(config)
+    val http = extractUrl(config)
+
+    (conf |@| http.toValidationNel) { (c, h) =>
+      HttpRepositoryRef(c, h.uri, h.apikey)
+    }
   }
 
   /**
@@ -133,7 +130,8 @@ object HttpRepositoryRef {
     try {
       (config \ "connection" \ "http").extract[HttpConnection].success
     } catch {
-      case me: MappingException => s"Could not extract connection.http from ${compact(render(config))}".failure.toProcessingMessage
+      case me: MappingException =>
+        s"Could not extract connection.http from ${compact(render(config))}".failure.toProcessingMessage
     }
 
   /**
@@ -151,15 +149,20 @@ object HttpRepositoryRef {
    * @return a URLobject, or an
    *         error message, all
    *         wrapped in a Validation
-   */       
+   */
   private def stringToUrl(url: String): Validated[URL] =
     (try {
       (new URL(url)).success
     } catch {
       case npe: NullPointerException => "Provided URL was null".failure
-      case mue: MalformedURLException => "Provided URL string [%s] is malformed: [%s]".format(url, mue.getMessage).failure
-      case iae: IllegalArgumentException => "Provided URL string [%s] violates RFC 2396: [%s]".format(url, ExceptionUtils.getRootCause(iae).getMessage).failure
-      case e: Throwable => "Unexpected error creating URL from string [%s]: [%s]".format(url, e.getMessage).failure
+      case mue: MalformedURLException =>
+        "Provided URL string [%s] is malformed: [%s]".format(url, mue.getMessage).failure
+      case iae: IllegalArgumentException =>
+        "Provided URL string [%s] violates RFC 2396: [%s]"
+          .format(url, ExceptionUtils.getRootCause(iae).getMessage)
+          .failure
+      case e: Throwable =>
+        "Unexpected error creating URL from string [%s]: [%s]".format(url, e.getMessage).failure
     }).toProcessingMessage
 
 }
@@ -170,7 +173,9 @@ object HttpRepositoryRef {
  */
 case class HttpRepositoryRef(
   override val config: RepositoryRefConfig,
-  uri: String, apikey: Option[String] = None) extends RepositoryRef {
+  uri: String,
+  apikey: Option[String] = None)
+    extends RepositoryRef {
 
   /**
    * De-prioritize searching this class of repository because
@@ -192,7 +197,7 @@ case class HttpRepositoryRef(
    *        the schema in Iglu
    * @return a Validation boxing either the Schema's
    *         JsonNode on Success, or an error String
-   *         on Failure 
+   *         on Failure
    */
   // TODO: this is only intermittently working when there is a network outage (e.g. running test suite on Tube)
   def lookupSchema(schemaKey: SchemaKey): Validated[Option[JsonNode]] = {
@@ -205,7 +210,10 @@ case class HttpRepositoryRef(
       // The most common failure case: the schema is not found in the repo
       case fnf: FileNotFoundException => None.success
       case jpe: JsonParseException =>
-        s"Problem parsing ${schemaKey} as JSON in ${descriptor} Iglu repository ${config.name}: %s".format(VE.stripInstanceEtc(jpe.getMessage)).failure.toProcessingMessage
+        s"Problem parsing ${schemaKey} as JSON in ${descriptor} Iglu repository ${config.name}: %s"
+          .format(VE.stripInstanceEtc(jpe.getMessage))
+          .failure
+          .toProcessingMessage
       case uhe: UnknownHostException =>
         s"Unknown host issue fetching ${schemaKey} in ${descriptor} Iglu repository ${config.name}: ${uhe.getMessage}".failure.toProcessingMessage
       case NonFatal(nfe) =>

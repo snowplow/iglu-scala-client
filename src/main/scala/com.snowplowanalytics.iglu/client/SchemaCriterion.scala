@@ -24,7 +24,8 @@ import validation.ProcessingMessageMethods._
  */
 object SchemaCriterion {
 
-  private val SchemaCriterionRegex = "^iglu:([a-zA-Z0-9-_.]+)/([a-zA-Z0-9-_]+)/([a-zA-Z0-9-_]+)/([0-9]+)-([0-9]+|\\*)-([0-9]+|\\*)$".r
+  private val SchemaCriterionRegex =
+    "^iglu:([a-zA-Z0-9-_.]+)/([a-zA-Z0-9-_]+)/([a-zA-Z0-9-_]+)/([0-9]+)-([0-9]+|\\*)-([0-9]+|\\*)$".r
 
   /**
    * Try to parse string into SchemaCriterion
@@ -52,14 +53,21 @@ object SchemaCriterion {
       s"$schemaCriterion is not a valid Iglu-format schema criterion".toProcessingMessage.failure
   }
 
-  def parseNel(schemaCriterion: String): ValidatedNel[SchemaCriterion] = parse(schemaCriterion).toValidationNel
+  def parseNel(schemaCriterion: String): ValidatedNel[SchemaCriterion] =
+    parse(schemaCriterion).toValidationNel
 
   /**
    * Constructs an exhaustive SchemaCriterion.
    *
    * @return our constructed SchemaCriterion
    */
-  def apply(vendor: String, name: String, format: String, model: Int, revision: Int, addition: Int): SchemaCriterion =
+  def apply(
+    vendor: String,
+    name: String,
+    format: String,
+    model: Int,
+    revision: Int,
+    addition: Int): SchemaCriterion =
     SchemaCriterion(vendor, name, format, model, revision.some, addition.some)
 
   /**
@@ -68,7 +76,12 @@ object SchemaCriterion {
    *
    * @return our constructed SchemaCriterion
    */
-  def apply(vendor: String, name: String, format: String, model: Int, revision: Int): SchemaCriterion =
+  def apply(
+    vendor: String,
+    name: String,
+    format: String,
+    model: Int,
+    revision: Int): SchemaCriterion =
     SchemaCriterion(vendor, name, format, model, revision.some)
 
   /**
@@ -93,7 +106,8 @@ case class SchemaCriterion(
   revision: Option[Int] = None,
   addition: Option[Int] = None) {
 
-  lazy val versionString = "%s-%s-%s".format(model, revision.getOrElse("*"), addition.getOrElse("*"))
+  lazy val versionString =
+    "%s-%s-%s".format(model, revision.getOrElse("*"), addition.getOrElse("*"))
 
   /**
    * Whether the vendor, name, and format are all correct.
@@ -123,14 +137,16 @@ case class SchemaCriterion(
         case None => false
         case Some((keyModel, keyRevision, keyAddition)) =>
           keyModel == model && (revision match {
-            case None => addition match {
-              case Some(a) => a == keyAddition
-              case None => true
-            }
-            case Some(r) => addition match {
-              case None => keyRevision <= r
-              case Some(a) => keyRevision < r || (keyRevision == r && keyAddition <= a)
-            }
+            case None =>
+              addition match {
+                case Some(a) => a == keyAddition
+                case None    => true
+              }
+            case Some(r) =>
+              addition match {
+                case None    => keyRevision <= r
+                case Some(a) => keyRevision < r || (keyRevision == r && keyAddition <= a)
+              }
           })
       }
     }

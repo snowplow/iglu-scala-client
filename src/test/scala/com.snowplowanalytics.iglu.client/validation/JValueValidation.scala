@@ -23,7 +23,8 @@ import ValidatableJValue._
 import org.specs2.Specification
 import org.specs2.scalaz.ValidationMatchers
 
-class SchemaJValueValidationSpec extends Specification with ValidationMatchers { def is = s2"""
+class SchemaJValueValidationSpec extends Specification with ValidationMatchers {
+  def is = s2"""
 
   This is a specification to test Schema Validation with json4s AST
 

@@ -23,8 +23,8 @@ object BuildSettings {
 
   lazy val buildSettings = Seq[Setting[_]](
     organization  := "com.snowplowanalytics",
-    scalaVersion  := "2.10.6",
-    crossScalaVersions  := Seq("2.10.6", "2.11.8"),
+    scalaVersion  := "2.11.12",
+    crossScalaVersions  := Seq("2.11.12"),
     scalacOptions := Seq(
       "-deprecation",
       "-encoding", "UTF-8",
@@ -40,10 +40,6 @@ object BuildSettings {
 
     scalacOptions in (Compile, console) ~= (_ filterNot (_ == "-Xfatal-warnings")),
     scalacOptions in (Test, console) := (scalacOptions in (Compile, console)).value,
-
-    // force scala version
-    // http://stackoverflow.com/questions/27809280/suppress-sbt-eviction-warnings
-    ivyScala := ivyScala.value map { _.copy(overrideScalaVersion = true) },
 
     parallelExecution in Test := false // possible race bugs
   )
