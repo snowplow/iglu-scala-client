@@ -1,12 +1,14 @@
 # Scala client for Iglu
 
-[ ![Build Status] [travis-image] ] [travis] [ ![Release] [release-image] ] [releases] [ ![License] [license-image] ] [license]
+[![Build Status][travis-image]][travis]
+[![Release][release-image]][releases]
+[![License][license-image]][license]
 
-A Scala client and resolver for **[Iglu schema repositories] [iglu-wiki]** from the team at **[Snowplow Analytics] [snowplow-website]**.
+A Scala client and resolver for **[Iglu schema repositories][iglu-wiki]** from the team at **[Snowplow Analytics][snowplow-website]**.
 
-Iglu Scala Client is used extensively in **[Snowplow] [snowplow-repo]** to validate self-describing JSONs. For a presentation on how we came to build Iglu, see **[this blog post] [snowplow-schema-post]**.
+Iglu Scala Client is used extensively in **[Snowplow][snowplow-repo]** to validate self-describing JSONs. For a presentation on how we came to build Iglu, see **[this blog post][snowplow-schema-post]**.
 
-![scala-client-img] [scala-client-img]
+![scala-client-img][scala-client-img]
 
 ## Installation
 
@@ -23,7 +25,7 @@ Note the double percent (`%%`) between the group and artifactId. That'll ensure 
 ## Usage
 
 Primary entity for working with Iglu Scala Client is `com.snowplowanalytics.iglu.client.Resolver`.
-Resolver companion object has `parse` method which allows you to create Resolver instance from **[resolver configuration] [resolver-config]**.
+Resolver companion object has `parse` method which allows you to create Resolver instance from **[resolver configuration][resolver-config]**.
 Second working method is `lookupSchema`, receiving Schema key as String or directly `com.snowplowanalytics.iglu.SchemaKey` object,
 this method traverse all configured repositories trying to find Schema by its key.
 
@@ -47,15 +49,15 @@ which itself is left side of `ValidatedNel`, structure isomorphic to native Scal
 
 ## Find out more
 
-| **[Technical Docs] [techdocs]**     | **[Setup Guide] [setup]**     | **[Roadmap] [roadmap]**           | **[Contributing] [contributing]**           |
+| **[Technical Docs][techdocs]**     | **[Setup Guide][setup]**     | **[Roadmap][roadmap]**           | **[Contributing][contributing]**           |
 |-------------------------------------|-------------------------------|-----------------------------------|---------------------------------------------|
-| [![i1] [techdocs-image]] [techdocs] | [![i2] [setup-image]] [setup] | [![i3] [roadmap-image]] [roadmap] | [![i4] [contributing-image]] [contributing] |
+| [![i1][techdocs-image]][techdocs] | [![i2][setup-image]][setup] | [![i3][roadmap-image]][roadmap] | [![i4][contributing-image]][contributing] |
 
 ## Copyright and license
 
 Iglu Scala Client is copyright 2014-2019 Snowplow Analytics Ltd.
 
-Licensed under the **[Apache License, Version 2.0] [license]** (the "License");
+Licensed under the **[Apache License, Version 2.0][license]** (the "License");
 you may not use this software except in compliance with the License.
 
 Unless required by applicable law or agreed to in writing, software
