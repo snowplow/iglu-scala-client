@@ -10,7 +10,7 @@ Iglu Scala Client is used extensively in **[Snowplow] [snowplow-repo]** to valid
 
 ## Installation
 
-The latest version of Iglu Scala Client is 0.5.0, which is cross-built against Scala 2.10.x and 2.11.x.
+The latest version of Iglu Scala Client is 0.5.0, which currently works with Scala 2.11.x
 
 If you're using SBT, add the following lines to your build file:
 
@@ -45,18 +45,6 @@ Above snippet returns mobile context JSON Schema if you provide correct `resolve
 If not you will get all errors (like invalid format, network failure, etc) accumulated in `scalaz.NonEmptyList`,
 which itself is left side of `scalaz.ValidationNel`, structure isomorphic to native Scala `Either`.
 
-## Developer quickstart
-
-Assuming git, **[Vagrant] [vagrant-install]** and **[VirtualBox] [virtualbox-install]** installed:
-
-```bash
- host> git clone https://github.com/snowplow/iglu-scala-client
- host> cd iglu-scala-client
- host> vagrant up && vagrant ssh
-guest> cd /vagrant
-guest> sbt compile
-```
-
 ## Find out more
 
 | **[Technical Docs] [techdocs]**     | **[Setup Guide] [setup]**     | **[Roadmap] [roadmap]**           | **[Contributing] [contributing]**           |
@@ -84,9 +72,6 @@ limitations under the License.
 
 [snowplow-repo]: https://github.com/snowplow/snowplow
 [snowplow-website]: http://snowplowanalytics.com
-
-[vagrant-install]: http://docs.vagrantup.com/v2/installation/index.html
-[virtualbox-install]: https://www.virtualbox.org/wiki/Downloads
 
 [techdocs-image]: https://d3i6fms1cm1j0i.cloudfront.net/github/images/techdocs.png
 [setup-image]: https://d3i6fms1cm1j0i.cloudfront.net/github/images/setup.png
