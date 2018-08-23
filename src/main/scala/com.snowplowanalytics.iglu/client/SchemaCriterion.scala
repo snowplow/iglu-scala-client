@@ -12,9 +12,9 @@
  */
 package com.snowplowanalytics.iglu.client
 
-// Scalaz
-import scalaz._
-import Scalaz._
+// Cats
+import cats._
+import cats.implicits._
 
 // This project
 import validation.ProcessingMessageMethods._
@@ -40,21 +40,21 @@ object SchemaCriterion {
    * @return a Validation-boxed SchemaCriterion for
    *         Success, and an error String on Failure
    */
-  def parse(schemaCriterion: String): Validated[SchemaCriterion] = schemaCriterion match {
+  def parse(schemaCriterion: String): ValidatedType[SchemaCriterion] = schemaCriterion match {
     case SchemaCriterionRegex(vnd, n, f, mod, "*", add) if add == "*" =>
-      SchemaCriterion(vnd, n, f, mod.toInt, None, None).success
+      SchemaCriterion(vnd, n, f, mod.toInt, None, None).valid
     case SchemaCriterionRegex(vnd, n, f, mod, "*", add) =>
-      SchemaCriterion(vnd, n, f, mod.toInt, None, add.toInt.some).success
+      SchemaCriterion(vnd, n, f, mod.toInt, None, add.toInt.some).valid
     case SchemaCriterionRegex(vnd, n, f, mod, rev, "*") =>
-      SchemaCriterion(vnd, n, f, mod.toInt, rev.toInt.some, None).success
+      SchemaCriterion(vnd, n, f, mod.toInt, rev.toInt.some, None).valid
     case SchemaCriterionRegex(vnd, n, f, mod, rev, add) =>
-      SchemaCriterion(vnd, n, f, mod.toInt, rev.toInt.some, add.toInt.some).success
+      SchemaCriterion(vnd, n, f, mod.toInt, rev.toInt.some, add.toInt.some).valid
     case _ =>
-      s"$schemaCriterion is not a valid Iglu-format schema criterion".toProcessingMessage.failure
+      s"$schemaCriterion is not a valid Iglu-format schema criterion".toProcessingMessage.invalid
   }
 
-  def parseNel(schemaCriterion: String): ValidatedNel[SchemaCriterion] =
-    parse(schemaCriterion).toValidationNel
+  def parseNel(schemaCriterion: String): ValidatedNelType[SchemaCriterion] =
+    parse(schemaCriterion).toValidatedNel
 
   /**
    * Constructs an exhaustive SchemaCriterion.

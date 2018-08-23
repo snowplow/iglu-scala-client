@@ -19,12 +19,11 @@ object Dependencies {
     val jacksonDatabind = "2.2.3"
     val jsonValidator   = "2.2.3"
     // Scala
+    val circe           = "0.9.3"
     val json4s          = "3.2.11"
-    val scalaz7         = "7.0.9"
     val collUtils       = "6.20.0"
     // Scala (test only)
     val specs2          = "4.3.3"
-    val scalazSpecs2    = "0.2"
     val mockito         = "1.10.19"
   }
 
@@ -34,13 +33,13 @@ object Dependencies {
     val jacksonDatabind  = "com.fasterxml.jackson.core" %  "jackson-databind"        % V.jacksonDatabind
     val jsonValidator    = "com.github.fge"             %  "json-schema-validator"   % V.jsonValidator
     // Scala
+    val circeParser      = "io.circe"                   %% "circe-parser"            % V.circe
     val json4sJackson    = "org.json4s"                 %% "json4s-jackson"          % V.json4s
-    val json4sScalaz     = "org.json4s"                 %% "json4s-scalaz"           % V.json4s
-    val scalaz7          = "org.scalaz"                 %% "scalaz-core"             % V.scalaz7
     val collUtils        = "com.twitter"                %% "util-collection"         % V.collUtils
     // Scala (test only)
     val specs2           = "org.specs2"                 %% "specs2-core"             % V.specs2          % "test"
-    val scalazSpecs2     = "org.typelevel"              %% "scalaz-specs2"           % V.scalazSpecs2    % "test"
+    val specs2Cats       = "org.specs2"                 %% "specs2-cats"             % V.specs2          % "test"
+    val specs2Mock       = "org.specs2"                 %% "specs2-mock"             % V.specs2          % "test"
     val mockito          = "org.mockito"                % "mockito-core"             % V.mockito         % "test"
   }
 }

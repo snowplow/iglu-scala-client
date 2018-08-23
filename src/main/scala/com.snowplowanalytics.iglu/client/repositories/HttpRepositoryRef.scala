@@ -31,8 +31,8 @@ import com.github.fge.jackson.JsonNodeReader
 import scala.util.control.NonFatal
 
 // Scalaz
-import scalaz._
-import Scalaz._
+import cats._
+import cats.implicits._
 
 // json4s
 import org.json4s._
@@ -96,7 +96,7 @@ object HttpRepositoryRef {
    * @return a configured reference to this embedded
    *         repository
    */
-  def parse(config: JsonNode): ValidatedNel[HttpRepositoryRef] =
+  def parse(config: JsonNode): ValidatedNelType[HttpRepositoryRef] =
     parse(fromJsonNode(config))
 
   /**
@@ -108,12 +108,12 @@ object HttpRepositoryRef {
    * @return a configured reference to this embedded
    *         repository
    */
-  def parse(config: JValue): ValidatedNel[HttpRepositoryRef] = {
+  def parse(config: JValue): ValidatedNelType[HttpRepositoryRef] = {
 
     val conf = RepositoryRefConfig.parse(config)
     val http = extractUrl(config)
 
-    (conf |@| http.toValidationNel) { (c, h) =>
+    (conf, http.toValidatedNel).mapN { (c, h) =>
       HttpRepositoryRef(c, h.uri, h.apikey)
     }
   }
@@ -126,12 +126,12 @@ object HttpRepositoryRef {
    * @return the path to the embedded repository on
    *         Success, or an error String on Failure
    */
-  private def extractUrl(config: JValue): Validated[HttpConnection] =
+  private def extractUrl(config: JValue): ValidatedType[HttpConnection] =
     try {
-      (config \ "connection" \ "http").extract[HttpConnection].success
+      (config \ "connection" \ "http").extract[HttpConnection].valid
     } catch {
       case me: MappingException =>
-        s"Could not extract connection.http from ${compact(render(config))}".failure.toProcessingMessage
+        s"Could not extract connection.http from ${compact(render(config))}".invalid.toProcessingMessage
     }
 
   /**
@@ -150,19 +150,21 @@ object HttpRepositoryRef {
    *         error message, all
    *         wrapped in a Validation
    */
-  private def stringToUrl(url: String): Validated[URL] =
+  private def stringToUrl(url: String): ValidatedType[URL] =
     (try {
-      (new URL(url)).success
+      (new URL(url)).valid
     } catch {
-      case npe: NullPointerException => "Provided URL was null".failure
+      case npe: NullPointerException => "Provided URL was null".invalid[URL]
       case mue: MalformedURLException =>
-        "Provided URL string [%s] is malformed: [%s]".format(url, mue.getMessage).failure
+        "Provided URL string [%s] is malformed: [%s]".format(url, mue.getMessage).invalid[URL]
       case iae: IllegalArgumentException =>
         "Provided URL string [%s] violates RFC 2396: [%s]"
           .format(url, ExceptionUtils.getRootCause(iae).getMessage)
-          .failure
+          .invalid[URL]
       case e: Throwable =>
-        "Unexpected error creating URL from string [%s]: [%s]".format(url, e.getMessage).failure
+        "Unexpected error creating URL from string [%s]: [%s]"
+          .format(url, e.getMessage)
+          .invalid[URL]
     }).toProcessingMessage
 
 }
@@ -200,7 +202,7 @@ case class HttpRepositoryRef(
    *         on Failure
    */
   // TODO: this is only intermittently working when there is a network outage (e.g. running test suite on Tube)
-  def lookupSchema(schemaKey: SchemaKey): Validated[Option[JsonNode]] = {
+  def lookupSchema(schemaKey: SchemaKey): ValidatedType[Option[JsonNode]] = {
     try {
       for {
         url <- HttpRepositoryRef.stringToUrl(s"$uri/schemas/${schemaKey.toPath}")
@@ -208,16 +210,16 @@ case class HttpRepositoryRef(
       } yield sch
     } catch {
       // The most common failure case: the schema is not found in the repo
-      case fnf: FileNotFoundException => None.success
+      case fnf: FileNotFoundException => None.valid
       case jpe: JsonParseException =>
         s"Problem parsing ${schemaKey} as JSON in ${descriptor} Iglu repository ${config.name}: %s"
           .format(VE.stripInstanceEtc(jpe.getMessage))
-          .failure
+          .invalid
           .toProcessingMessage
       case uhe: UnknownHostException =>
-        s"Unknown host issue fetching ${schemaKey} in ${descriptor} Iglu repository ${config.name}: ${uhe.getMessage}".failure.toProcessingMessage
+        s"Unknown host issue fetching ${schemaKey} in ${descriptor} Iglu repository ${config.name}: ${uhe.getMessage}".invalid.toProcessingMessage
       case NonFatal(nfe) =>
-        s"Unexpected exception fetching $schemaKey in ${descriptor} Iglu repository ${config.name}: $nfe".failure.toProcessingMessage
+        s"Unexpected exception fetching $schemaKey in ${descriptor} Iglu repository ${config.name}: $nfe".invalid.toProcessingMessage
     }
   }
 }

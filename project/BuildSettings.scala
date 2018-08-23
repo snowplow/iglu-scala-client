@@ -35,7 +35,8 @@ object BuildSettings {
       "-Ywarn-nullary-override",
       "-Ywarn-nullary-unit",
       "-Ywarn-numeric-widen",
-      "-Ywarn-value-discard"
+      "-Ywarn-value-discard",
+      "-Ypartial-unification"
     ),
 
     scalacOptions in (Compile, console) ~= (_ filterNot (_ == "-Xfatal-warnings")),

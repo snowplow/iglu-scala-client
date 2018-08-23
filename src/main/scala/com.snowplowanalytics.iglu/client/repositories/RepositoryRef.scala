@@ -19,18 +19,20 @@ import com.fasterxml.jackson.databind.JsonNode
 // JSON Schema
 import com.github.fge.jsonschema.core.report.ProcessingMessage
 
-// Scalaz
-import scalaz._
-import Scalaz._
+// Cats
+import cats._
+import cats.implicits._
+import cats.data._
+import cats.data.Validated._
 
 // json4s
 import org.json4s._
 import org.json4s.JsonDSL._
 import org.json4s.jackson.JsonMethods._
-import org.json4s.scalaz.JsonScalaz._
 
 // This project
 import validation.ProcessingMessageMethods._
+import utils.TemporaryJson4sCatsUtils._
 
 /**
  * Singleton object contains a constructor
@@ -51,11 +53,12 @@ object RepositoryRefConfig {
    */
   // TODO: convert the Scalaz Error sub-types to
   // ProcessingMessages more cleanly (not just via toString)
-  def parse(config: JValue): ValidatedNel[RepositoryRefConfig] =
-    (field[String]("name")(config) |@| field[Int]("priority")(config) |@| field[List[String]](
-      "vendorPrefixes")(config)) {
-      RepositoryRefConfig(_, _, _)
-    }.leftMap(_.map(_.toString.toProcessingMessage))
+  def parse(config: JValue): ValidatedNelType[RepositoryRefConfig] =
+    (
+      validatedField[String]("name")(config),
+      validatedField[Int]("priority")(config),
+      validatedField[List[String]]("vendorPrefixes")(config)
+    ).mapN(RepositoryRefConfig(_, _, _)).leftMap(_.map(_.toString.toProcessingMessage))
 }
 
 /**
@@ -101,7 +104,7 @@ trait RepositoryRef {
    *         JsonNode on Success, or an error String
    *         on Failure
    */
-  def lookupSchema(schemaKey: SchemaKey): Validated[Option[JsonNode]]
+  def lookupSchema(schemaKey: SchemaKey): ValidatedType[Option[JsonNode]]
 
   /**
    * Retrieves an IgluSchema from the Iglu Repo as
@@ -118,9 +121,9 @@ trait RepositoryRef {
         s"Unsafe lookup of schema ${schemaKey} in ${descriptor} Iglu repository ${config.name} failed: ${msg}")
 
     lookupSchema(schemaKey) match {
-      case Success(Some(schema)) => schema
-      case Success(None)         => throw exception("not found".toProcessingMessage)
-      case Failure(err)          => throw exception(err)
+      case Valid(Some(schema)) => schema
+      case Valid(None)         => throw exception("not found".toProcessingMessage)
+      case Invalid(err)        => throw exception(err)
     }
   }
 

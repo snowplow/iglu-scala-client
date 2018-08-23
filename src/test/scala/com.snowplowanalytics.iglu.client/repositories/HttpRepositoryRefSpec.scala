@@ -13,16 +13,15 @@
 package com.snowplowanalytics.iglu.client
 package repositories
 
-// Scalaz
-import scalaz._
-import Scalaz._
+// Cats
+import cats._
+import cats.implicits._
 
 // Specs2
 import org.specs2.Specification
-import org.specs2.matcher.DataTables
-import org.specs2.scalaz.ValidationMatchers
+import org.specs2.matcher.{DataTables, ValidatedMatchers}
 
-class HttpRepositoryRefSpec extends Specification with DataTables with ValidationMatchers {
+class HttpRepositoryRefSpec extends Specification with DataTables with ValidatedMatchers {
   def is = s2"""
 
   This is a specification to test an HTTP-based RepositoryRef
@@ -68,7 +67,7 @@ class HttpRepositoryRefSpec extends Specification with DataTables with Validatio
       config = RepositoryRefConfig("Acme Iglu Repo", 5, List("com.acme")),
       uri = "http://iglu.acme.com"
     )
-    HttpRepositoryRef.parse(AcmeConfig) must beSuccessful(expected)
+    HttpRepositoryRef.parse(AcmeConfig) must beValid(expected)
   }
 
   def e3 = {
@@ -109,12 +108,12 @@ class HttpRepositoryRefSpec extends Specification with DataTables with Validatio
     )
 
     val actual = SpecHelpers.IgluCentral.lookupSchema(schemaKey)
-    actual.map(_.map(_.toString)) must beSuccessful(expected.toString.some)
+    actual.map(_.map(_.toString)) must beValid(expected.toString.some)
   }
 
   def e4 = {
     val schemaKey = SchemaKey("de.ersatz.n-a", "null", "jsonschema", "1-0-0")
-    SpecHelpers.IgluCentral.lookupSchema(schemaKey) must beSuccessful(None)
+    SpecHelpers.IgluCentral.lookupSchema(schemaKey) must beValid(None)
   }
 
   def e5 = {
@@ -123,6 +122,6 @@ class HttpRepositoryRefSpec extends Specification with DataTables with Validatio
       uri = "http://iglu.acme.com",
       Some("de305d54-75b4-431b-adb2-eb6b9e546014")
     )
-    HttpRepositoryRef.parse(AcmeConfigWithAuth) must beSuccessful(expected)
+    HttpRepositoryRef.parse(AcmeConfigWithAuth) must beValid(expected)
   }
 }

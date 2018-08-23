@@ -13,16 +13,15 @@
 package com.snowplowanalytics.iglu.client
 package validation
 
-// Scalaz
-import scalaz._
-import Scalaz._
+// Cats
+import cats._
+import cats.implicits._
 
 // Specs2
 import org.specs2.Specification
-import org.specs2.matcher.DataTables
-import org.specs2.scalaz.ValidationMatchers
+import org.specs2.matcher.{DataTables, ValidatedMatchers}
 
-class SchemaCriterionSpec extends Specification with DataTables with ValidationMatchers {
+class SchemaCriterionSpec extends Specification with DataTables with ValidatedMatchers {
   def is = s2"""
 
   This is a specification to test the SchemaCriterion class
@@ -66,7 +65,7 @@ class SchemaCriterionSpec extends Specification with DataTables with ValidationM
   def e3 = {
     val criterion =
       SchemaCriterion.parse("iglu:com.snowplowanalytics.snowplow/mobile_context/jsonschema/1-0-*")
-    criterion must beSuccessful(
+    criterion must beValid(
       SchemaCriterion(
         "com.snowplowanalytics.snowplow",
         "mobile_context",
@@ -79,7 +78,7 @@ class SchemaCriterionSpec extends Specification with DataTables with ValidationM
   def e4 = {
     val criterion =
       SchemaCriterion.parse("iglu:com.snowplowanalytics.snowplow/mobile_context/jsonschema/1-*-3")
-    criterion must beSuccessful(
+    criterion must beValid(
       SchemaCriterion(
         "com.snowplowanalytics.snowplow",
         "mobile_context",

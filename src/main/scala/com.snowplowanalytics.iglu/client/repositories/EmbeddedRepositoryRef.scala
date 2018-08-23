@@ -24,12 +24,11 @@ import com.fasterxml.jackson.core.JsonParseException
 import com.fasterxml.jackson.databind.JsonNode
 import com.github.fge.jackson.JsonLoader
 
-// Scalaz
-import scalaz._
-import Scalaz._
+// Cats
+import cats._
+import cats.implicits._
 
 // json4s
-import org.json4s.scalaz.JsonScalaz._
 import org.json4s._
 import org.json4s.JsonDSL._
 import org.json4s.jackson.JsonMethods._
@@ -67,7 +66,7 @@ object EmbeddedRepositoryRef {
    * @return a configured reference to this embedded
    *         repository
    */
-  def parse(config: JsonNode): ValidatedNel[EmbeddedRepositoryRef] =
+  def parse(config: JsonNode): ValidatedNelType[EmbeddedRepositoryRef] =
     parse(fromJsonNode(config))
 
   /**
@@ -79,10 +78,10 @@ object EmbeddedRepositoryRef {
    * @return a configured reference to this embedded
    *         repository
    */
-  def parse(config: JValue): ValidatedNel[EmbeddedRepositoryRef] = {
+  def parse(config: JValue): ValidatedNelType[EmbeddedRepositoryRef] = {
     val conf = RepositoryRefConfig.parse(config)
     val path = extractPath(config)
-    (conf |@| path.toValidationNel) { EmbeddedRepositoryRef(_, _) }
+    (conf, path.toValidatedNel).mapN { EmbeddedRepositoryRef(_, _) }
   }
 
   /**
@@ -93,12 +92,12 @@ object EmbeddedRepositoryRef {
    * @return the path to the embedded repository on
    *         Success, or an error String on Failure
    */
-  private def extractPath(config: JValue): Validated[String] =
+  private def extractPath(config: JValue): ValidatedType[String] =
     try {
-      (config \ "connection" \ "embedded" \ "path").extract[String].success
+      (config \ "connection" \ "embedded" \ "path").extract[String].valid
     } catch {
       case me: MappingException =>
-        s"Could not extract connection.embedded.path from ${compact(render(config))}".failure.toProcessingMessage
+        s"Could not extract connection.embedded.path from ${compact(render(config))}".invalid.toProcessingMessage
     }
 
 }
@@ -134,21 +133,21 @@ case class EmbeddedRepositoryRef(override val config: RepositoryRefConfig, path:
    *         on Failure
    */
   // TODO: would be nice to abstract out failure.toProcessingMessage, and scrubbing
-  def lookupSchema(schemaKey: SchemaKey): Validated[Option[JsonNode]] = {
+  def lookupSchema(schemaKey: SchemaKey): ValidatedType[Option[JsonNode]] = {
     val schemaPath = s"${path}/schemas/${schemaKey.toPath}"
     try {
-      JsonLoader.fromResource(schemaPath).some.success
+      JsonLoader.fromResource(schemaPath).some.valid
     } catch {
       case jpe: JsonParseException => // Child of IOException so match first
         s"Problem parsing ${schemaPath} as JSON in ${descriptor} Iglu repository ${config.name}: %s"
           .format(VE.stripInstanceEtc(jpe.getMessage))
-          .failure
+          .invalid
           .toProcessingMessage
       case ioe: IOException =>
-        None.success // Schema not found
+        None.valid // Schema not found
       case e: Throwable =>
         s"Unknown problem reading and parsing ${schemaPath} in ${descriptor} Iglu repository ${config.name}: ${VE
-          .getThrowableMessage(e)}".failure.toProcessingMessage
+          .getThrowableMessage(e)}".invalid.toProcessingMessage
     }
   }
 }

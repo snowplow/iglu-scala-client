@@ -13,9 +13,10 @@
 package com.snowplowanalytics.iglu.client
 package validation
 
-// Scalaz
-import scalaz._
-import Scalaz._
+// Cats
+import cats._
+import cats.implicits._
+import cats.data.NonEmptyList
 
 // This project
 import ValidatableJsonMethods._
@@ -23,9 +24,9 @@ import validation.ProcessingMessageMethods._
 
 // Specs2
 import org.specs2.Specification
-import org.specs2.scalaz.ValidationMatchers
+import org.specs2.matcher.ValidatedMatchers
 
-class SelfDescValidationSpec extends Specification with ValidationMatchers {
+class SelfDescValidationSpec extends Specification with ValidatedMatchers {
   def is = s2"""
 
   This is a specification to test validation of self-describing JsonNodes
@@ -48,36 +49,38 @@ class SelfDescValidationSpec extends Specification with ValidationMatchers {
     """{"schema": "iglu:com.snowplowanalytics.iglu-test/stock-item/jsonschema/1-0-0", "data": { "id": "123-12", "name": "t-shirt", "price": 29.99 } }"""
   )
 
-  def e1 = validJson.validate(false) must beSuccessful(validJson)
+  def e1 = validJson.validate(false) must beValid(validJson)
 
-  def e2 = validJson.validate(true) must beSuccessful(validJson.get("data"))
+  def e2 = validJson.validate(true) must beValid(validJson.get("data"))
 
   val invalidJson = SpecHelpers.asJsonNode(
     """{"schema": "iglu:com.snowplowanalytics.iglu-test/stock-item/jsonschema/1-0-0", "data": { "id": "123-12", "newName": "t-shirt", "price": "tbc" } }"""
   )
-  val invalidExpected = NonEmptyList(
-    SpecHelpers.asProcessingMessage(
-      message =
-        """object instance has properties which are not allowed by the schema: ["newName"]""",
-      schema = """{"loadingURI":"#","pointer":""}""",
-      instance = """{"pointer":""}""",
-      keyword = "additionalProperties",
-      foundExpected = None,
-      requiredMissing = None,
-      unwanted = Some("""["newName"]""")
-    ),
-    SpecHelpers.asProcessingMessage(
-      message = """object has missing required properties (["name"])""",
-      schema = """{"loadingURI":"#","pointer":""}""",
-      instance = """{"pointer":""}""",
-      keyword = "required",
-      foundExpected = None,
-      requiredMissing = Some("""["id","name","price"]""", """["name"]"""),
-      unwanted = None
+  val invalidExpected = NonEmptyList
+    .of(
+      SpecHelpers.asProcessingMessage(
+        message =
+          """object instance has properties which are not allowed by the schema: ["newName"]""",
+        schema = """{"loadingURI":"#","pointer":""}""",
+        instance = """{"pointer":""}""",
+        keyword = "additionalProperties",
+        foundExpected = None,
+        requiredMissing = None,
+        unwanted = Some("""["newName"]""")
+      ),
+      SpecHelpers.asProcessingMessage(
+        message = """object has missing required properties (["name"])""",
+        schema = """{"loadingURI":"#","pointer":""}""",
+        instance = """{"pointer":""}""",
+        keyword = "required",
+        foundExpected = None,
+        requiredMissing = Some("""["id","name","price"]""", """["name"]"""),
+        unwanted = None
+      )
     )
-  ).map(_.toString)
+    .map(_.toString)
 
-  def e3 = invalidJson.validate(false).leftMap(_.map(_.toString)) must beFailing(invalidExpected)
+  def e3 = invalidJson.validate(false).leftMap(_.map(_.toString)) must beInvalid(invalidExpected)
 
   val expectedKey =
     SchemaKey("com.snowplowanalytics.iglu-test", "stock-item", "jsonschema", "1-0-0")
@@ -85,21 +88,19 @@ class SelfDescValidationSpec extends Specification with ValidationMatchers {
   val expectedCriterion =
     SchemaCriterion("com.snowplowanalytics.iglu-test", "stock-item", "jsonschema", 1, 0, 0)
 
-  def e4 = validJson.validateAndIdentifySchema(false) must beSuccessful((expectedKey, validJson))
+  def e4 = validJson.validateAndIdentifySchema(false) must beValid((expectedKey, validJson))
 
   def e5 =
-    validJson.validateAndIdentifySchema(true) must beSuccessful(
-      (expectedKey, validJson.get("data")))
+    validJson.validateAndIdentifySchema(true) must beValid((expectedKey, validJson.get("data")))
 
   def e6 =
-    invalidJson.validateAndIdentifySchema(false).leftMap(_.map(_.toString)) must beFailing(
+    invalidJson.validateAndIdentifySchema(false).leftMap(_.map(_.toString)) must beInvalid(
       invalidExpected)
 
-  def e7 = validJson.verifySchemaAndValidate(expectedCriterion, false) must beSuccessful(validJson)
+  def e7 = validJson.verifySchemaAndValidate(expectedCriterion, false) must beValid(validJson)
 
   def e8 =
-    validJson.verifySchemaAndValidate(expectedCriterion, true) must beSuccessful(
-      validJson.get("data"))
+    validJson.verifySchemaAndValidate(expectedCriterion, true) must beValid(validJson.get("data"))
 
   val incorrectKey =
     SchemaCriterion("com.snowplowanalytics.iglu-test", "stock-item", "jsonschema", 2, 0, 0)
@@ -110,10 +111,10 @@ class SelfDescValidationSpec extends Specification with ValidationMatchers {
   def e9 =
     validJson
       .verifySchemaAndValidate(incorrectKey, false)
-      .leftMap(_.map(_.toString)) must beFailing(verifyExpected)
+      .leftMap(_.map(_.toString)) must beInvalid(verifyExpected)
 
   def e10 =
     invalidJson
       .verifySchemaAndValidate(incorrectKey, false)
-      .leftMap(_.map(_.toString)) must beFailing(verifyExpected)
+      .leftMap(_.map(_.toString)) must beInvalid(verifyExpected)
 }

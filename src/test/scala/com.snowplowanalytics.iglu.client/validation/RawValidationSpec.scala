@@ -16,16 +16,18 @@ package validation
 // Jackson
 import com.github.fge.jackson.JsonLoader
 
-// Scalaz
-import scalaz._
-import Scalaz._
+// Cats
+import cats._
+import cats.implicits._
+import cats.data.NonEmptyList
+import cats.data.Validated._
 
 // Specs2
 import org.specs2.Specification
 import org.specs2.matcher.DataTables
-import org.specs2.scalaz.ValidationMatchers
+import org.specs2.matcher.ValidatedMatchers
 
-class RawValidationSpec extends Specification with DataTables with ValidationMatchers {
+class RawValidationSpec extends Specification with DataTables with ValidatedMatchers {
   def is = s2"""
 
   This is a specification to test the basic ValidatableJsonNode functionality
@@ -42,7 +44,7 @@ class RawValidationSpec extends Specification with DataTables with ValidationMat
 
   def e1 = {
     val json = SpecHelpers.asJsonNode("""{"country": "JP", "beers": ["Asahi", "Orion", "..."]}""")
-    json.validateAgainstSchema(SimpleSchema) must beSuccessful(json)
+    json.validateAgainstSchema(SimpleSchema) must beValid(json)
   }
 
   def e2 =
@@ -54,7 +56,7 @@ class RawValidationSpec extends Specification with DataTables with ValidationMat
       )) { str: String =>
       {
         val json = SpecHelpers.asJsonNode(str)
-        json.validateAgainstSchema(SimpleSchema) must beSuccessful(json)
+        json.validateAgainstSchema(SimpleSchema) must beValid(json)
       }
     }
 
@@ -71,7 +73,7 @@ class RawValidationSpec extends Specification with DataTables with ValidationMat
         {
           val json = SpecHelpers.asJsonNode(input)
           json.validateAgainstSchema(SimpleSchema) must beLike {
-            case Failure(NonEmptyList(head, tail @ _*)) if tail.isEmpty =>
+            case Invalid(NonEmptyList(head, tail)) if tail.isEmpty =>
               head.toString must_== SpecHelpers
                 .asProcessingMessage(
                   message,
