@@ -13,19 +13,18 @@
 package com.snowplowanalytics.iglu.client
 package repositories
 
-// Scalaz
-import scalaz._
-import Scalaz._
+// Cats
+import cats._
+import cats.implicits._
 
 // This project
 import validation.ProcessingMessageMethods._
 
 // Specs2
 import org.specs2.Specification
-import org.specs2.matcher.DataTables
-import org.specs2.scalaz.ValidationMatchers
+import org.specs2.matcher.{DataTables, ValidatedMatchers}
 
-class EmbeddedRepositoryRefSpec extends Specification with DataTables with ValidationMatchers {
+class EmbeddedRepositoryRefSpec extends Specification with DataTables with ValidatedMatchers {
   def is = s2"""
 
   This is a specification to test an embedded RepositoryRef
@@ -57,7 +56,7 @@ class EmbeddedRepositoryRefSpec extends Specification with DataTables with Valid
       config = RepositoryRefConfig("Acme Embedded", 100, List("uk.co.acme", "de.acme")),
       path = "/acme-embedded-new"
     )
-    EmbeddedRepositoryRef.parse(AcmeConfig) must beSuccessful(expected)
+    EmbeddedRepositoryRef.parse(AcmeConfig) must beValid(expected)
   }
 
   def e3 = {
@@ -89,13 +88,13 @@ class EmbeddedRepositoryRefSpec extends Specification with DataTables with Valid
         |"additionalProperties":false
       |}""".stripMargin.replaceAll("[\n\r]", "")
 
-    SpecHelpers.EmbeddedTest.lookupSchema(schemaKey).map(_.map(_.toString)) must beSuccessful(
+    SpecHelpers.EmbeddedTest.lookupSchema(schemaKey).map(_.map(_.toString)) must beValid(
       Some(expected))
   }
 
   def e4 = {
     val schemaKey = SchemaKey("com.acme.n-a", "null", "jsonschema", "1-0-0")
-    SpecHelpers.EmbeddedTest.lookupSchema(schemaKey) must beSuccessful(None)
+    SpecHelpers.EmbeddedTest.lookupSchema(schemaKey) must beValid(None)
   }
 
   def e5 = {
@@ -103,7 +102,7 @@ class EmbeddedRepositoryRefSpec extends Specification with DataTables with Valid
       SchemaKey("com.snowplowanalytics.iglu-test", "corrupted_schema", "jsonschema", "1-0-0")
     val expected =
       "Problem parsing /iglu-test-embedded/schemas/com.snowplowanalytics.iglu-test/corrupted_schema/jsonschema/1-0-0 as JSON in embedded Iglu repository Iglu Test Embedded: Unexpected end-of-input within/between OBJECT entries at [Source: java.io.BufferedInputStream@xxxxxx; line: 10, column: 316]".toProcessingMessage.toString
-    SpecHelpers.EmbeddedTest.lookupSchema(schemaKey).leftMap(_.toString) must beFailing(
+    SpecHelpers.EmbeddedTest.lookupSchema(schemaKey).leftMap(_.toString) must beInvalid(
       expected.toString)
   }
 

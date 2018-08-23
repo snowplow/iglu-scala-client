@@ -28,13 +28,13 @@ Second working method is `lookupSchema`, receiving Schema key as String or direc
 this method traverse all configured repositories trying to find Schema by its key.
 
 ```scala
-import scalaz.ValidationNel
+import cats.data.ValidatedNel
 import com.fasterxml.jackson.databind.JsonNode
 import com.github.fge.jsonschema.core.report.ProcessingMessage
 import com.snowplowanalytics.iglu.client.{ Resolver, SchemaKey }
 
 val resolverConfig: JsonNode = ???
-val schema: ValidationNel[ProcessingMessage, JsonNode] = for {
+val schema: ValidatedNel[ProcessingMessage, JsonNode] = for {
   schemaKey <- SchemaKey.parseNel("iglu:com.snowplowanalytics.snowplow/mobile_context/jsonschema/1-0-0")
   resolver <- Resolver.parse(resolverConfig)
   schema <- resolver.lookupSchema(schemaKey)
@@ -42,8 +42,8 @@ val schema: ValidationNel[ProcessingMessage, JsonNode] = for {
 ```
 
 Above snippet returns mobile context JSON Schema if you provide correct `resolverConfig`.
-If not you will get all errors (like invalid format, network failure, etc) accumulated in `scalaz.NonEmptyList`,
-which itself is left side of `scalaz.ValidationNel`, structure isomorphic to native Scala `Either`.
+If not you will get all errors (like invalid format, network failure, etc) accumulated in `cats.data.NonEmptyList`,
+which itself is left side of `ValidatedNel`, structure isomorphic to native Scala `Either`.
 
 ## Find out more
 

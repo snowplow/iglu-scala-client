@@ -21,9 +21,9 @@ import ValidatableJsonMethods._
 
 // Specs2
 import org.specs2.Specification
-import org.specs2.scalaz.ValidationMatchers
+import org.specs2.matcher.ValidatedMatchers
 
-class SchemaValidationSpec extends Specification with ValidationMatchers {
+class SchemaValidationSpec extends Specification with ValidatedMatchers {
   def is = s2"""
 
   This is a specification to test Schema Validation
@@ -46,8 +46,8 @@ class SchemaValidationSpec extends Specification with ValidationMatchers {
 
   val validJValueWithInvalidSchema = fromJsonNode(validJsonWithInvalidSchema)
 
-  def e1 = validJson.validate(false) must beSuccessful(validJson)
+  def e1 = validJson.validate(false) must beValid(validJson)
 
-  def e2 = validJsonWithInvalidSchema.validate(false) must beFailing
+  def e2 = validJsonWithInvalidSchema.validate(false) must beInvalid
 
 }

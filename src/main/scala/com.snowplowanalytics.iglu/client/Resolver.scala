@@ -21,15 +21,16 @@ import com.github.fge.jsonschema.core.report.{LogLevel, ProcessingMessage}
 // Scala
 import scala.annotation.tailrec
 
-// Scalaz
-import scalaz._
-import Scalaz._
+// Cats
+import cats._
+import cats.implicits._
+import cats.data.NonEmptyList
+import cats.data.Validated._
 
 // json4s
 import org.json4s._
 import org.json4s.JsonDSL._
 import org.json4s.jackson.JsonMethods._
-import org.json4s.scalaz.JsonScalaz._
 
 // This project
 import repositories.{EmbeddedRepositoryRef, HttpRepositoryRef, RepositoryRef}
@@ -37,6 +38,7 @@ import validation.SchemaValidation.{getErrors, isValid}
 import validation.ValidatableJsonMethods
 import validation.ProcessingMessageMethods
 import ProcessingMessageMethods._
+import utils.TemporaryJson4sCatsUtils._
 
 /**
  * Companion object. Lets us create a Resolver from
@@ -64,7 +66,7 @@ object Resolver {
    * Semigroup instance helping to aggregate repository errors
    */
   private[client] implicit object RepoErrorSemigroup extends Semigroup[RepoError] {
-    def append(a: RepoError, b: => RepoError): RepoError =
+    override def combine(a: RepoError, b: RepoError): RepoError =
       RepoError(
         a.errors |+| b.errors,
         a.attempts.max(b.attempts) + 1,
@@ -90,7 +92,7 @@ object Resolver {
    *        for this resolver
    * @return a configured Resolver instance
    */
-  def parse(config: JValue): ValidatedNel[Resolver] =
+  def parse(config: JValue): ValidatedNelType[Resolver] =
     parse(asJsonNode(config))
 
   /**
@@ -100,7 +102,7 @@ object Resolver {
    *        for this resolver
    * @return a configured Resolver instance
    */
-  def parse(config: JsonNode): ValidatedNel[Resolver] = {
+  def parse(config: JsonNode): ValidatedNelType[Resolver] = {
 
     // We can use the bootstrap Resolver for working
     // with JSON Schemas here.
@@ -110,25 +112,26 @@ object Resolver {
     import ValidatableJsonMethods._
 
     // Check it passes validation
-    config.verifySchemaAndValidate(ConfigurationSchema, dataOnly = true) match {
-      case Success(node) =>
-        val json      = fromJsonNode(node)
-        val cacheSize = field[Int]("cacheSize")(json).leftMap(_.map(_.toString.toProcessingMessage))
+    config
+      .verifySchemaAndValidate(ConfigurationSchema, dataOnly = true)
+      .andThen { node =>
+        val json = fromJsonNode(node)
+        val cacheSize =
+          validatedField[Int]("cacheSize")(json).leftMap(_.map(_.toString.toProcessingMessage))
         val cacheTtl =
-          field[Option[Int]]("cacheTtl")(json).leftMap(_.map(_.toString.toProcessingMessage))
-        val repositoryRefs: ValidatedNel[RepositoryRefs] =
-          (field[List[JValue]]("repositories")(json)).fold(
-            f => f.map(_.toString.toProcessingMessage).failure,
+          validatedOptionalField[Int]("cacheTtl")(json)
+            .leftMap(_.map(_.toString.toProcessingMessage))
+        val repositoryRefs: ValidatedNelType[RepositoryRefs] =
+          (validatedField[List[JValue]]("repositories")(json)).fold(
+            f => f.map(_.toString.toProcessingMessage).invalid,
             s => getRepositoryRefs(s)
           )
-        (cacheSize |@| repositoryRefs |@| cacheTtl) {
+        (cacheSize, repositoryRefs, cacheTtl).mapN {
           Resolver(_, _, _)
         }
-      case Failure(err) =>
-        err
-          .<::("Resolver configuration failed JSON Schema validation".toProcessingMessage)
-          .failure[Resolver]
-    }
+      }
+      .leftMap(errors =>
+        errors.prepend("Resolver configuration failed JSON Schema validation".toProcessingMessage))
   }
 
   /**
@@ -140,7 +143,7 @@ object Resolver {
    * @return our assembled List of RepositoryRefs
    */
   private[client] def getRepositoryRefs(
-    repositoryConfigs: List[JValue]): ValidatedNel[RepositoryRefs] =
+    repositoryConfigs: List[JValue]): ValidatedNelType[RepositoryRefs] =
     repositoryConfigs.map { conf =>
       buildRepositoryRef(conf)
     }.sequence
@@ -158,14 +161,15 @@ object Resolver {
    *        configuration for this repository
    * @return our constructed RepositoryRef
    */
-  private[client] def buildRepositoryRef(repositoryConfig: JValue): ValidatedNel[RepositoryRef] = {
+  private[client] def buildRepositoryRef(
+    repositoryConfig: JValue): ValidatedNelType[RepositoryRef] = {
     val rc = repositoryConfig
     if (EmbeddedRepositoryRef.isEmbedded(rc)) {
       EmbeddedRepositoryRef.parse(rc)
     } else if (HttpRepositoryRef.isHttp(rc)) {
       HttpRepositoryRef.parse(rc)
     } else {
-      s"Configuration unrecognizable as either embedded or HTTP repository".failure.toProcessingMessageNel
+      s"Configuration unrecognizable as either embedded or HTTP repository".invalid.toProcessingMessageNel
     }
   }
 
@@ -188,18 +192,18 @@ object Resolver {
     remaining: RepositoryRefs,
     tried: RepoFailuresMap): SchemaLookup = {
     remaining match {
-      case Nil => tried.failure
+      case Nil => tried.invalid
       case repo :: repos => {
         repo.lookupSchema(schemaKey) match {
-          case Success(Some(schema)) if isValid(schema) => schema.success
-          case Success(Some(schema)) =>
-            val error = RepoError(getErrors(schema).toSet, 1, true).some
+          case Valid(Some(schema)) if isValid(schema) => schema.valid
+          case Valid(Some(schema)) =>
+            val error = RepoError(getErrors(schema).toSet, 1, unrecoverable = true).some
             traverseRepos(schemaKey, repos, Map(repo -> error) |+| tried)
-          case Success(None) =>
+          case Valid(None) =>
             val error = none[RepoError]
             traverseRepos(schemaKey, repos, Map(repo -> error) |+| tried)
-          case Failure(e) =>
-            val error = RepoError(Set(e), 1, false).some
+          case Invalid(e) =>
+            val error = RepoError(Set(e), 1, unrecoverable = false).some
             traverseRepos(schemaKey, repos, Map(repo -> error) |+| tried)
         }
       }
@@ -264,7 +268,7 @@ object Resolver {
       .setMessage(s"Could not find schema with key $schemaKey in any repository, tried:")
       .put("repositories", asJsonNode(repos))
 
-    NonEmptyList(notFound, failures: _*)
+    NonEmptyList(notFound, failures)
   }
 
   /**
@@ -359,17 +363,12 @@ case class Resolver(
    *         JsonNode on Success, or an error String
    *         on Failure
    */
-  def lookupSchema(schemaKey: SchemaKey, attempts: Int = 3): ValidatedNel[JsonNode] = {
+  def lookupSchema(schemaKey: SchemaKey, attempts: Int = 3): ValidatedNelType[JsonNode] = {
     val result = cache.get(schemaKey) match {
       case Some(schema) =>
-        schema match {
-          case Success(schema) => schema.success
-          case Failure(serverErrors) =>
-            val reposForRetry = getReposForRetry(serverErrors, attempts)
-            traverseRepos(
-              schemaKey,
-              Resolver.prioritizeRepos(schemaKey, reposForRetry),
-              serverErrors)
+        schema.handleErrorWith { serverErrors =>
+          val reposForRetry = getReposForRetry(serverErrors, attempts)
+          traverseRepos(schemaKey, Resolver.prioritizeRepos(schemaKey, reposForRetry), serverErrors)
         }
       case None => traverseRepos(schemaKey, prioritizeRepos(schemaKey, allRepos), Map())
     }
@@ -390,11 +389,10 @@ case class Resolver(
    *         JsonNode on Success, or an error String
    *         on Failure
    */
-  def lookupSchema(schemaUri: String): ValidatedNel[JsonNode] =
-    for {
-      k <- SchemaKey.parseNel(schemaUri)
-      s <- lookupSchema(k)
-    } yield s
+  def lookupSchema(schemaUri: String): ValidatedNelType[JsonNode] =
+    SchemaKey
+      .parseNel(schemaUri)
+      .andThen(k => lookupSchema(k))
 
   /**
    * Tries to find the given schema in any of the
@@ -409,7 +407,7 @@ case class Resolver(
    */
   def unsafeLookupSchema(schemaKey: SchemaKey): JsonNode =
     lookupSchema(schemaKey) match {
-      case Success(schema) => schema
-      case Failure(err)    => throw new RuntimeException(s"Unsafe schema lookup failed: $err")
+      case Valid(schema) => schema
+      case Invalid(err)  => throw new RuntimeException(s"Unsafe schema lookup failed: $err")
     }
 }
