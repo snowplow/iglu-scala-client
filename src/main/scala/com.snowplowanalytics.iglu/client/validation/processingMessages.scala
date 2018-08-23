@@ -19,9 +19,9 @@ import scala.language.implicitConversions
 // JSON Schema
 import com.github.fge.jsonschema.core.report.{LogLevel, ProcessingMessage}
 
-// Scalaz
-import scalaz._
-import Scalaz._
+// Cats
+import cats.implicits._
+import cats.data.{NonEmptyList, Validated, ValidatedNel}
 
 /**
  * Makes it easier to work with ProcessingMessages.
@@ -29,17 +29,17 @@ import Scalaz._
 object ProcessingMessageMethods {
 
   /**
-   * Implicit to pimp a Scalaz Validation to a
+   * Implicit to pimp a Cats Validated to a
    * version that makes it easy to convert
    * Failure Strings to Failure ProcessingMessages.
    *
    * @param instance A JsonNode
    * @return the pimped ValidatableJsonNode
    */
-  implicit def pimpValidation[A](validation: Validation[String, A]) =
+  implicit def pimpValidated[A](validation: Validated[String, A]) =
     new ProcMsgValidation[A](validation)
 
-  implicit def pimpValidationNel[A](validation: ValidationNel[String, A]) =
+  implicit def pimpValidatedNel[A](validation: ValidatedNel[String, A]) =
     new ProcMsgValidationNel[A](validation)
 
   implicit def pimpString(str: String) = new ProcMsgString(str)
@@ -67,7 +67,7 @@ object ProcessingMessageMethods {
     messages.map(msg => toProcMsg(msg, logLevel))
 
   def toProcMsgNel(message: String, logLevel: LogLevel = LogLevel.ERROR): ProcessingMessageNel =
-    NonEmptyList(toProcMsg(message, logLevel))
+    NonEmptyList.one(toProcMsg(message, logLevel))
 
 }
 
@@ -76,17 +76,17 @@ object ProcessingMessageMethods {
  * Strings to ProcessingMessages on the Failure side of
  * Validations.
  */
-class ProcMsgValidation[+A](validation: Validation[String, A]) {
+class ProcMsgValidation[+A](validation: Validated[String, A]) {
 
   // import validation.{ProcessingMessageMethods => PMM}
 
-  def toProcessingMessage: Validation[ProcessingMessage, A] =
+  def toProcessingMessage: Validated[ProcessingMessage, A] =
     validation.leftMap { err =>
       ProcessingMessageMethods.toProcMsg(err, LogLevel.ERROR)
     }
 
-  def toProcessingMessageNel: ValidationNel[ProcessingMessage, A] =
-    toProcessingMessage.toValidationNel
+  def toProcessingMessageNel: ValidatedNel[ProcessingMessage, A] =
+    toProcessingMessage.toValidatedNel
 }
 
 /**
@@ -94,9 +94,9 @@ class ProcMsgValidation[+A](validation: Validation[String, A]) {
  * Strings to ProcessingMessages on the Failure side of
  * Validations.
  */
-class ProcMsgValidationNel[+A](validation: ValidationNel[String, A]) {
+class ProcMsgValidationNel[+A](validation: ValidatedNel[String, A]) {
 
-  def toProcessingMessages: ValidationNel[ProcessingMessage, A] =
+  def toProcessingMessages: ValidatedNel[ProcessingMessage, A] =
     validation.leftMap { err =>
       ProcessingMessageMethods.toProcMsg(err, LogLevel.ERROR)
     }

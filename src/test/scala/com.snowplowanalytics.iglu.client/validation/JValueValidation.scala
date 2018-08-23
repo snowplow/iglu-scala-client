@@ -21,9 +21,9 @@ import ValidatableJValue._
 
 // Specs2
 import org.specs2.Specification
-import org.specs2.scalaz.ValidationMatchers
+import org.specs2.matcher.ValidatedMatchers
 
-class SchemaJValueValidationSpec extends Specification with ValidationMatchers {
+class SchemaJValueValidationSpec extends Specification with ValidatedMatchers {
   def is = s2"""
 
   This is a specification to test Schema Validation with json4s AST
@@ -42,7 +42,7 @@ class SchemaJValueValidationSpec extends Specification with ValidationMatchers {
     """{"schema": "iglu:com.snowplowanalytics.iglu-test/invalid-protocol/jsonschema/1-0-0", "data": { "id": 0 } }"""
   )
 
-  def e1 = validJson.validate(false) must beSuccessful(validJson)
+  def e1 = validJson.validate(false) must beValid(validJson)
 
-  def e2 = validJsonWithInvalidSchema.validate(false) must beFailing
+  def e2 = validJsonWithInvalidSchema.validate(false) must beInvalid
 }

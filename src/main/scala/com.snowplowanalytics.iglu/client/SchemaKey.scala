@@ -15,9 +15,9 @@ package com.snowplowanalytics.iglu.client
 // Jackson
 import com.fasterxml.jackson.databind.JsonNode
 
-// Scalaz
-import scalaz._
-import Scalaz._
+// Cats
+import cats._
+import cats.implicits._
 
 // json4s
 import org.json4s._
@@ -49,14 +49,14 @@ object SchemaKey {
    * @return a Validation-boxed SchemaKey for
    *         Success, and an error String on Failure
    */
-  def parse(schemaUri: String): Validated[SchemaKey] = schemaUri match {
+  def parse(schemaUri: String): ValidatedType[SchemaKey] = schemaUri match {
     case SchemaUriRegex(vnd, n, f, ver) =>
-      SchemaKey(vnd, n, f, ver).success
+      SchemaKey(vnd, n, f, ver).valid
     case _ =>
-      s"${schemaUri} is not a valid Iglu-format schema URI".toProcessingMessage.failure
+      s"${schemaUri} is not a valid Iglu-format schema URI".toProcessingMessage.invalid
   }
 
-  def parseNel(schemaUri: String): ValidatedNel[SchemaKey] = parse(schemaUri).toValidationNel
+  def parseNel(schemaUri: String): ValidatedNelType[SchemaKey] = parse(schemaUri).toValidatedNel
 }
 
 /**

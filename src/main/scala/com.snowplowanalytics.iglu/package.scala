@@ -19,8 +19,9 @@ import com.fasterxml.jackson.databind.JsonNode
 import com.github.fge.jsonschema.core.report.ProcessingMessage
 
 // Scalaz
-import scalaz._
-import Scalaz._
+import cats._
+import cats.implicits._
+import cats.data.{NonEmptyList, Validated, ValidatedNel}
 
 // LRU
 import com.twitter.util.SynchronizedLruMap
@@ -41,8 +42,8 @@ package object client {
   /**
    * Helpful archetypes
    */
-  type Validated[A]    = Validation[ProcessingMessage, A]
-  type ValidatedNel[A] = ValidationNel[ProcessingMessage, A]
+  type ValidatedType[A]    = Validated[ProcessingMessage, A]
+  type ValidatedNelType[A] = ValidatedNel[ProcessingMessage, A]
 
   /**
    * Our LRU cache of schemas
@@ -68,7 +69,7 @@ package object client {
    * JsonNode in case of Success or Map of all currently failed repositories
    * in case of Failure
    */
-  type SchemaLookup = Validation[RepoFailuresMap, JsonNode]
+  type SchemaLookup = Validated[RepoFailuresMap, JsonNode]
 
   /**
    * Schema lookup result associated with timestamp (in seconds) it was stored at

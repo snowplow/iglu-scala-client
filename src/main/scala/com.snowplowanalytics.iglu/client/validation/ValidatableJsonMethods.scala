@@ -14,6 +14,8 @@ package com.snowplowanalytics.iglu.client
 package validation
 
 // Scala
+import cats.data.StateT
+
 import scala.collection.JavaConversions._
 
 // Jackson
@@ -25,9 +27,10 @@ import com.github.fge.jsonschema.cfg.ValidationConfiguration
 import com.github.fge.jsonschema.core.report.{ListReportProvider, LogLevel, ProcessingMessage}
 import com.github.fge.jsonschema.main.{JsonSchemaFactory, JsonValidator}
 
-// Scalaz
-import scalaz._
-import Scalaz._
+// Cats
+import cats._
+import cats.implicits._
+import cats.data.NonEmptyList
 
 // This project
 import ProcessingMessageMethods._
@@ -37,18 +40,18 @@ object ValidatableJsonMethods extends Validatable[JsonNode] {
   private[validation] lazy val JsonSchemaValidator = getJsonSchemaValidator(SchemaVersion.DRAFTV4)
 
   def validateAgainstSchema(instance: JsonNode, schema: JsonNode)(
-    implicit resolver: Resolver): ValidatedNel[JsonNode] = {
+    implicit resolver: Resolver): ValidatedNelType[JsonNode] = {
     val validatedReport = try {
-      JsonSchemaValidator.validateUnchecked(schema, instance).success
+      JsonSchemaValidator.validateUnchecked(schema, instance).valid
     } catch {
       case re: RuntimeException =>
-        s"Exception validating instance, possibly caused by malformed $schema field: [$re]".toProcessingMessageNel.failure
+        s"Exception validating instance, possibly caused by malformed $schema field: [$re]".toProcessingMessageNel.invalid
     }
-    validatedReport.flatMap { report =>
+    validatedReport.andThen { report =>
       val msgs = report.iterator.toList
       msgs match {
-        case x :: xs if !report.isSuccess => NonEmptyList[ProcessingMessage](x, xs: _*).failure
-        case Nil if report.isSuccess      => instance.success
+        case x :: xs if !report.isSuccess => NonEmptyList(x, xs).invalid
+        case Nil if report.isSuccess      => instance.valid
         case _ =>
           throw new RuntimeException(
             s"Validation report success [$report.isSuccess] conflicts with message count [$msgs.length]")
@@ -57,40 +60,63 @@ object ValidatableJsonMethods extends Validatable[JsonNode] {
   }
 
   def validate(instance: JsonNode, dataOnly: Boolean = false)(
-    implicit resolver: Resolver): ValidatedNel[JsonNode] =
-    for {
-      j <- validateAsSelfDescribing(instance)
-      s = j.get("schema").asText
-      d = j.get("data")
-      js <- resolver.lookupSchema(s)
-      _  <- validateAgainstSchema(d, js)
-    } yield if (dataOnly) d else instance
+    implicit resolver: Resolver): ValidatedNelType[JsonNode] = {
+
+    validateAsSelfDescribing(instance)
+      .andThen { j =>
+        val key  = j.get("schema").asText
+        val data = j.get("data")
+
+        resolver.lookupSchema(key).map(schema => (data, schema))
+      }
+      .andThen {
+        case (data, schema) =>
+          validateAgainstSchema(data, schema).map(_ => if (dataOnly) data else instance)
+      }
+  }
 
   def validateAndIdentifySchema(instance: JsonNode, dataOnly: Boolean = false)(
-    implicit resolver: Resolver): ValidatedNel[JsonSchemaPair] =
-    for {
-      j <- validateAsSelfDescribing(instance)
-      s = j.get("schema").asText
-      d = j.get("data")
-      sk <- SchemaKey.parseNel(s)
-      js <- resolver.lookupSchema(sk)
-      _  <- validateAgainstSchema(d, js)
-    } yield if (dataOnly) (sk, d) else (sk, instance)
+    implicit resolver: Resolver): ValidatedNelType[JsonSchemaPair] = {
+
+    validateAsSelfDescribing(instance)
+      .andThen { j =>
+        val key  = j.get("schema").asText
+        val data = j.get("data")
+
+        SchemaKey
+          .parseNel(key)
+          .andThen(
+            schemaKey =>
+              resolver
+                .lookupSchema(schemaKey)
+                .andThen(schema => validateAgainstSchema(data, schema))
+                .map(_ => if (dataOnly) (schemaKey, data) else (schemaKey, instance)))
+      }
+  }
 
   def verifySchemaAndValidate(
     instance: JsonNode,
     schemaCriterion: SchemaCriterion,
-    dataOnly: Boolean = false)(implicit resolver: Resolver): ValidatedNel[JsonNode] =
-    for {
-      j <- validateAsSelfDescribing(instance)
-      s = j.get("schema").asText
-      d = j.get("data")
-      sk <- SchemaKey.parseNel(s)
-      m <- if (schemaCriterion.matches(sk)) sk.success
-      else s"Verifying schema as $schemaCriterion failed: found $sk".toProcessingMessageNel.failure
-      js <- resolver.lookupSchema(m)
-      _  <- validateAgainstSchema(d, js)
-    } yield if (dataOnly) d else instance
+    dataOnly: Boolean = false)(implicit resolver: Resolver): ValidatedNelType[JsonNode] = {
+
+    validateAsSelfDescribing(instance)
+      .andThen { j =>
+        val key  = j.get("schema").asText
+        val data = j.get("data")
+
+        SchemaKey
+          .parseNel(key)
+          .andThen(
+            schemaKey =>
+              if (schemaCriterion.matches(schemaKey))
+                schemaKey.valid
+              else
+                s"Verifying schema as $schemaCriterion failed: found $schemaKey".toProcessingMessageNel.invalid)
+          .andThen(schemaKey => resolver.lookupSchema(schemaKey))
+          .andThen(schema => validateAgainstSchema(data, schema))
+          .map(_ => if (dataOnly) data else instance)
+      }
+  }
 
   /**
    * Get our schema for self-describing Iglu instances.
@@ -114,7 +140,7 @@ object ValidatableJsonMethods extends Validatable[JsonNode] {
    *         ProcessingMessages
    */
   private[validation] def validateAsSelfDescribing(instance: JsonNode)(
-    implicit resolver: Resolver): ValidatedNel[JsonNode] =
+    implicit resolver: Resolver): ValidatedNelType[JsonNode] =
     validateAgainstSchema(instance, getSelfDescribingSchema)
 
   /**

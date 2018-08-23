@@ -27,13 +27,13 @@ lazy val root = (project in file("."))
       Dependencies.Libraries.jacksonDatabind,
       Dependencies.Libraries.jsonValidator,
       // Scala
+      Dependencies.Libraries.circeParser,
       Dependencies.Libraries.json4sJackson,
-      Dependencies.Libraries.json4sScalaz,
-      Dependencies.Libraries.scalaz7,
       Dependencies.Libraries.collUtils,
       // Scala (test only)
       Dependencies.Libraries.specs2,
-      Dependencies.Libraries.scalazSpecs2,
+      Dependencies.Libraries.specs2Cats,
+      Dependencies.Libraries.specs2Mock,
       Dependencies.Libraries.mockito
     ),
     scalafmtOnCompile := true
