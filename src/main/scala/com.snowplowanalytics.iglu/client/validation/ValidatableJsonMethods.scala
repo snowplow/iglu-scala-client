@@ -14,18 +14,13 @@ package com.snowplowanalytics.iglu.client
 package validation
 
 // Scala
-import cats.data.StateT
-
-import scala.collection.JavaConversions._
+import scala.collection.JavaConverters._
 
 // Jackson
 import com.fasterxml.jackson.databind.JsonNode
 
 // JSON Schema
-import com.github.fge.jsonschema.SchemaVersion
-import com.github.fge.jsonschema.cfg.ValidationConfiguration
-import com.github.fge.jsonschema.core.report.{ListReportProvider, LogLevel, ProcessingMessage}
-import com.github.fge.jsonschema.main.{JsonSchemaFactory, JsonValidator}
+import com.networknt.schema._
 
 // Cats
 import cats._
@@ -37,26 +32,38 @@ import ProcessingMessageMethods._
 
 object ValidatableJsonMethods extends Validatable[JsonNode] {
 
-  private[validation] lazy val JsonSchemaValidator = getJsonSchemaValidator(SchemaVersion.DRAFTV4)
+  private val metaSchema = JsonMetaSchema
+    .builder(
+      "http://iglucentral.com/schemas/com.snowplowanalytics.self-desc/schema/jsonschema/1-0-0#",
+      JsonMetaSchema.getDraftV4)
+    .build()
 
-  def validateAgainstSchema(instance: JsonNode, schema: JsonNode)(
-    implicit resolver: Resolver): ValidatedNelType[JsonNode] = {
-    val validatedReport = try {
-      JsonSchemaValidator.validateUnchecked(schema, instance).valid
-    } catch {
-      case re: RuntimeException =>
-        s"Exception validating instance, possibly caused by malformed $schema field: [$re]".toProcessingMessageNel.invalid
+  private val factory =
+    JsonSchemaFactory.builder(JsonSchemaFactory.getInstance).addMetaSchema(metaSchema).build()
+
+  private def validateOnReadySchema(
+    schema: JsonSchema,
+    instance: JsonNode): ValidatedNelType[JsonNode] = {
+    val messages = schema
+      .validate(instance)
+      .asScala
+      .toList
+      .map(message => ProcessingMessage(message.getMessage))
+
+    messages match {
+      case x :: xs => NonEmptyList(x, xs).invalid
+      case Nil     => instance.valid
     }
-    validatedReport.andThen { report =>
-      val msgs = report.iterator.toList
-      msgs match {
-        case x :: xs if !report.isSuccess => NonEmptyList(x, xs).invalid
-        case Nil if report.isSuccess      => instance.valid
-        case _ =>
-          throw new RuntimeException(
-            s"Validation report success [$report.isSuccess] conflicts with message count [$msgs.length]")
-      }
-    }
+  }
+
+  def validateAgainstSchema(
+    instance: JsonNode,
+    schemaJson: JsonNode): ValidatedNelType[JsonNode] = {
+    Either
+      .catchNonFatal(factory.getSchema(schemaJson))
+      .leftMap(error => NonEmptyList.one(ProcessingMessage(error.getMessage)))
+      .toValidated
+      .andThen(schema => validateOnReadySchema(schema, instance))
   }
 
   def validate(instance: JsonNode, dataOnly: Boolean = false)(
@@ -142,27 +149,4 @@ object ValidatableJsonMethods extends Validatable[JsonNode] {
   private[validation] def validateAsSelfDescribing(instance: JsonNode)(
     implicit resolver: Resolver): ValidatedNelType[JsonNode] =
     validateAgainstSchema(instance, getSelfDescribingSchema)
-
-  /**
-   * Factory for retrieving a JSON Schema
-   * validator with the specific version.
-   *
-   * @param version The version of the JSON
-   *        Schema spec to validate against
-   * @return a JsonValidator
-   */
-  private[validation] def getJsonSchemaValidator(version: SchemaVersion): JsonValidator = {
-
-    // Override the ReportProvider so we never throw Exceptions and only collect ERRORS+
-    val rep = new ListReportProvider(LogLevel.ERROR, LogLevel.NONE)
-    val cfg = ValidationConfiguration.newBuilder
-      .setDefaultVersion(version)
-      .freeze
-    val fac = JsonSchemaFactory.newBuilder
-      .setReportProvider(rep)
-      .setValidationConfiguration(cfg)
-      .freeze
-
-    fac.getValidator
-  }
 }

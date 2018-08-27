@@ -14,15 +14,12 @@ package com.snowplowanalytics.iglu.client
 package repositories
 
 // Java
-import java.io.IOException
-
-// Apache Commons
-import org.apache.commons.lang3.exception.ExceptionUtils
+import com.fasterxml.jackson.databind.ObjectMapper
+import com.snowplowanalytics.iglu.client.validation.ProcessingMessage
 
 // Jackson
 import com.fasterxml.jackson.core.JsonParseException
 import com.fasterxml.jackson.databind.JsonNode
-import com.github.fge.jackson.JsonLoader
 
 // Cats
 import cats._
@@ -135,19 +132,25 @@ case class EmbeddedRepositoryRef(override val config: RepositoryRefConfig, path:
   // TODO: would be nice to abstract out failure.toProcessingMessage, and scrubbing
   def lookupSchema(schemaKey: SchemaKey): ValidatedType[Option[JsonNode]] = {
     val schemaPath = s"${path}/schemas/${schemaKey.toPath}"
+    val streamOpt =
+      Option(EmbeddedRepositoryRef.getClass.getResource(schemaPath)).map(_.openStream())
+
     try {
-      JsonLoader.fromResource(schemaPath).some.valid
+      streamOpt
+        .map(stream => new ObjectMapper().readTree(stream).asRight[ProcessingMessage]) // TODO: sequence on Validated doesn't work
+        .sequence
+        .toValidated
     } catch {
       case jpe: JsonParseException => // Child of IOException so match first
         s"Problem parsing ${schemaPath} as JSON in ${descriptor} Iglu repository ${config.name}: %s"
           .format(VE.stripInstanceEtc(jpe.getMessage))
           .invalid
           .toProcessingMessage
-      case ioe: IOException =>
-        None.valid // Schema not found
       case e: Throwable =>
         s"Unknown problem reading and parsing ${schemaPath} in ${descriptor} Iglu repository ${config.name}: ${VE
           .getThrowableMessage(e)}".invalid.toProcessingMessage
+    } finally {
+      streamOpt.foreach(_.close())
     }
   }
 }

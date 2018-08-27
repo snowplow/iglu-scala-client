@@ -14,20 +14,20 @@ package com.snowplowanalytics.iglu.client
 package validation
 
 // Scala
-import scala.collection.JavaConverters.asScalaIteratorConverter
-import scala.util.control.NonFatal
+import scala.collection.JavaConverters._
 
-// jackson
-import com.fasterxml.jackson.databind.JsonNode
+// Jackson
+import com.fasterxml.jackson.databind.{JsonNode, ObjectMapper}
 
 // JsonSchema
-import com.github.fge.jsonschema.cfg.ValidationConfiguration
-import com.github.fge.jsonschema.core.report.{LogLevel, ProcessingMessage}
-import com.github.fge.jsonschema.processors.syntax.SyntaxValidator
+import com.networknt.schema._
 
 object SchemaValidation {
-  private val validator: SyntaxValidator =
-    new SyntaxValidator(ValidationConfiguration.byDefault())
+
+  private lazy val v4MetaSchema =
+    new ObjectMapper().readTree(getClass.getResourceAsStream("/v4metaschema.json"))
+
+  private lazy val v4Schema = JsonSchemaFactory.getInstance.getSchema(v4MetaSchema)
 
   /**
    * Get validation errors for Schema
@@ -37,23 +37,8 @@ object SchemaValidation {
    * @param schema JSON Schema
    * @return list of Processing Messages with log level above warning
    */
-  def getErrors(schema: JsonNode): List[ProcessingMessage] = {
-    try {
-      validator
-        .validateSchema(schema)
-        .iterator
-        .asScala
-        .filter(r => (r.getLogLevel == LogLevel.ERROR) || (r.getLogLevel == LogLevel.FATAL))
-        .toList
-    } catch {
-      case NonFatal(e) =>
-        val fatalMessage = new ProcessingMessage()
-          .setLogLevel(LogLevel.FATAL)
-          .setMessage(
-            s"JSON Schema is invalid.\n$schema\nCheck that it conforms iglu format. Full stack-trace:\n${e.getStackTrace}")
-        List(fatalMessage)
-    }
-  }
+  def getErrors(schema: JsonNode): List[ProcessingMessage] =
+    v4Schema.validate(schema).asScala.toList.map(m => ProcessingMessage(m.getMessage))
 
   /**
    * Validate JSON Schema against it's own Schema
@@ -63,7 +48,5 @@ object SchemaValidation {
    * @param schema JSON Schema
    * @return true if Schema is valid
    */
-  def isValid(schema: JsonNode): Boolean =
-    getErrors(schema).isEmpty
-
+  def isValid(schema: JsonNode): Boolean = getErrors(schema).isEmpty
 }

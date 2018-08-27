@@ -30,8 +30,8 @@ this method traverse all configured repositories trying to find Schema by its ke
 ```scala
 import cats.data.ValidatedNel
 import com.fasterxml.jackson.databind.JsonNode
-import com.github.fge.jsonschema.core.report.ProcessingMessage
 import com.snowplowanalytics.iglu.client.{ Resolver, SchemaKey }
+import com.snowplowanalytics.iglu.client.validation.ProcessingMessage
 
 val resolverConfig: JsonNode = ???
 val schema: ValidatedNel[ProcessingMessage, JsonNode] = for {

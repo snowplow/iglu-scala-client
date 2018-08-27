@@ -16,7 +16,6 @@ package com.snowplowanalytics.iglu.client
 import cats._
 import cats.implicits._
 
-// This project
 import validation.ProcessingMessageMethods._
 
 /**

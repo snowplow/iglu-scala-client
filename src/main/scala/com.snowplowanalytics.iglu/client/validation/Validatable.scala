@@ -38,8 +38,7 @@ trait Validatable[JsonAST] { self =>
    *         a NonEmptyList of
    *         ProcessingMessages
    */
-  def validateAgainstSchema(instance: JsonAST, schema: JsonAST)(
-    implicit resolver: Resolver): ValidatedNelType[JsonAST]
+  def validateAgainstSchema(instance: JsonAST, schema: JsonAST): ValidatedNelType[JsonAST]
 
   /**
    * Validates a self-describing JSON against

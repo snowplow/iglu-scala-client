@@ -16,7 +16,6 @@ package com.snowplowanalytics.iglu.client
 import com.fasterxml.jackson.databind.JsonNode
 
 // JSON Schema
-import com.github.fge.jsonschema.core.report.{LogLevel, ProcessingMessage}
 
 // Scala
 import scala.annotation.tailrec
@@ -36,9 +35,9 @@ import org.json4s.jackson.JsonMethods._
 import repositories.{EmbeddedRepositoryRef, HttpRepositoryRef, RepositoryRef}
 import validation.SchemaValidation.{getErrors, isValid}
 import validation.ValidatableJsonMethods
-import validation.ProcessingMessageMethods
-import ProcessingMessageMethods._
 import utils.TemporaryJson4sCatsUtils._
+import validation.ProcessingMessage
+import validation.ProcessingMessageMethods._
 
 /**
  * Companion object. Lets us create a Resolver from
@@ -263,10 +262,10 @@ object Resolver {
       prioritizeRepos(schemaKey, tried.keys.toList).reverse // TODO: remove this legacy order, pre-0.4.0 errors were queued LIFO
         .map(repo => s"${repo.config.name} [${repo.descriptor}]")
 
-    val notFound = new ProcessingMessage()
-      .setLogLevel(LogLevel.ERROR)
-      .setMessage(s"Could not find schema with key $schemaKey in any repository, tried:")
-      .put("repositories", asJsonNode(repos))
+    val notFound = ProcessingMessage(
+      message = s"Could not find schema with key $schemaKey in any repository, tried:",
+      repositories = Some(asJsonNode(repos))
+    )
 
     NonEmptyList(notFound, failures)
   }

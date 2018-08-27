@@ -13,15 +13,32 @@
 package com.snowplowanalytics.iglu.client
 package validation
 
-// Scala
-import scala.language.implicitConversions
-
-// JSON Schema
-import com.github.fge.jsonschema.core.report.{LogLevel, ProcessingMessage}
+// JSON
+import com.fasterxml.jackson.databind.JsonNode
 
 // Cats
 import cats.implicits._
 import cats.data.{NonEmptyList, Validated, ValidatedNel}
+
+// Circe
+import io.circe._
+import io.circe.syntax._
+
+// TODO: replace with better format after discussion
+case class ProcessingMessage(
+  message: String,
+  schemaKey: Option[String] = None,
+  repositories: Option[JsonNode] = None) {
+
+  def asJson: Json = {
+    Json.obj(
+      "level" := "error",
+      "message" := message,
+      "schemaKey" := schemaKey
+    )
+  }
+
+}
 
 /**
  * Makes it easier to work with ProcessingMessages.
@@ -58,21 +75,19 @@ object ProcessingMessageMethods {
    * @return the generated ProcessingMessage
    *         with message and log level set
    */
-  def toProcMsg(message: String, logLevel: LogLevel = LogLevel.ERROR): ProcessingMessage =
-    new ProcessingMessage()
-      .setLogLevel(logLevel)
-      .setMessage(message)
+  def toProcMsg(message: String): ProcessingMessage =
+    ProcessingMessage(message)
 
-  def toProcMsg(messages: NonEmptyList[String], logLevel: LogLevel): ProcessingMessageNel =
-    messages.map(msg => toProcMsg(msg, logLevel))
+  def toProcMsg(messages: NonEmptyList[String]): ProcessingMessageNel =
+    messages.map(msg => toProcMsg(msg))
 
-  def toProcMsgNel(message: String, logLevel: LogLevel = LogLevel.ERROR): ProcessingMessageNel =
-    NonEmptyList.one(toProcMsg(message, logLevel))
+  def toProcMsgNel(message: String): ProcessingMessageNel =
+    NonEmptyList.one(toProcMsg(message))
 
 }
 
 /**
- * A wrapper for the Scalaz Validation, to make it easy to convert
+ * A wrapper for the Cats Validated, to make it easy to convert
  * Strings to ProcessingMessages on the Failure side of
  * Validations.
  */
@@ -82,7 +97,7 @@ class ProcMsgValidation[+A](validation: Validated[String, A]) {
 
   def toProcessingMessage: Validated[ProcessingMessage, A] =
     validation.leftMap { err =>
-      ProcessingMessageMethods.toProcMsg(err, LogLevel.ERROR)
+      ProcessingMessageMethods.toProcMsg(err)
     }
 
   def toProcessingMessageNel: ValidatedNel[ProcessingMessage, A] =
@@ -98,7 +113,7 @@ class ProcMsgValidationNel[+A](validation: ValidatedNel[String, A]) {
 
   def toProcessingMessages: ValidatedNel[ProcessingMessage, A] =
     validation.leftMap { err =>
-      ProcessingMessageMethods.toProcMsg(err, LogLevel.ERROR)
+      ProcessingMessageMethods.toProcMsg(err)
     }
 }
 
@@ -108,8 +123,8 @@ class ProcMsgValidationNel[+A](validation: ValidatedNel[String, A]) {
 class ProcMsgString(str: String) {
 
   def toProcessingMessage: ProcessingMessage =
-    ProcessingMessageMethods.toProcMsg(str, LogLevel.ERROR)
+    ProcessingMessageMethods.toProcMsg(str)
 
   def toProcessingMessageNel: ProcessingMessageNel =
-    ProcessingMessageMethods.toProcMsgNel(str, LogLevel.ERROR)
+    ProcessingMessageMethods.toProcMsgNel(str)
 }
