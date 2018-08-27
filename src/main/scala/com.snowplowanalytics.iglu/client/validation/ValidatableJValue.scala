@@ -19,8 +19,7 @@ import org.json4s.jackson.JsonMethods.{asJsonNode, fromJsonNode}
 
 object ValidatableJValue extends Validatable[JValue] {
 
-  def validateAgainstSchema(instance: JValue, schema: JValue)(
-    implicit resolver: Resolver): ValidatedNelType[JValue] =
+  def validateAgainstSchema(instance: JValue, schema: JValue): ValidatedNelType[JValue] =
     ValidatableJsonMethods
       .validateAgainstSchema(asJsonNode(instance), asJsonNode(schema))
       .map(fromJsonNode)

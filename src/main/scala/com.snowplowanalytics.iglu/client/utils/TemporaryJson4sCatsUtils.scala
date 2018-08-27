@@ -8,7 +8,7 @@ import cats.data.{Validated, ValidatedNel}
 import org.json4s.JsonAST.{JNothing, JObject, JValue}
 import org.json4s.{Formats, Reader}
 
-// Just ignore this in the review, these functions are temporary
+// Just ignore this in the review, these functions are temporary (will be gone in the next PR)
 object TemporaryJson4sCatsUtils {
 
   def validatedField[A: Manifest](name: String)(json: JValue)(

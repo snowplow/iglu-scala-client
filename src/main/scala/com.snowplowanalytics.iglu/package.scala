@@ -15,10 +15,7 @@ package com.snowplowanalytics.iglu
 // Jackson
 import com.fasterxml.jackson.databind.JsonNode
 
-// JSON Schema Validator
-import com.github.fge.jsonschema.core.report.ProcessingMessage
-
-// Scalaz
+// Cats
 import cats._
 import cats.implicits._
 import cats.data.{NonEmptyList, Validated, ValidatedNel}
@@ -29,6 +26,7 @@ import com.twitter.util.SynchronizedLruMap
 // This project
 import client.repositories.RepositoryRef
 import client.Resolver.RepoError
+import client.validation.ProcessingMessage
 
 /**
  * Scala package object to hold types,

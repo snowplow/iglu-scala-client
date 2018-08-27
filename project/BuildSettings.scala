@@ -26,6 +26,7 @@ object BuildSettings {
     scalaVersion  := "2.11.12",
     crossScalaVersions  := Seq("2.11.12"),
     scalacOptions := Seq(
+      "-Ypartial-unification",
       "-deprecation",
       "-encoding", "UTF-8",
       "-feature",
@@ -35,12 +36,8 @@ object BuildSettings {
       "-Ywarn-nullary-override",
       "-Ywarn-nullary-unit",
       "-Ywarn-numeric-widen",
-      "-Ywarn-value-discard",
-      "-Ypartial-unification"
+      "-Ywarn-value-discard"
     ),
-
-    scalacOptions in (Compile, console) ~= (_ filterNot (_ == "-Xfatal-warnings")),
-    scalacOptions in (Test, console) := (scalacOptions in (Compile, console)).value,
 
     parallelExecution in Test := false // possible race bugs
   )

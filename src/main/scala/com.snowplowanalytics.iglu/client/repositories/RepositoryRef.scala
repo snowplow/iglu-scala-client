@@ -16,9 +16,6 @@ package repositories
 // Jackson
 import com.fasterxml.jackson.databind.JsonNode
 
-// JSON Schema
-import com.github.fge.jsonschema.core.report.ProcessingMessage
-
 // Cats
 import cats._
 import cats.implicits._
@@ -33,6 +30,7 @@ import org.json4s.jackson.JsonMethods._
 // This project
 import validation.ProcessingMessageMethods._
 import utils.TemporaryJson4sCatsUtils._
+import validation.ProcessingMessage
 
 /**
  * Singleton object contains a constructor

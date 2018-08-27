@@ -21,14 +21,13 @@ import java.net.{MalformedURLException, URL, UnknownHostException}
 import org.apache.commons.lang3.exception.ExceptionUtils
 
 // Jackson
+import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.core.JsonParseException
 import com.fasterxml.jackson.databind.JsonNode
 
-// Json Schema
-import com.github.fge.jackson.JsonNodeReader
-
 // Scala
 import scala.util.control.NonFatal
+import scala.io.Source
 
 // Scalaz
 import cats._
@@ -51,8 +50,6 @@ object HttpRepositoryRef {
 
   implicit val formats = DefaultFormats
 
-  private lazy val reader = new JsonNodeReader()
-
   /**
    * Helper class to extract HTTP URI and api key from config JSON
    */
@@ -73,7 +70,8 @@ object HttpRepositoryRef {
       case Some(key) => connection.setRequestProperty("apikey", key)
       case None      => ()
     }
-    reader.fromInputStream(connection.getInputStream)
+
+    new ObjectMapper().readTree(connection.getInputStream)
   }
 
   /**
