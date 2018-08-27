@@ -12,9 +12,6 @@
  */
 package com.snowplowanalytics.iglu.client
 
-// JSON Schema
-import com.github.fge.jsonschema.core.report.{LogLevel, ProcessingMessage}
-
 // json4s
 import org.json4s._
 import org.json4s.JsonDSL._
@@ -22,6 +19,7 @@ import org.json4s.jackson.JsonMethods.{parse, asJsonNode => ajn}
 
 // This project
 import repositories.{EmbeddedRepositoryRef, HttpRepositoryRef, RepositoryRefConfig}
+import com.snowplowanalytics.iglu.client.validation.ProcessingMessage
 
 object SpecHelpers {
 
@@ -43,6 +41,7 @@ object SpecHelpers {
   def asJsonNode(str: String) =
     ajn(asJValue(str))
 
+  // TODO: improve this after ProcessingMessage format is discussed
   def asProcessingMessage(
     message: String,
     schema: String,
@@ -50,33 +49,9 @@ object SpecHelpers {
     keyword: String,
     foundExpected: Option[(String, String)],
     requiredMissing: Option[(String, String)],
-    unwanted: Option[String]) = {
+    unwanted: Option[String]): ProcessingMessage = {
 
-    val pm = new ProcessingMessage()
-      .setLogLevel(LogLevel.ERROR)
-      .setMessage(message)
-      .put("schema", asJsonNode(schema))
-      .put("instance", asJsonNode(instance))
-      .put("domain", "validation")
-      .put("keyword", keyword)
-
-    foundExpected match {
-      case Some(Tuple2(found, expected)) =>
-        pm.put("found", found)
-        pm.put("expected", asJsonNode(expected))
-      case _ =>
-    }
-    requiredMissing match {
-      case Some(Tuple2(required, missing)) =>
-        pm.put("required", asJsonNode(required))
-        pm.put("missing", asJsonNode(missing))
-      case _ =>
-    }
-    for (unw <- unwanted) {
-      pm.put("unwanted", asJsonNode(unw))
-    }
-
-    pm
+    ProcessingMessage(message = message)
   }
 
 }

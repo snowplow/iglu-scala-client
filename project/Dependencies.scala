@@ -17,7 +17,7 @@ object Dependencies {
     // Java
     val commonsLang     = "3.1"
     val jacksonDatabind = "2.2.3"
-    val jsonValidator   = "2.2.3"
+    val jsonValidator   = "0.1.21"
     // Scala
     val circe           = "0.9.3"
     val json4s          = "3.2.11"
@@ -31,7 +31,7 @@ object Dependencies {
     // Java
     val commonsLang      = "org.apache.commons"         %  "commons-lang3"           % V.commonsLang
     val jacksonDatabind  = "com.fasterxml.jackson.core" %  "jackson-databind"        % V.jacksonDatabind
-    val jsonValidator    = "com.github.fge"             %  "json-schema-validator"   % V.jsonValidator
+    val jsonValidator    = "com.networknt"              %  "json-schema-validator"   % V.jsonValidator
     // Scala
     val circeParser      = "io.circe"                   %% "circe-parser"            % V.circe
     val json4sJackson    = "org.json4s"                 %% "json4s-jackson"          % V.json4s
