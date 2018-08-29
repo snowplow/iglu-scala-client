@@ -14,8 +14,6 @@ package com.snowplowanalytics.iglu.client
 package validation
 
 // Cats
-import cats._
-import cats.implicits._
 import cats.data.NonEmptyList
 
 // This project

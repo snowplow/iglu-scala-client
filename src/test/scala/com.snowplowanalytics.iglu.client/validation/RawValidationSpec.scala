@@ -13,12 +13,6 @@
 package com.snowplowanalytics.iglu.client
 package validation
 
-// Cats
-import cats._
-import cats.implicits._
-import cats.data.NonEmptyList
-import cats.data.Validated._
-
 // Specs2
 import org.specs2.Specification
 import org.specs2.matcher.DataTables
@@ -79,6 +73,7 @@ class RawValidationSpec extends Specification with DataTables with ValidatedMatc
       (_, input, message, schema, instance, keyword, foundExpected, requiredMissing) =>
         {
           val json = SpecHelpers.asJsonNode(input)
+          json.validateAgainstSchema(simpleSchema) must beInvalid
         }
     }
 

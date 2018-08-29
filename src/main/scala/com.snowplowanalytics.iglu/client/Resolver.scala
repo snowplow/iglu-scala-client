@@ -21,8 +21,17 @@ import com.fasterxml.jackson.databind.JsonNode
 import scala.annotation.tailrec
 
 // Cats
-import cats._
-import cats.implicits._
+import cats.Semigroup
+import cats.instances.list._
+import cats.instances.set._
+import cats.instances.map._
+import cats.instances.option._
+import cats.syntax.apply._
+import cats.syntax.applicativeError._
+import cats.syntax.semigroup._
+import cats.syntax.option._
+import cats.syntax.traverse._
+import cats.syntax.validated._
 import cats.data.NonEmptyList
 import cats.data.Validated._
 

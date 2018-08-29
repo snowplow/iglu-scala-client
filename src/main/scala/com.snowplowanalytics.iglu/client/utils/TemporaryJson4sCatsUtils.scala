@@ -1,10 +1,9 @@
 package com.snowplowanalytics.iglu.client.utils
 
-import cats._
-import cats.implicits._
-import cats.data.Validated.Valid
-
+import cats.syntax.option._
+import cats.syntax.validated._
 import cats.data.{Validated, ValidatedNel}
+
 import org.json4s.JsonAST.{JNothing, JObject, JValue}
 import org.json4s.{Formats, Reader}
 

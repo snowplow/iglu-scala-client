@@ -22,6 +22,7 @@ object Dependencies {
     val circe           = "0.9.3"
     val json4s          = "3.2.11"
     val collUtils       = "6.20.0"
+    val scalaj          = "2.4.1"
     // Scala (test only)
     val specs2          = "4.3.3"
     val mockito         = "1.10.19"
@@ -36,6 +37,7 @@ object Dependencies {
     val circeParser      = "io.circe"                   %% "circe-parser"            % V.circe
     val json4sJackson    = "org.json4s"                 %% "json4s-jackson"          % V.json4s
     val collUtils        = "com.twitter"                %% "util-collection"         % V.collUtils
+    val scalaj           = "org.scalaj"                 %% "scalaj-http"             % V.scalaj
     // Scala (test only)
     val specs2           = "org.specs2"                 %% "specs2-core"             % V.specs2          % "test"
     val specs2Cats       = "org.specs2"                 %% "specs2-cats"             % V.specs2          % "test"

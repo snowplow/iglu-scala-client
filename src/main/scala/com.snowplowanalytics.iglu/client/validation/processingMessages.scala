@@ -17,7 +17,6 @@ package validation
 import com.fasterxml.jackson.databind.JsonNode
 
 // Cats
-import cats.implicits._
 import cats.data.{NonEmptyList, Validated, ValidatedNel}
 
 // Circe

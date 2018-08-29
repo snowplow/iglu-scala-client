@@ -14,8 +14,10 @@ package com.snowplowanalytics.iglu.client
 package repositories
 
 // Java
-import java.io.FileNotFoundException
-import java.net.{MalformedURLException, URL, UnknownHostException}
+import java.net.{URI, UnknownHostException}
+
+// Scala
+import scala.util.control.NonFatal
 
 // Apache Commons
 import org.apache.commons.lang3.exception.ExceptionUtils
@@ -25,22 +27,23 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.core.JsonParseException
 import com.fasterxml.jackson.databind.JsonNode
 
-// Scala
-import scala.util.control.NonFatal
-import scala.io.Source
-
-// Scalaz
-import cats._
-import cats.implicits._
+// Cats
+import cats.syntax.apply._
+import cats.syntax.option._
+import cats.syntax.validated._
 
 // json4s
 import org.json4s._
 import org.json4s.jackson.JsonMethods._
 
+// scalaj
+import scalaj.http._
+
 // This project
 import validation.ProcessingMessageMethods
 import ProcessingMessageMethods._
 import utils.{ValidationExceptions => VE}
+import validation.ProcessingMessage
 
 /**
  * Helpers for constructing an HttpRepository.
@@ -56,22 +59,25 @@ object HttpRepositoryRef {
   private[client] case class HttpConnection(uri: String, apikey: Option[String])
 
   /**
-   * Read a JsonNode from an URL using optional apikey
-   * This method is just a copy of [[com.github.fge.jackson.JsonLoader.fromURL]]
+   * Read a JsonNode from an URI using optional apikey
    * with added optional header, so it is unsafe as well and throws same exceptions
    *
-   * @param url the URL to fetch the JSON document from
+   * @param uri the URL to fetch the JSON document from
    * @param apikey optional apikey UUID to aunthenticate in Iglu HTTP repo
    * @return The document at that URL
    */
-  private def getFromUrl(url: URL, apikey: Option[String]): JsonNode = {
-    val connection = url.openConnection()
-    apikey match {
-      case Some(key) => connection.setRequestProperty("apikey", key)
-      case None      => ()
-    }
+  private def getFromUri(uri: URI, apikey: Option[String]): Option[JsonNode] = {
+    val request = apikey
+      .map(key => Http(uri.toString).header("apikey", key))
+      .getOrElse(Http(uri.toString))
 
-    new ObjectMapper().readTree(connection.getInputStream)
+    val response = request.asString
+
+    if (response.is2xx) {
+      new ObjectMapper().readTree(response.body).some
+    } else {
+      None
+    }
   }
 
   /**
@@ -148,22 +154,18 @@ object HttpRepositoryRef {
    *         error message, all
    *         wrapped in a Validation
    */
-  private def stringToUrl(url: String): ValidatedType[URL] =
-    (try {
-      (new URL(url)).valid
+  private def stringToUri(url: String): ValidatedType[URI] =
+    try {
+      URI.create(url).valid
     } catch {
-      case npe: NullPointerException => "Provided URL was null".invalid[URL]
-      case mue: MalformedURLException =>
-        "Provided URL string [%s] is malformed: [%s]".format(url, mue.getMessage).invalid[URL]
-      case iae: IllegalArgumentException =>
-        "Provided URL string [%s] violates RFC 2396: [%s]"
-          .format(url, ExceptionUtils.getRootCause(iae).getMessage)
-          .invalid[URL]
-      case e: Throwable =>
-        "Unexpected error creating URL from string [%s]: [%s]"
-          .format(url, e.getMessage)
-          .invalid[URL]
-    }).toProcessingMessage
+      case _: NullPointerException =>
+        ProcessingMessage("Provided URL was null").invalid
+      case e: IllegalArgumentException =>
+        val messageString = "Provided URI string [%s] violates RFC 2396: [%s]"
+          .format(url, ExceptionUtils.getRootCause(e).getMessage)
+
+        ProcessingMessage(messageString).invalid
+    }
 
 }
 
@@ -202,13 +204,10 @@ case class HttpRepositoryRef(
   // TODO: this is only intermittently working when there is a network outage (e.g. running test suite on Tube)
   def lookupSchema(schemaKey: SchemaKey): ValidatedType[Option[JsonNode]] = {
     try {
-      for {
-        url <- HttpRepositoryRef.stringToUrl(s"$uri/schemas/${schemaKey.toPath}")
-        sch = HttpRepositoryRef.getFromUrl(url, apikey).some
-      } yield sch
+      HttpRepositoryRef
+        .stringToUri(s"$uri/schemas/${schemaKey.toPath}")
+        .map(uri => HttpRepositoryRef.getFromUri(uri, apikey))
     } catch {
-      // The most common failure case: the schema is not found in the repo
-      case fnf: FileNotFoundException => None.valid
       case jpe: JsonParseException =>
         s"Problem parsing ${schemaKey} as JSON in ${descriptor} Iglu repository ${config.name}: %s"
           .format(VE.stripInstanceEtc(jpe.getMessage))

@@ -16,8 +16,6 @@ package com.snowplowanalytics.iglu
 import com.fasterxml.jackson.databind.JsonNode
 
 // Cats
-import cats._
-import cats.implicits._
 import cats.data.{NonEmptyList, Validated, ValidatedNel}
 
 // LRU

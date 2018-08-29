@@ -16,8 +16,8 @@ package com.snowplowanalytics.iglu.client
 import com.fasterxml.jackson.databind.JsonNode
 
 // Cats
-import cats._
-import cats.implicits._
+import cats.syntax.option._
+import cats.syntax.validated._
 
 // json4s
 import org.json4s._
