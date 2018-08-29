@@ -23,8 +23,8 @@ import com.fasterxml.jackson.databind.JsonNode
 import com.networknt.schema._
 
 // Cats
-import cats._
-import cats.implicits._
+import cats.syntax.either._
+import cats.syntax.validated._
 import cats.data.NonEmptyList
 
 // This project

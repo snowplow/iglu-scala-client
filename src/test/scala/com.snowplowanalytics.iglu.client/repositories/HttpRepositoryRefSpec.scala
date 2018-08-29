@@ -14,8 +14,7 @@ package com.snowplowanalytics.iglu.client
 package repositories
 
 // Cats
-import cats._
-import cats.implicits._
+import cats.syntax.option._
 
 // Specs2
 import org.specs2.Specification

@@ -22,8 +22,12 @@ import com.fasterxml.jackson.core.JsonParseException
 import com.fasterxml.jackson.databind.JsonNode
 
 // Cats
-import cats._
-import cats.implicits._
+import cats.instances.option._
+import cats.instances.either._
+import cats.syntax.apply._
+import cats.syntax.validated._
+import cats.syntax.either._
+import cats.syntax.traverse._
 
 // json4s
 import org.json4s._
@@ -137,8 +141,7 @@ case class EmbeddedRepositoryRef(override val config: RepositoryRefConfig, path:
 
     try {
       streamOpt
-        .map(stream => new ObjectMapper().readTree(stream).asRight[ProcessingMessage]) // TODO: sequence on Validated doesn't work
-        .sequence
+        .traverse(stream => new ObjectMapper().readTree(stream).asRight[ProcessingMessage])
         .toValidated
     } catch {
       case jpe: JsonParseException => // Child of IOException so match first

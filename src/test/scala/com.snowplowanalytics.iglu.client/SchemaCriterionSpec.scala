@@ -12,10 +12,6 @@
  */
 package com.snowplowanalytics.iglu.client
 
-// Cats
-import cats._
-import cats.implicits._
-
 // Specs2
 import org.specs2.Specification
 import org.specs2.matcher.{DataTables, ValidatedMatchers}

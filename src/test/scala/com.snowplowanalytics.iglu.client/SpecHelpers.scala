@@ -14,7 +14,6 @@ package com.snowplowanalytics.iglu.client
 
 // json4s
 import org.json4s._
-import org.json4s.JsonDSL._
 import org.json4s.jackson.JsonMethods.{parse, asJsonNode => ajn}
 
 // This project
@@ -49,9 +48,7 @@ object SpecHelpers {
     keyword: String,
     foundExpected: Option[(String, String)],
     requiredMissing: Option[(String, String)],
-    unwanted: Option[String]): ProcessingMessage = {
-
+    unwanted: Option[String]): ProcessingMessage =
     ProcessingMessage(message = message)
-  }
 
 }

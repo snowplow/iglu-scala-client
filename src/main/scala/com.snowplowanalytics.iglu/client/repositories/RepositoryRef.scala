@@ -17,10 +17,8 @@ package repositories
 import com.fasterxml.jackson.databind.JsonNode
 
 // Cats
-import cats._
-import cats.implicits._
-import cats.data._
-import cats.data.Validated._
+import cats.syntax.apply._
+import cats.data.Validated.{Invalid, Valid}
 
 // json4s
 import org.json4s._
