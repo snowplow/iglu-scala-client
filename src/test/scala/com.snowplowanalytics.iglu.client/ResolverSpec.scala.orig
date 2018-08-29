@@ -12,9 +12,6 @@
  */
 package com.snowplowanalytics.iglu.client
 
-// JSON Schema
-import com.github.fge.jsonschema.core.report.{LogLevel, ProcessingMessage}
-
 // Cats
 import cats.syntax.option._
 import cats.syntax.validated._
@@ -123,6 +120,8 @@ class ResolverSpec extends Specification with DataTables with ValidatedMatchers 
 
     val expected = Resolver(cacheSize = 500, SpecHelpers.IgluCentral, Repos.three)
 
+    val result = Resolver.parse(SpecHelpers.asJsonNode(config))
+
     Resolver.parse(SpecHelpers.asJsonNode(config)) must beValid(expected)
   }
 
@@ -164,7 +163,17 @@ class ResolverSpec extends Specification with DataTables with ValidatedMatchers 
         "iglu:com.snowplowanalytics.iglu-test/invalid_schema/jsonschema/1-0-0",
         List("Iglu Client Embedded [embedded]", "Iglu Test Embedded [embedded]")
       ),
+<<<<<<< HEAD
       "array must have at least one element".toProcessingMessage.toString
+=======
+      "array must have at least one element".toProcessingMessage
+      /*
+        .put("domain", "syntax")
+        .put("schema", asJsonNode(parse("""{"loadingURI":"#","pointer":""}""")))
+        .put("keyword", "required")
+       */ // TODO
+      .toString
+>>>>>>> WIP migrate to networknt
     )
 
     val actual = SpecHelpers.TestResolver.lookupSchema(schemaKey)
