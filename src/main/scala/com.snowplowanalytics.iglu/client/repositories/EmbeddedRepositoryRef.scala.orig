@@ -20,7 +20,6 @@ import com.snowplowanalytics.iglu.client.validation.ProcessingMessage
 // Jackson
 import com.fasterxml.jackson.core.JsonParseException
 import com.fasterxml.jackson.databind.JsonNode
-import com.github.fge.jackson.JsonLoader
 
 // Cats
 import cats.instances.option._
@@ -142,7 +141,12 @@ case class EmbeddedRepositoryRef(override val config: RepositoryRefConfig, path:
 
     try {
       streamOpt
+<<<<<<< HEAD
         .traverse(stream => new ObjectMapper().readTree(stream).asRight[ProcessingMessage])
+=======
+        .map(stream => new ObjectMapper().readTree(stream).asRight[ProcessingMessage]) // TODO: sequence on Validated doesn't work
+        .sequence
+>>>>>>> WIP migrate to networknt
         .toValidated
     } catch {
       case jpe: JsonParseException => // Child of IOException so match first
@@ -150,8 +154,6 @@ case class EmbeddedRepositoryRef(override val config: RepositoryRefConfig, path:
           .format(VE.stripInstanceEtc(jpe.getMessage))
           .invalid
           .toProcessingMessage
-      case ioe: IOException =>
-        None.valid // Schema not found
       case e: Throwable =>
         s"Unknown problem reading and parsing ${schemaPath} in ${descriptor} Iglu repository ${config.name}: ${VE
           .getThrowableMessage(e)}".invalid.toProcessingMessage

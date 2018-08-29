@@ -27,10 +27,20 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.core.JsonParseException
 import com.fasterxml.jackson.databind.JsonNode
 
+<<<<<<< HEAD
 // Cats
 import cats.syntax.apply._
 import cats.syntax.option._
 import cats.syntax.validated._
+=======
+// Scala
+import scala.util.control.NonFatal
+import scala.io.Source
+
+// Scalaz
+import cats._
+import cats.implicits._
+>>>>>>> WIP migrate to networknt
 
 // json4s
 import org.json4s._
@@ -78,6 +88,11 @@ object HttpRepositoryRef {
     } else {
       None
     }
+<<<<<<< HEAD
+=======
+
+    new ObjectMapper().readTree(connection.getInputStream)
+>>>>>>> WIP migrate to networknt
   }
 
   /**
@@ -208,8 +223,6 @@ case class HttpRepositoryRef(
         .stringToUri(s"$uri/schemas/${schemaKey.toPath}")
         .map(uri => HttpRepositoryRef.getFromUri(uri, apikey))
     } catch {
-      // The most common failure case: the schema is not found in the repo
-      case fnf: FileNotFoundException => None.valid
       case jpe: JsonParseException =>
         s"Problem parsing ${schemaKey} as JSON in ${descriptor} Iglu repository ${config.name}: %s"
           .format(VE.stripInstanceEtc(jpe.getMessage))

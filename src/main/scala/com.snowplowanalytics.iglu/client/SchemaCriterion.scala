@@ -13,8 +13,8 @@
 package com.snowplowanalytics.iglu.client
 
 // Cats
-import cats._
-import cats.implicits._
+import cats.syntax.option._
+import cats.syntax.validated._
 
 import validation.ProcessingMessageMethods._
 

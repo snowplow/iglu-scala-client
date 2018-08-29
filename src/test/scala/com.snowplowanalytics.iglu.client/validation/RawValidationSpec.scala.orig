@@ -13,15 +13,15 @@
 package com.snowplowanalytics.iglu.client
 package validation
 
-// Jackson
-import com.github.fge.jackson.JsonLoader
-
+<<<<<<< HEAD
+=======
 // Cats
 import cats._
 import cats.implicits._
 import cats.data.NonEmptyList
 import cats.data.Validated._
 
+>>>>>>> WIP migrate to networknt
 // Specs2
 import org.specs2.Specification
 import org.specs2.matcher.DataTables
@@ -83,6 +83,24 @@ class RawValidationSpec extends Specification with DataTables with ValidatedMatc
         {
           val json = SpecHelpers.asJsonNode(input)
           json.validateAgainstSchema(simpleSchema) must beInvalid
+<<<<<<< HEAD
+=======
+
+          /* TODO: check this
+          json.validateAgainstSchema(simpleSchema) must beLike {
+            case Invalid(NonEmptyList(head, tail)) if tail.isEmpty =>
+              head.toString must_== SpecHelpers
+                .asProcessingMessage(
+                  message,
+                  schema,
+                  instance,
+                  keyword,
+                  foundExpected,
+                  requiredMissing,
+                  None)
+                .toString
+          }*/
+>>>>>>> WIP migrate to networknt
         }
     }
 

@@ -16,6 +16,11 @@ package com.snowplowanalytics.iglu
 import com.fasterxml.jackson.databind.JsonNode
 
 // Cats
+<<<<<<< HEAD
+=======
+import cats._
+import cats.implicits._
+>>>>>>> WIP migrate to networknt
 import cats.data.{NonEmptyList, Validated, ValidatedNel}
 
 // LRU
