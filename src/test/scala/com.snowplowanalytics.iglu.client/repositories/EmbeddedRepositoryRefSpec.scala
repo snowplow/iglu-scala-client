@@ -13,13 +13,6 @@
 package com.snowplowanalytics.iglu.client
 package repositories
 
-// Cats
-import cats._
-import cats.implicits._
-
-// This project
-import validation.ProcessingMessageMethods._
-
 // Specs2
 import org.specs2.Specification
 import org.specs2.matcher.{DataTables, ValidatedMatchers}
