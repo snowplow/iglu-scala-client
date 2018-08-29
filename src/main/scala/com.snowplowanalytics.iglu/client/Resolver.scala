@@ -14,6 +14,7 @@ package com.snowplowanalytics.iglu.client
 
 // Jackson
 import com.fasterxml.jackson.databind.JsonNode
+import com.snowplowanalytics.lrumap.LruMap
 
 // JSON Schema
 
@@ -34,6 +35,7 @@ import cats.syntax.traverse._
 import cats.syntax.validated._
 import cats.data.NonEmptyList
 import cats.data.Validated._
+import cats.effect.IO
 
 // json4s
 import org.json4s._
@@ -310,7 +312,9 @@ case class Resolver(
   object cache {
 
     private val lru: Option[SchemaLruMap] =
-      if (cacheSize > 0) Some(new SchemaLruMap(cacheSize)) else None
+      if (cacheSize > 0)
+        Some(LruMap.create[IO, SchemaKey, SchemaLookupStamped](cacheSize).unsafeRunSync())
+      else None
 
     /**
      * Looks up the given schema key in the cache.
@@ -323,7 +327,7 @@ case class Resolver(
     def get(schemaKey: SchemaKey): Option[SchemaLookup] =
       for {
         l      <- lru
-        (t, k) <- l.get(schemaKey)
+        (t, k) <- l.get(schemaKey).unsafeRunSync()
         if isViable(t)
       } yield k
 
@@ -337,7 +341,7 @@ case class Resolver(
      */
     def store(schemaKey: SchemaKey, schema: SchemaLookup): SchemaLookup = {
       for (l <- lru) {
-        l.put(schemaKey, (currentSeconds, schema))
+        l.put(schemaKey, (currentSeconds, schema)).unsafeRunSync()
       }
       schema
     }
