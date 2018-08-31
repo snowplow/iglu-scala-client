@@ -14,12 +14,14 @@ package com.snowplowanalytics.iglu
 
 // Jackson
 import com.fasterxml.jackson.databind.JsonNode
+import com.snowplowanalytics.iglu.client.validation.ProcessingMessage
 
 // Cats
 import cats.data.{NonEmptyList, Validated, ValidatedNel}
+import cats.effect.IO
 
 // LRU
-import com.twitter.util.SynchronizedLruMap
+import com.snowplowanalytics.lrumap.LruMap
 
 // This project
 import client.repositories.RepositoryRef
@@ -44,7 +46,7 @@ package object client {
   /**
    * Our LRU cache of schemas
    */
-  type SchemaLruMap = SynchronizedLruMap[SchemaKey, SchemaLookupStamped]
+  type SchemaLruMap = LruMap[IO, SchemaKey, SchemaLookupStamped]
 
   /**
    * Aggregated lookup failures for single schema

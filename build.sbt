@@ -29,7 +29,7 @@ lazy val root = (project in file("."))
       // Scala
       Dependencies.Libraries.circeParser,
       Dependencies.Libraries.json4sJackson,
-      Dependencies.Libraries.collUtils,
+      Dependencies.Libraries.lruMap,
       Dependencies.Libraries.scalaj,
       // Scala (test only)
       Dependencies.Libraries.specs2,
