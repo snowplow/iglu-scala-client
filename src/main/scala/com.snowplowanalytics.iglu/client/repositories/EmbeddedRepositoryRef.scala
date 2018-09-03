@@ -17,10 +17,8 @@ package repositories
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.snowplowanalytics.iglu.client.validation.ProcessingMessage
 
-// Jackson
-import com.fasterxml.jackson.core.JsonParseException
-import com.fasterxml.jackson.databind.JsonNode
-import com.github.fge.jackson.JsonLoader
+// Scala
+import scala.io.Source
 
 // Cats
 import cats.instances.option._
@@ -30,10 +28,10 @@ import cats.syntax.validated._
 import cats.syntax.either._
 import cats.syntax.traverse._
 
-// json4s
-import org.json4s._
-import org.json4s.JsonDSL._
-import org.json4s.jackson.JsonMethods._
+// circe
+import io.circe.Json
+import io.circe.parser.parse
+import io.circe.optics.JsonPath._
 
 // This project
 import validation.ProcessingMessageMethods
@@ -56,31 +54,19 @@ object EmbeddedRepositoryRef {
    * @return true if this is the configuration for
    *         an EmbeddedRepositoryRef, else false
    */
-  def isEmbedded(config: JValue): Boolean =
-    (config \ "connection" \ "embedded").toSome.isDefined
+  def isEmbedded(config: Json): Boolean =
+    root.connection.embedded.json.getOption(config).isDefined
 
   /**
    * Constructs an EmbeddedRepositoryRef
-   * from a JsonNode.
+   * from a Json.
    *
    * @param config The JSON containing the configuration
    *        for this repository reference
    * @return a configured reference to this embedded
    *         repository
    */
-  def parse(config: JsonNode): ValidatedNelType[EmbeddedRepositoryRef] =
-    parse(fromJsonNode(config))
-
-  /**
-   * Constructs an EmbeddedRepositoryRef
-   * from a JValue.
-   *
-   * @param config The JSON containing the configuration
-   *        for this repository reference
-   * @return a configured reference to this embedded
-   *         repository
-   */
-  def parse(config: JValue): ValidatedNelType[EmbeddedRepositoryRef] = {
+  def parse(config: Json): ValidatedNelType[EmbeddedRepositoryRef] = {
     val conf = RepositoryRefConfig.parse(config)
     val path = extractPath(config)
     (conf, path.toValidatedNel).mapN { EmbeddedRepositoryRef(_, _) }
@@ -89,18 +75,16 @@ object EmbeddedRepositoryRef {
   /**
    * Returns the path to this embedded repository.
    *
-   * @param ref The JSON containing the configuration
+   * @param config The JSON containing the configuration
    *        for this repository reference
    * @return the path to the embedded repository on
    *         Success, or an error String on Failure
    */
-  private def extractPath(config: JValue): ValidatedType[String] =
-    try {
-      (config \ "connection" \ "embedded" \ "path").extract[String].valid
-    } catch {
-      case me: MappingException =>
-        s"Could not extract connection.embedded.path from ${compact(render(config))}".invalid.toProcessingMessage
-    }
+  private def extractPath(config: Json): ValidatedType[String] =
+    root.connection.embedded.path.string
+      .getOption(config)
+      .toValid(
+        s"Could not extract connection.embedded.path from ${config.spaces2}".toProcessingMessage)
 
 }
 
@@ -126,23 +110,26 @@ case class EmbeddedRepositoryRef(override val config: RepositoryRefConfig, path:
 
   /**
    * Retrieves an IgluSchema from the Iglu Repo as
-   * a JsonNode.
+   * a json.
    *
    * @param schemaKey The SchemaKey uniquely identifies
    *        the schema in Iglu
-   * @return a Validation boxing either the Schema's
-   *         JsonNode on Success, or an error String
+   * @return a Validated boxing either the Schema's
+   *         Json on Success, or an error String
    *         on Failure
    */
-  // TODO: would be nice to abstract out failure.toProcessingMessage, and scrubbing
-  def lookupSchema(schemaKey: SchemaKey): ValidatedType[Option[JsonNode]] = {
-    val schemaPath = s"${path}/schemas/${schemaKey.toPath}"
-    val streamOpt =
-      Option(EmbeddedRepositoryRef.getClass.getResource(schemaPath)).map(_.openStream())
+  def lookupSchema(schemaKey: SchemaKey): ValidatedType[Option[Json]] = {
+    val schemaPath = s"$path/schemas/${schemaKey.toPath}"
+    val streamOpt  = Option(getClass.getResource(schemaPath)).map(_.openStream())
 
     try {
       streamOpt
-        .traverse(stream => new ObjectMapper().readTree(stream).asRight[ProcessingMessage])
+        .map(stream => Source.fromInputStream(stream).mkString)
+        .traverse(jsonString => parse(jsonString))
+        .leftMap(failure =>
+          s"Problem parsing ${schemaPath} as JSON in ${descriptor} Iglu repository ${config.name}: %s"
+            .format(VE.stripInstanceEtc(failure.message))
+            .toProcessingMessage)
         .toValidated
     } catch {
       case jpe: JsonParseException => // Child of IOException so match first
@@ -150,8 +137,6 @@ case class EmbeddedRepositoryRef(override val config: RepositoryRefConfig, path:
           .format(VE.stripInstanceEtc(jpe.getMessage))
           .invalid
           .toProcessingMessage
-      case ioe: IOException =>
-        None.valid // Schema not found
       case e: Throwable =>
         s"Unknown problem reading and parsing ${schemaPath} in ${descriptor} Iglu repository ${config.name}: ${VE
           .getThrowableMessage(e)}".invalid.toProcessingMessage

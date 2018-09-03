@@ -12,13 +12,12 @@
  */
 package com.snowplowanalytics.iglu
 
-// Jackson
-import com.fasterxml.jackson.databind.JsonNode
-import com.snowplowanalytics.iglu.client.validation.ProcessingMessage
-
 // Cats
 import cats.data.{NonEmptyList, Validated, ValidatedNel}
 import cats.effect.IO
+
+// circe
+import io.circe.Json
 
 // LRU
 import com.snowplowanalytics.lrumap.LruMap
@@ -64,10 +63,10 @@ package object client {
 
   /**
    * Validated schema lookup result containing, cache result which is
-   * JsonNode in case of Success or Map of all currently failed repositories
+   * Json in case of Success or Map of all currently failed repositories
    * in case of Failure
    */
-  type SchemaLookup = Validated[RepoFailuresMap, JsonNode]
+  type SchemaLookup = Validated[RepoFailuresMap, Json]
 
   /**
    * Schema lookup result associated with timestamp (in seconds) it was stored at
@@ -97,11 +96,4 @@ package object client {
    * https://github.com/snowplow/iglu-scala-client/issues/20
    */
   type SchemaVer = String
-
-  /**
-   * Type alias for a Tuple2
-   * containing a SchemaKey and its
-   * corresponding JsonNode.
-   */
-  type JsonSchemaPair = Tuple2[SchemaKey, JsonNode]
 }

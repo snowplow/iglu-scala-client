@@ -1,9 +1,10 @@
 {
 <<<<<<< HEAD
   "$schema": "http://json-schema.org/draft-04/schema#",
-=======
->>>>>>> WIP migrate to networknt
   "description": "Simple schema for testing ValidatableJsonNode",
+=======
+  "description": "Simple schema for testing Validatable",
+>>>>>>> Add circe support (closes #74)
   "type": "object",
   "properties": {
     "country": {

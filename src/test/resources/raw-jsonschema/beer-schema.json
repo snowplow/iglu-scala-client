@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-04/schema#",
-  "description": "Simple schema for testing ValidatableJsonNode",
+  "description": "Simple schema for testing Validatable",
   "type": "object",
   "properties": {
     "country": {

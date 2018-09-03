@@ -19,7 +19,7 @@ import scala.language.implicitConversions
 /**
  * Interface common for JSON AST that can be validated with Resolver
  *
- * @tparam JsonAST AST to validate (jackson `JsonNode` or `JValue`)
+ * @tparam JsonAST AST to validate (eg circe's Json)
  */
 trait Validatable[JsonAST] { self =>
 
@@ -34,7 +34,7 @@ trait Validatable[JsonAST] { self =>
    * @param schema The JSON Schema to
    *        validate the JSON against
    * @return either Success boxing the
-   *         JsonNode, or a Failure boxing
+   *         Json, or a Failure boxing
    *         a NonEmptyList of
    *         ProcessingMessages
    */
@@ -50,10 +50,10 @@ trait Validatable[JsonAST] { self =>
    *
    * @param instance The self-describing JSON
    *         to validate
-   * @param dataOnly Whether the returned JsonNode
+   * @param dataOnly Whether the returned Json
    *        should be the data only, or the whole
    *        JSON (schema + data)
-   * @return either Success boxing the JsonNode
+   * @return either Success boxing the Json
    *         or a Failure boxing a NonEmptyList
    *         of ProcessingMessages
    */
@@ -63,7 +63,7 @@ trait Validatable[JsonAST] { self =>
   /**
    * The same as validate(), but on Success returns
    * a tuple containing the SchemaKey as well as
-   * the JsonNode.
+   * the Json.
    *
    * IMPORTANT: currently the exact version of
    * the JSON Schema (i.e. MODEL-REVISION-ADDITION)
@@ -71,11 +71,11 @@ trait Validatable[JsonAST] { self =>
    *
    * @param instance The self-describing JSON
    *         to validate
-   * @param dataOnly Whether the returned JsonNode
+   * @param dataOnly Whether the returned Json
    *        should be the data only, or the whole
    *        JSON (schema + data)
    * @return either Success boxing a Tuple2 of the
-   *         JSON's SchemaKey plus its JsonNode,
+   *         JSON's SchemaKey plus its Json,
    *         or a Failure boxing a NonEmptyList
    *         of ProcessingMessages
    */
@@ -94,10 +94,10 @@ trait Validatable[JsonAST] { self =>
    *        verify and validate
    * @param schemaCriterion Identifying the schema we
    *        believe this JSON is described by
-   * @param dataOnly Whether the returned JsonNode
+   * @param dataOnly Whether the returned Json
    *        should be the data only, or the whole
    *        JSON (schema + data)
-   * @return either Success boxing the JsonNode
+   * @return either Success boxing the Json
    *         or a Failure boxing a NonEmptyList
    *         of ProcessingMessages
    */
@@ -120,7 +120,7 @@ trait Validatable[JsonAST] { self =>
      * On Failure, return a NonEmptyList of failure messages.
      *
      * @param schema The JSON Schema to validate the JSON against
-     * @return either Success boxing the JsonNode, or a Failure boxing
+     * @return either Success boxing the Json, or a Failure boxing
      *         a NonEmptyList of ProcessingMessages
      */
     def validateAgainstSchema(schema: JsonAST)(
@@ -130,9 +130,9 @@ trait Validatable[JsonAST] { self =>
     /**
      * Validates a self-describing JSON against its specified JSON Schema.
      *
-     * @param dataOnly Whether the returned JsonNode should be the data only, or the whole
+     * @param dataOnly Whether the returned Json should be the data only, or the whole
      *        JSON (schema + data)
-     * @return either Success boxing the JsonNode or a Failure boxing a NonEmptyList
+     * @return either Success boxing the Json or a Failure boxing a NonEmptyList
      *         of ProcessingMessages
      */
     def validate(dataOnly: Boolean)(implicit resolver: Resolver): ValidatedNelType[JsonAST] =
@@ -140,11 +140,11 @@ trait Validatable[JsonAST] { self =>
 
     /**
      * The same as validate(), but on Success returns a tuple containing the SchemaKey as well as
-     * the JsonNode.
+     * the Json.
      *
-     * @param dataOnly Whether the returned JsonNode should be the data only, or the whole
+     * @param dataOnly Whether the returned Json should be the data only, or the whole
      *        JSON (schema + data)
-     * @return either Success boxing a Tuple2 of the JSON's SchemaKey plus its JsonNode,
+     * @return either Success boxing a Tuple2 of the JSON's SchemaKey plus its Json,
      *         or a Failure boxing a NonEmptyList of ProcessingMessages
      */
     def validateAndIdentifySchema(dataOnly: Boolean)(
@@ -155,9 +155,9 @@ trait Validatable[JsonAST] { self =>
      * Verify that this JSON is of the expected schema, then validate it against the schema.
      *
      * @param schemaCriterion Identifying the schema we believe this JSON is described by
-     * @param dataOnly Whether the returned JsonNode should be the data only, or the whole
+     * @param dataOnly Whether the returned Json should be the data only, or the whole
      *        JSON (schema + data)
-     * @return either Success boxing the JsonNode or a Failure boxing a NonEmptyList
+     * @return either Success boxing the Json or a Failure boxing a NonEmptyList
      *         of ProcessingMessages
      */
     def verifySchemaAndValidate(schemaCriterion: SchemaCriterion, dataOnly: Boolean)(
