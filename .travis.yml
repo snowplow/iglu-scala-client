@@ -1,6 +1,7 @@
 language: scala
 scala:
    - 2.11.12
+   - 2.12.8
 jdk:
   - openjdk8
 addons:
@@ -14,7 +15,7 @@ deploy:
   provider: script
   script: ./.travis/deploy.sh $TRAVIS_TAG
   on:
-    condition: '"${TRAVIS_SCALA_VERSION}" == "2.11.12" && "${TRAVIS_JDK_VERSION}" == "openjdk8"'
+    condition: '"${TRAVIS_SCALA_VERSION}" == "2.12.8" && "${TRAVIS_JDK_VERSION}" == "openjdk8"'
     tags: true
 env:
   global:
