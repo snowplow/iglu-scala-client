@@ -13,14 +13,15 @@
 package com.snowplowanalytics.iglu.client
 package validation
 
-// Jackson
-import com.github.fge.jackson.JsonLoader
-
 // Cats
 import cats._
 import cats.implicits._
 import cats.data.NonEmptyList
 import cats.data.Validated._
+
+// circe
+import io.circe.literal._
+import io.circe.parser.parse
 
 // Specs2
 import org.specs2.Specification
@@ -30,59 +31,74 @@ import org.specs2.matcher.ValidatedMatchers
 class RawValidationSpec extends Specification with DataTables with ValidatedMatchers {
   def is = s2"""
 
-  This is a specification to test the basic ValidatableJsonNode functionality
+  This is a specification to test the basic Validatable functionality
 
-  a JsonNode should be pimped to a ValidatableJsonNode as needed  $e1
-  JsonNodes that pass explicit validation should be wrapped in a Success  $e2
-  JsonNodes that fail explicit validation should wrap ProcessageMessages in a Failure  $e3
+  a Json should be pimped to a ValidatableJson as needed  $e1
+  JsonS that pass explicit validation should be wrapped in a Success  $e2
+  Jsons that fail explicit validation should wrap ProcessageMessages in a Failure  $e3
   """
 
-  // TODO
-  import org.json4s._
-  import org.json4s.jackson.JsonMethods._
+  val simpleSchemaResult =
+    parse(
+      scala.io.Source
+        .fromInputStream(getClass.getResourceAsStream("/raw-jsonschema/beer-schema.json"))
+        .mkString).leftMap(_ => ProcessingMessage("foo")).toValidatedNel
 
-  val simpleSchema =
-    asJsonNode(
-      parse(
-        scala.io.Source
-          .fromInputStream(getClass.getResourceAsStream("/raw-jsonschema/beer-schema.json"))
-          .mkString))
-
-  import ValidatableJsonMethods._
+  import ValidatableCirceMethods._
   implicit val resolver = Bootstrap.Resolver
 
   def e1 = {
-    val json = SpecHelpers.asJsonNode("""{"country": "JP", "beers": ["Asahi", "Orion", "..."]}""")
-    json.validateAgainstSchema(simpleSchema) must beValid(json)
+    val json = json"""{"country": "JP", "beers": ["Asahi", "Orion", "..."]}"""
+
+    val result =
+      simpleSchemaResult.andThen(simpleSchema => json.validateAgainstSchema(simpleSchema))
+
+    result must beValid(json)
   }
 
   def e2 =
     foreach(
-      Seq(
-        """{"country": "AQ", "beers": []}""",
-        """{"country":"GR","beers":["Fix","Mythos"]}""",
-        """{"country": "fr","beers": ["Jenlain"]}"""
-      )) { str: String =>
-      {
-        val json = SpecHelpers.asJsonNode(str)
-        json.validateAgainstSchema(simpleSchema) must beValid(json)
-      }
+      List(
+        json"""{"country": "AQ", "beers": []}""",
+        json"""{"country":"GR","beers":["Fix","Mythos"]}""",
+        json"""{"country": "fr","beers": ["Jenlain"]}"""
+      )) { json =>
+      val result =
+        simpleSchemaResult.andThen(simpleSchema => json.validateAgainstSchema(simpleSchema))
+
+      result must beValid(json)
     }
 
-  // TODO: revisit after ProcessingMessage format is decided
   def e3 =
     "SPEC NAME" || "IN JSON" | "OUT MESSAGE" | "OUT SCHEMA" | "OUT INSTANCE" | "OUT KEYWORD" | "OUT FOUND & EXPECTED" | "OUT REQUIRED & MISSING" |
-      "numeric country" !! """{"country": 123, "beers": []}""" ! """instance type (integer) does not match any allowed primitive type (allowed: ["string"])""" ! """{"loadingURI":"#","pointer":"/properties/country"}""" ! """{"pointer":"/country"}""" ! "type" ! Some(
+      "numeric country" !! json"""{"country": 123, "beers": []}""" ! """instance type (integer) does not match any allowed primitive type (allowed: ["string"])""" ! """{"loadingURI":"#","pointer":"/properties/country"}""" ! """{"pointer":"/country"}""" ! "type" ! Some(
         ("integer", """["string"]""")) ! None |
-      "missing beers" !! """{"country": "cy"}""" ! """object has missing required properties (["beers"])""" ! """{"loadingURI":"#","pointer":""}""" ! """{"pointer":""}""" ! "required" ! None ! Some(
+      "missing beers" !! json"""{"country": "cy"}""" ! """object has missing required properties (["beers"])""" ! """{"loadingURI":"#","pointer":""}""" ! """{"pointer":""}""" ! "required" ! None ! Some(
         ("""["beers","country"]""", """["beers"]""")) |
-      "heterogenous beers" !! """{"country": "GB", "beers": ["ale", false]}""" ! """instance type (boolean) does not match any allowed primitive type (allowed: ["string"])""" ! """{"loadingURI":"#","pointer":"/properties/beers/items"}""" ! """{"pointer":"/beers/1"}""" ! "type" ! Some(
+      "heterogenous beers" !! json"""{"country": "GB", "beers": ["ale", false]}""" ! """instance type (boolean) does not match any allowed primitive type (allowed: ["string"])""" ! """{"loadingURI":"#","pointer":"/properties/beers/items"}""" ! """{"pointer":"/beers/1"}""" ! "type" ! Some(
         ("boolean", """["string"]""")) ! None |> {
 
       (_, input, message, schema, instance, keyword, foundExpected, requiredMissing) =>
         {
-          val json = SpecHelpers.asJsonNode(input)
-          json.validateAgainstSchema(simpleSchema) must beInvalid
+          val result =
+            simpleSchemaResult.andThen(simpleSchema => input.validateAgainstSchema(simpleSchema))
+
+          result must beInvalid
+
+          /* TODO: check this
+          json.validateAgainstSchema(simpleSchema) must beLike {
+            case Invalid(NonEmptyList(head, tail)) if tail.isEmpty =>
+              head.toString must_== SpecHelpers
+                .asProcessingMessage(
+                  message,
+                  schema,
+                  instance,
+                  keyword,
+                  foundExpected,
+                  requiredMissing,
+                  None)
+                .toString
+          }*/
         }
     }
 

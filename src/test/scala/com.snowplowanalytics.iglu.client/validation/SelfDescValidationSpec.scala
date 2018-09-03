@@ -16,8 +16,12 @@ package validation
 // Cats
 import cats.data.NonEmptyList
 
+// circe
+import io.circe.Json
+import io.circe.literal._
+
 // This project
-import ValidatableJsonMethods._
+import ValidatableCirceMethods._
 import validation.ProcessingMessageMethods._
 
 // Specs2
@@ -27,7 +31,7 @@ import org.specs2.matcher.ValidatedMatchers
 class SelfDescValidationSpec extends Specification with ValidatedMatchers {
   def is = s2"""
 
-  This is a specification to test validation of self-describing JsonNodes
+  This is a specification to test validation of self-describing Jsons
 
   validating a correct self-desc JSON should return the JSON in a Success  $e1
   validating a correct self-desc JSON should return only the JSON's data field in a Success if requested  $e2
@@ -43,17 +47,21 @@ class SelfDescValidationSpec extends Specification with ValidatedMatchers {
 
   implicit val resolver = SpecHelpers.TestResolver
 
-  val validJson = SpecHelpers.asJsonNode(
-    """{"schema": "iglu:com.snowplowanalytics.iglu-test/stock-item/jsonschema/1-0-0", "data": { "id": "123-12", "name": "t-shirt", "price": 29.99 } }"""
-  )
+  val validJson =
+    json"""{"schema": "iglu:com.snowplowanalytics.iglu-test/stock-item/jsonschema/1-0-0", "data": { "id": "123-12", "name": "t-shirt", "price": 29.99 } }"""
+
+  val validJsonExpectedData = validJson.hcursor
+    .get[Json]("data")
+    .toValidatedNel
 
   def e1 = validJson.validate(false) must beValid(validJson)
 
-  def e2 = validJson.validate(true) must beValid(validJson.get("data"))
+  def e2 =
+    validJson.validate(true) must beEqualTo(validJsonExpectedData)
 
-  val invalidJson = SpecHelpers.asJsonNode(
-    """{"schema": "iglu:com.snowplowanalytics.iglu-test/stock-item/jsonschema/1-0-0", "data": { "id": "123-12", "newName": "t-shirt", "price": "tbc" } }"""
-  )
+  val invalidJson =
+    json"""{"schema": "iglu:com.snowplowanalytics.iglu-test/stock-item/jsonschema/1-0-0", "data": { "id": "123-12", "newName": "t-shirt", "price": "tbc" } }"""
+
   val invalidExpected = NonEmptyList
     .of(
       SpecHelpers.asProcessingMessage(
@@ -92,7 +100,8 @@ class SelfDescValidationSpec extends Specification with ValidatedMatchers {
   def e4 = validJson.validateAndIdentifySchema(false) must beValid((expectedKey, validJson))
 
   def e5 =
-    validJson.validateAndIdentifySchema(true) must beValid((expectedKey, validJson.get("data")))
+    validJson.validateAndIdentifySchema(true) must beEqualTo(
+      validJsonExpectedData.map(data => (expectedKey, data)))
 
   def e6 =
     invalidJson
@@ -102,7 +111,7 @@ class SelfDescValidationSpec extends Specification with ValidatedMatchers {
   def e7 = validJson.verifySchemaAndValidate(expectedCriterion, false) must beValid(validJson)
 
   def e8 =
-    validJson.verifySchemaAndValidate(expectedCriterion, true) must beValid(validJson.get("data"))
+    validJson.verifySchemaAndValidate(expectedCriterion, true) must beEqualTo(validJsonExpectedData)
 
   val incorrectKey =
     SchemaCriterion("com.snowplowanalytics.iglu-test", "stock-item", "jsonschema", 2, 0, 0)

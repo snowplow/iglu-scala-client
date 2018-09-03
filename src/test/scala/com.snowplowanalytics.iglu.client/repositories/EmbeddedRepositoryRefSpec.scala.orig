@@ -13,9 +13,19 @@
 package com.snowplowanalytics.iglu.client
 package repositories
 
+<<<<<<< HEAD
+=======
+// Cats
+import cats._
+import cats.implicits._
+
 // circe
 import io.circe.literal._
 
+// This project
+import validation.ProcessingMessageMethods._
+
+>>>>>>> Add circe support (closes #74)
 // Specs2
 import org.specs2.Specification
 import org.specs2.matcher.{DataTables, ValidatedMatchers}
