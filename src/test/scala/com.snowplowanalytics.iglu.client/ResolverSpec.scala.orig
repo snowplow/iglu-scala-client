@@ -12,17 +12,19 @@
  */
 package com.snowplowanalytics.iglu.client
 
+// JSON Schema
+import com.github.fge.jsonschema.core.report.{LogLevel, ProcessingMessage}
+
 // Cats
 import cats.syntax.option._
 import cats.syntax.validated._
 import cats.data.NonEmptyList
 
-// json4s
-import org.json4s._
-import org.json4s.JsonDSL._
-import org.json4s.jackson.JsonMethods._
-
-import com.fasterxml.jackson.databind.JsonNode
+// circe
+import io.circe.Json
+import io.circe.syntax._
+import io.circe.parser.parse
+import io.circe.literal._
 
 // This project
 import repositories.{EmbeddedRepositoryRef, HttpRepositoryRef, RepositoryRefConfig}
@@ -52,7 +54,7 @@ object ResolverSpec {
   def notFoundError(schemaKey: String, repos: List[String]): String =
     ProcessingMessage(
       s"Could not find schema with key ${schemaKey} in any repository, tried:",
-      repositories = Some(asJsonNode(repos))).toString
+      repositories = Some(repos.asJson)).toString
 }
 
 class ResolverSpec extends Specification with DataTables with ValidatedMatchers with Mockito {
@@ -90,39 +92,41 @@ class ResolverSpec extends Specification with DataTables with ValidatedMatchers 
   def e2 = {
 
     val config =
-      s"""|{
-            |"schema": "iglu:com.snowplowanalytics.iglu/resolver-config/jsonschema/1-0-0",
-            |"data": {
-              |"cacheSize": 500,
-              |"repositories": [
-                |{
-                  |"name": "Iglu Central",
-                  |"priority": 0,
-                  |"vendorPrefixes": [ "com.snowplowanalytics" ],
-                  |"connection": {
-                    |"http": {
-                      |"uri": "http://iglucentral.com"
-                    |}
-                  |}
-                |}, {                
-                  |"name": "An embedded repo",
-                  |"priority": 100,
-                  |"vendorPrefixes": [ "de.acompany.snowplow" ],
-                  |"connection": {
-                    |"embedded": {
-                      |"path": "/embed-path"
-                    |}
-                  |}
-                |}
-              |]
-            |}
-          |}""".stripMargin.replaceAll("[\n\r]", "")
+      json"""{
+            "schema": "iglu:com.snowplowanalytics.iglu/resolver-config/jsonschema/1-0-0",
+            "data": {
+              "cacheSize": 500,
+              "repositories": [
+                {
+                  "name": "Iglu Central",
+                  "priority": 0,
+                  "vendorPrefixes": [ "com.snowplowanalytics" ],
+                  "connection": {
+                    "http": {
+                      "uri": "http://iglucentral.com"
+                    }
+                  }
+                }, {
+                  "name": "An embedded repo",
+                  "priority": 100,
+                  "vendorPrefixes": [ "de.acompany.snowplow" ],
+                  "connection": {
+                    "embedded": {
+                      "path": "/embed-path"
+                    }
+                  }
+                }
+              ]
+            }
+          }"""
 
     val expected = Resolver(cacheSize = 500, SpecHelpers.IgluCentral, Repos.three)
 
-    val result = Resolver.parse(SpecHelpers.asJsonNode(config))
-
+<<<<<<< HEAD
     Resolver.parse(SpecHelpers.asJsonNode(config)) must beValid(expected)
+=======
+    Resolver.parse(config) must beValid(expected)
+>>>>>>> Add circe support (closes #74)
   }
 
   def e3 = {
@@ -148,7 +152,8 @@ class ResolverSpec extends Specification with DataTables with ValidatedMatchers 
         "iglu:com.snowplowanalytics.iglu-test/corrupted_schema/jsonschema/1-0-0",
         List("Iglu Client Embedded [embedded]", "Iglu Test Embedded [embedded]")
       ),
-      "Problem parsing /iglu-test-embedded/schemas/com.snowplowanalytics.iglu-test/corrupted_schema/jsonschema/1-0-0 as JSON in embedded Iglu repository Iglu Test Embedded: Unexpected end-of-input within/between Object entries at [Source: (BufferedInputStream); line: 10, column: 316]".toProcessingMessage.toString
+      ("Problem parsing /iglu-test-embedded/schemas/com.snowplowanalytics.iglu-test/corrupted_schema/jsonschema/1-0-0 as JSON in embedded Iglu repository Iglu Test Embedded: exhausted inpu" +
+        "t").toProcessingMessage.toString
     )
 
     val actual = SpecHelpers.TestResolver.lookupSchema(schemaKey)
@@ -169,11 +174,11 @@ class ResolverSpec extends Specification with DataTables with ValidatedMatchers 
       "array must have at least one element".toProcessingMessage
       /*
         .put("domain", "syntax")
-        .put("schema", asJsonNode(parse("""{"loadingURI":"#","pointer":""}""")))
+        .put("schema", asJson(parse("""{"loadingURI":"#","pointer":""}""")))
         .put("keyword", "required")
        */ // TODO
       .toString
->>>>>>> WIP migrate to networknt
+>>>>>>> Add circe support (closes #74)
     )
 
     val actual = SpecHelpers.TestResolver.lookupSchema(schemaKey)
@@ -183,17 +188,17 @@ class ResolverSpec extends Specification with DataTables with ValidatedMatchers 
   def e6 = {
     val schemaKey =
       SchemaKey("com.snowplowanalytics.iglu-test", "mock_schema", "jsonschema", "1-0-0")
-    val timeoutError = ProcessingMessage("Timeout exception").invalid[Option[JsonNode]]
-    val correctSchema = asJsonNode(
-      parse("""|{
-       |	"$schema": "http://iglucentral.com/schemas/com.snowplowanalytics.self-desc/schema/jsonschema/1-0-0#",
-       |	"self": {
-       |		"vendor": "com.snowplowanalytics.iglu-test",
-       |		"name": "mock_schema",
-       |		"format": "jsonschema",
-       |		"version": "1-0-0"
-       |	}
-       |}""".stripMargin)).some.valid
+    val timeoutError = ProcessingMessage("Timeout exception").invalid[Option[Json]]
+    val correctSchema =
+      json"""{
+       	"$$schema": "http://iglucentral.com/schemas/com.snowplowanalytics.self-desc/schema/jsonschema/1-0-0#",
+       	"self": {
+       		"vendor": "com.snowplowanalytics.iglu-test",
+       		"name": "mock_schema",
+       		"format": "jsonschema",
+       		"version": "1-0-0"
+       	}
+       }""".some.valid
 
     // Mocking repository
     val httpRep = mock[HttpRepositoryRef]
@@ -217,17 +222,17 @@ class ResolverSpec extends Specification with DataTables with ValidatedMatchers 
     val schemaKey =
       SchemaKey("com.snowplowanalytics.iglu-test", "future_schema", "jsonschema", "1-0-0")
     val timeout      = ProcessingMessage("Timeout exception")
-    val timeoutError = timeout.invalid[Option[JsonNode]]
-    val correctSchema = asJsonNode(
-      parse("""|{
-       |	"$schema": "http://iglucentral.com/schemas/com.snowplowanalytics.self-desc/schema/jsonschema/1-0-0#",
-       |	"self": {
-       |		"vendor": "com.snowplowanalytics.iglu-test",
-       |		"name": "future_schema",
-       |		"format": "jsonschema",
-       |		"version": "1-0-0"
-       |	}
-       |}""".stripMargin)).some.valid
+    val timeoutError = timeout.invalid[Option[Json]]
+    val correctSchema =
+      json"""{
+       	"$$schema": "http://iglucentral.com/schemas/com.snowplowanalytics.self-desc/schema/jsonschema/1-0-0#",
+       	"self": {
+       		"vendor": "com.snowplowanalytics.iglu-test",
+       		"name": "future_schema",
+       		"format": "jsonschema",
+       		"version": "1-0-0"
+       	}
+       }""".some.valid
 
     // Mocking repository
     val httpRep = mock[HttpRepositoryRef]
@@ -283,10 +288,10 @@ class ResolverSpec extends Specification with DataTables with ValidatedMatchers 
     httpRep2.classPriority returns 1
 
     // Stubbing
-    httpRep1.lookupSchema(schemaKey) returns error1.invalid[Option[JsonNode]] thenReturns error2
-      .invalid[Option[JsonNode]]
-    httpRep2.lookupSchema(schemaKey) returns error3.invalid[Option[JsonNode]] thenReturns error4
-      .invalid[Option[JsonNode]]
+    httpRep1.lookupSchema(schemaKey) returns error1.invalid[Option[Json]] thenReturns error2
+      .invalid[Option[Json]]
+    httpRep2.lookupSchema(schemaKey) returns error3.invalid[Option[Json]] thenReturns error4
+      .invalid[Option[Json]]
 
     val resolver = Resolver(10, List(httpRep1, httpRep2))
     resolver.lookupSchema(schemaKey)
@@ -309,19 +314,19 @@ class ResolverSpec extends Specification with DataTables with ValidatedMatchers 
     val schemaKey =
       SchemaKey("com.snowplowanalytics.iglu-test", "future_schema", "jsonschema", "1-0-0")
     val timeout      = ProcessingMessage("Timeout exception")
-    val timeoutError = timeout.invalid[Option[JsonNode]]
-    val correctSchema = asJsonNode(
-      parse("""|{
-       |	"$schema": "http://iglucentral.com/schemas/com.snowplowanalytics.self-desc/schema/jsonschema/1-0-0#",
-       |	"self": {
-       |		"vendor": "com.snowplowanalytics.iglu-test",
-       |		"name": "future_schema",
-       |		"format": "jsonschema",
-       |		"version": "1-0-0"
-       |	}
-       |}""".stripMargin)).some.valid
+    val timeoutError = timeout.invalid[Option[Json]]
+    val correctSchema =
+      json"""{
+       	"$$schema": "http://iglucentral.com/schemas/com.snowplowanalytics.self-desc/schema/jsonschema/1-0-0#",
+       	"self": {
+       		"vendor": "com.snowplowanalytics.iglu-test",
+       		"name": "future_schema",
+       		"format": "jsonschema",
+       		"version": "1-0-0"
+        }
+       }""".some.valid
 
-    def notFound: ValidatedType[Option[JsonNode]] = Option.empty[JsonNode].valid // 404
+    def notFound: ValidatedType[Option[Json]] = Option.empty[Json].valid // 404
 
     // Mocking repository
     val httpRep = mock[HttpRepositoryRef]
@@ -358,40 +363,40 @@ class ResolverSpec extends Specification with DataTables with ValidatedMatchers 
   def e10 = {
 
     val config =
-      s"""|{
-          |"schema": "iglu:com.snowplowanalytics.iglu/resolver-config/jsonschema/1-0-2",
-          |"data": {
-            |"cacheSize": 500,
-            |"cacheTtl": 10,
-            |"repositories": [
-              |{
-                |"name": "Iglu Central",
-                |"priority": 0,
-                |"vendorPrefixes": [ "com.snowplowanalytics" ],
-                |"connection": {
-                  |"http": {
-                    |"uri": "http://iglucentral.com",
-                    |"apikey": null
-                  |}
-                |}
-              |}, {
-                |"name": "An embedded repo",
-                |"priority": 100,
-                |"vendorPrefixes": [ "de.acompany.snowplow" ],
-                |"connection": {
-                  |"embedded": {
-                    |"path": "/embed-path"
-                  |}
-                |}
-              |}
-            |]
-          |}
-          |}""".stripMargin.replaceAll("[\n\r]", "")
+      json"""{
+          "schema": "iglu:com.snowplowanalytics.iglu/resolver-config/jsonschema/1-0-2",
+          "data": {
+            "cacheSize": 500,
+            "cacheTtl": 10,
+            "repositories": [
+              {
+                "name": "Iglu Central",
+                "priority": 0,
+                "vendorPrefixes": [ "com.snowplowanalytics" ],
+                "connection": {
+                  "http": {
+                    "uri": "http://iglucentral.com",
+                    "apikey": null
+                  }
+                }
+              }, {
+                "name": "An embedded repo",
+                "priority": 100,
+                "vendorPrefixes": [ "de.acompany.snowplow" ],
+                "connection": {
+                  "embedded": {
+                    "path": "/embed-path"
+                  }
+                }
+              }
+            ]
+          }
+          }"""
 
     val expected =
       Resolver(cacheSize = 500, List(SpecHelpers.IgluCentral, Repos.three), cacheTtl = Some(10))
 
-    Resolver.parse(SpecHelpers.asJsonNode(config)) must beValid(expected)
+    Resolver.parse(config) must beValid(expected)
   }
 
 }

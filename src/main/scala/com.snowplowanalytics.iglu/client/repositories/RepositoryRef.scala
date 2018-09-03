@@ -13,30 +13,24 @@
 package com.snowplowanalytics.iglu.client
 package repositories
 
-// Jackson
-import com.fasterxml.jackson.databind.JsonNode
-
 // Cats
 import cats.syntax.apply._
 import cats.data.Validated.{Invalid, Valid}
 
-// json4s
-import org.json4s._
-import org.json4s.JsonDSL._
-import org.json4s.jackson.JsonMethods._
+// circe
+import io.circe.Json
+import io.circe.optics.JsonPath._
 
 // This project
 import validation.ProcessingMessageMethods._
-import utils.TemporaryJson4sCatsUtils._
+import utils.JacksonCatsUtils._
 import validation.ProcessingMessage
 
 /**
  * Singleton object contains a constructor
- * from a JValue.
+ * from a json.
  */
 object RepositoryRefConfig {
-
-  implicit val formats = DefaultFormats
 
   /**
    * Parses the standard repository ref configuration
@@ -47,14 +41,23 @@ object RepositoryRefConfig {
    * @return either the RepositoryRefConfig on Success,
    *         or a Nel of ProcessingMessages on Failure.
    */
-  // TODO: convert the Scalaz Error sub-types to
-  // ProcessingMessages more cleanly (not just via toString)
-  def parse(config: JValue): ValidatedNelType[RepositoryRefConfig] =
+  def parse(config: Json): ValidatedNelType[RepositoryRefConfig] =
     (
-      validatedField[String]("name")(config),
-      validatedField[Int]("priority")(config),
-      validatedField[List[String]]("vendorPrefixes")(config)
-    ).mapN(RepositoryRefConfig(_, _, _)).leftMap(_.map(_.toString.toProcessingMessage))
+      root.name.string
+        .getOption(config)
+        .toValidNel(s"Could not retrieve field 'name'".toProcessingMessage),
+      root.priority.int
+        .getOption(config)
+        .toValidNel(s"Could not retrieve field 'priority'".toProcessingMessage),
+      root.vendorPrefixes.each.string
+        .getAll(config)
+        .validNel
+        .andThen(
+          list =>
+            if (list.isEmpty)
+              s"Could not retrieve field 'vendorPrefixes'".toProcessingMessage.invalidNel
+            else list.validNel)
+    ).mapN(RepositoryRefConfig(_, _, _))
 }
 
 /**
@@ -97,21 +100,21 @@ trait RepositoryRef {
    * @param schemaKey The SchemaKey uniquely identifying
    *        the schema in Iglu
    * @return a Validation boxing either the Schema's
-   *         JsonNode on Success, or an error String
+   *         Json on Success, or an error String
    *         on Failure
    */
-  def lookupSchema(schemaKey: SchemaKey): ValidatedType[Option[JsonNode]]
+  def lookupSchema(schemaKey: SchemaKey): ValidatedType[Option[Json]]
 
   /**
    * Retrieves an IgluSchema from the Iglu Repo as
-   * a JsonNode. Unsafe - only use when you know the
+   * a Json. Unsafe - only use when you know the
    * schema is available locally.
    *
    * @param schemaKey The SchemaKey uniquely identifies
    *        the schema in Iglu
-   * @return the JsonNode representing this schema
+   * @return the Json representing this schema
    */
-  def unsafeLookupSchema(schemaKey: SchemaKey): JsonNode = {
+  def unsafeLookupSchema(schemaKey: SchemaKey): Json = {
     def exception(msg: ProcessingMessage) =
       new RuntimeException(
         s"Unsafe lookup of schema ${schemaKey} in ${descriptor} Iglu repository ${config.name} failed: ${msg}")

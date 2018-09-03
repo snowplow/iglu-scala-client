@@ -12,17 +12,13 @@
  */
 package com.snowplowanalytics.iglu.client
 
-// Jackson
-import com.fasterxml.jackson.databind.JsonNode
-
 // Cats
 import cats.syntax.option._
 import cats.syntax.validated._
 
-// json4s
-import org.json4s._
-import org.json4s.JsonDSL._
-import org.json4s.jackson.JsonMethods._
+// circe
+import io.circe.Json
+import io.circe.syntax._
 
 // This project
 import validation.ProcessingMessageMethods
@@ -68,11 +64,7 @@ object SchemaKey {
  * 3. format
  * 4. version
  */
-case class SchemaKey(
-  val vendor: String,
-  val name: String,
-  val format: String,
-  val version: SchemaVer) {
+case class SchemaKey(vendor: String, name: String, format: String, version: SchemaVer) {
 
   /**
    * Extract the model, revision, and addition of the SchemaVer
@@ -89,27 +81,14 @@ case class SchemaKey(
   }
 
   /**
-   * Converts a SchemaKey into a Jackson JsonNode
+   * Converts a SchemaKey into a json
    * containing each element. The properties in this
    * JSON conform to the self-describing JSON schema.
    *
-   * @return the SchemaKey as a JsonNode
+   * @return the SchemaKey as a json
    */
-  def toJsonNode: JsonNode =
-    asJsonNode(this.toJValue)
-
-  /**
-   * Converts a SchemaKey into a json4s JValue
-   * containing each element. The properties in this
-   * JSON conform to the self-describing JSON schema.
-   *
-   * @return the SchemaKey as a JValue
-   */
-  def toJValue: JValue =
-    ("vendor"    -> vendor) ~
-      ("name"    -> name) ~
-      ("format"  -> format) ~
-      ("version" -> version)
+  def toJson: Json =
+    Json.obj("vendor" := vendor, "name" := name, "format" := format, "version" := version)
 
   /**
    * Converts a SchemaKey into a path which is compatible

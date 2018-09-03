@@ -12,12 +12,6 @@
  */
 package com.snowplowanalytics.iglu.client
 
-// Jackson
-import com.fasterxml.jackson.databind.JsonNode
-import com.snowplowanalytics.lrumap.LruMap
-
-// JSON Schema
-
 // Scala
 import scala.annotation.tailrec
 
@@ -37,22 +31,25 @@ import cats.data.NonEmptyList
 import cats.data.Validated._
 import cats.effect.IO
 
-// json4s
-import org.json4s._
-import org.json4s.JsonDSL._
-import org.json4s.jackson.JsonMethods._
+// circe
+import io.circe.Json
+import io.circe.syntax._
+import io.circe.optics.JsonPath._
+
+// LruMap
+import com.snowplowanalytics.lrumap.LruMap
 
 // This project
 import repositories.{EmbeddedRepositoryRef, HttpRepositoryRef, RepositoryRef}
 import validation.SchemaValidation.{getErrors, isValid}
-import validation.ValidatableJsonMethods
-import utils.TemporaryJson4sCatsUtils._
+import validation.ValidatableCirceMethods
+import utils.JacksonCatsUtils._
 import validation.ProcessingMessage
 import validation.ProcessingMessageMethods._
 
 /**
  * Companion object. Lets us create a Resolver from
- * a JsonNode or JValue.
+ * a Json
  */
 object Resolver {
 
@@ -96,46 +93,36 @@ object Resolver {
     Resolver(cacheSize, List[RepositoryRef](refs: _*))
 
   /**
-   * Creates a Resolver instance from a JValue.
+   * Constructs a Resolver instance from a Json.
    *
    * @param config The JSON containing the configuration
    *        for this resolver
    * @return a configured Resolver instance
    */
-  def parse(config: JValue): ValidatedNelType[Resolver] =
-    parse(asJsonNode(config))
-
-  /**
-   * Constructs a Resolver instance from a JsonNode.
-   *
-   * @param config The JSON containing the configuration
-   *        for this resolver
-   * @return a configured Resolver instance
-   */
-  def parse(config: JsonNode): ValidatedNelType[Resolver] = {
+  def parse(config: Json): ValidatedNelType[Resolver] = {
 
     // We can use the bootstrap Resolver for working
     // with JSON Schemas here.
-    implicit val resolver     = Bootstrap.Resolver
-    implicit lazy val formats = org.json4s.DefaultFormats
+    implicit val resolver = Bootstrap.Resolver
 
-    import ValidatableJsonMethods._
+    import ValidatableCirceMethods._
 
     // Check it passes validation
     config
       .verifySchemaAndValidate(ConfigurationSchema, dataOnly = true)
-      .andThen { node =>
-        val json = fromJsonNode(node)
+      .andThen { json =>
         val cacheSize =
-          validatedField[Int]("cacheSize")(json).leftMap(_.map(_.toString.toProcessingMessage))
+          root.cacheSize.int
+            .getOption(json)
+            .toValidNel("Could not retrieve field 'cacheSize'".toProcessingMessage)
         val cacheTtl =
-          validatedOptionalField[Int]("cacheTtl")(json)
-            .leftMap(_.map(_.toString.toProcessingMessage))
-        val repositoryRefs: ValidatedNelType[RepositoryRefs] =
-          (validatedField[List[JValue]]("repositories")(json)).fold(
-            f => f.map(_.toString.toProcessingMessage).invalid,
-            s => getRepositoryRefs(s)
-          )
+          root.cacheTtl.int.getOption(json).validNel[ProcessingMessage]
+        val repositoryRefs =
+          root.repositories.arr
+            .getOption(json)
+            .toValidNel("Could not retrieve field 'repositories'".toProcessingMessage)
+            .andThen(arr => getRepositoryRefs(arr.toList))
+
         (cacheSize, repositoryRefs, cacheTtl).mapN {
           Resolver(_, _, _)
         }
@@ -146,21 +133,21 @@ object Resolver {
 
   /**
    * Extracts a List of RepositoryRefs from the
-   * given JValue.
+   * given a json.
    *
    * @param repositoryConfigs The JSON containing
    *        all of the repository configurations
    * @return our assembled List of RepositoryRefs
    */
   private[client] def getRepositoryRefs(
-    repositoryConfigs: List[JValue]): ValidatedNelType[RepositoryRefs] =
+    repositoryConfigs: List[Json]): ValidatedNelType[RepositoryRefs] =
     repositoryConfigs.map { conf =>
       buildRepositoryRef(conf)
     }.sequence
 
   /**
    * Builds a RepositoryRef sub-type from the
-   * given JValue. Uses the connection property
+   * given a Json. Uses the connection property
    * to determine which RepositoryRef to build.
    *
    * Currently supports:
@@ -172,7 +159,7 @@ object Resolver {
    * @return our constructed RepositoryRef
    */
   private[client] def buildRepositoryRef(
-    repositoryConfig: JValue): ValidatedNelType[RepositoryRef] = {
+    repositoryConfig: Json): ValidatedNelType[RepositoryRef] = {
     val rc = repositoryConfig
     if (EmbeddedRepositoryRef.isEmbedded(rc)) {
       EmbeddedRepositoryRef.parse(rc)
@@ -193,7 +180,7 @@ object Resolver {
    *                  (not-tried yet or with non-404 error)
    * @param tried A Map of repositories with their accumulated errors
    *              we have looked in fruitlessly so far
-   * @return either a Success-boxed schema (as a JsonNode),
+   * @return either a Success-boxed schema (as a Json),
    *         or a Failure-boxing of Map of repositories with all their
    *         accumulated errors
    */
@@ -275,7 +262,7 @@ object Resolver {
 
     val notFound = ProcessingMessage(
       message = s"Could not find schema with key $schemaKey in any repository, tried:",
-      repositories = Some(asJsonNode(repos))
+      repositories = Some(repos.asJson)
     )
 
     NonEmptyList(notFound, failures)
@@ -321,7 +308,7 @@ case class Resolver(
      *
      * @param schemaKey The SchemaKey uniquely identifying
      *        the schema in Iglu
-     * @return the schema if found as Some JsonNode or None
+     * @return the schema if found as Some Json or None
      *         if not found, or cache is not enabled.
      */
     def get(schemaKey: SchemaKey): Option[SchemaLookup] =
@@ -372,10 +359,10 @@ case class Resolver(
    *        the schema in Iglu
    * @param attempts number of attempts to retry after non-404 errors
    * @return a Validation boxing either the Schema's
-   *         JsonNode on Success, or an error String
+   *         Json on Success, or an error String
    *         on Failure
    */
-  def lookupSchema(schemaKey: SchemaKey, attempts: Int = 3): ValidatedNelType[JsonNode] = {
+  def lookupSchema(schemaKey: SchemaKey, attempts: Int = 3): ValidatedNelType[Json] = {
     val result = cache.get(schemaKey) match {
       case Some(schema) =>
         schema.handleErrorWith { serverErrors =>
@@ -398,10 +385,10 @@ case class Resolver(
    *
    * @param schemaUri The Iglu-format schema URI
    * @return a Validation boxing either the Schema's
-   *         JsonNode on Success, or an error String
+   *         Json on Success, or an error String
    *         on Failure
    */
-  def lookupSchema(schemaUri: String): ValidatedNelType[JsonNode] =
+  def lookupSchema(schemaUri: String): ValidatedNelType[Json] =
     SchemaKey
       .parseNel(schemaUri)
       .andThen(k => lookupSchema(k))
@@ -415,9 +402,9 @@ case class Resolver(
    *
    * @param schemaKey The SchemaKey uniquely identifying
    *        the schema in Iglu
-   * @return the JsonNode representing this schema
+   * @return the Json representing this schema
    */
-  def unsafeLookupSchema(schemaKey: SchemaKey): JsonNode =
+  def unsafeLookupSchema(schemaKey: SchemaKey): Json =
     lookupSchema(schemaKey) match {
       case Valid(schema) => schema
       case Invalid(err)  => throw new RuntimeException(s"Unsafe schema lookup failed: $err")

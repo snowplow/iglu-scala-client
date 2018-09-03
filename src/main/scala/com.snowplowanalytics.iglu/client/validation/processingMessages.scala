@@ -13,9 +13,6 @@
 package com.snowplowanalytics.iglu.client
 package validation
 
-// JSON
-import com.fasterxml.jackson.databind.JsonNode
-
 // Cats
 import cats.data.{NonEmptyList, Validated, ValidatedNel}
 
@@ -27,7 +24,7 @@ import io.circe.syntax._
 case class ProcessingMessage(
   message: String,
   schemaKey: Option[String] = None,
-  repositories: Option[JsonNode] = None) {
+  repositories: Option[Json] = None) {
 
   def asJson: Json = {
     Json.obj(
@@ -49,8 +46,8 @@ object ProcessingMessageMethods {
    * version that makes it easy to convert
    * Failure Strings to Failure ProcessingMessages.
    *
-   * @param instance A JsonNode
-   * @return the pimped ValidatableJsonNode
+   * @param instance A Json
+   * @return the pimped ValidatableJson
    */
   implicit def pimpValidated[A](validation: Validated[String, A]) =
     new ProcMsgValidation[A](validation)
@@ -91,8 +88,6 @@ object ProcessingMessageMethods {
  * Validations.
  */
 class ProcMsgValidation[+A](validation: Validated[String, A]) {
-
-  // import validation.{ProcessingMessageMethods => PMM}
 
   def toProcessingMessage: Validated[ProcessingMessage, A] =
     validation.leftMap { err =>
