@@ -13,11 +13,11 @@
 package com.snowplowanalytics.iglu.client
 package validation
 
-// Json4s
-import org.json4s.jackson.JsonMethods.fromJsonNode
+// circe
+import io.circe.literal._
 
 // This project
-import ValidatableJsonMethods._
+import ValidatableCirceMethods._
 
 // Specs2
 import org.specs2.Specification
@@ -34,20 +34,14 @@ class SchemaValidationSpec extends Specification with ValidatedMatchers {
 
   implicit val resolver = SpecHelpers.TestResolver
 
-  val validJson = SpecHelpers.asJsonNode(
-    """{"schema": "iglu:com.snowplowanalytics.iglu-test/stock-item/jsonschema/1-0-0", "data": { "id": "123-12", "name": "t-shirt", "price": 29.99 } }"""
-  )
+  val validJson =
+    json"""{"schema": "iglu:com.snowplowanalytics.iglu-test/stock-item/jsonschema/1-0-0", "data": { "id": "123-12", "name": "t-shirt", "price": 29.99 } }"""
 
-  val validJsonWithInvalidSchema = SpecHelpers.asJsonNode(
-    """{"schema": "iglu:com.snowplowanalytics.iglu-test/invalid-protocol/jsonschema/1-0-0", "data": { "id": 0 } }"""
-  )
+  val validJsonWithInvalidSchema =
+    json"""{"schema": "iglu:com.snowplowanalytics.iglu-test/invalid-protocol/jsonschema/1-0-0", "data": { "id": 0 } }"""
 
-  val validJValue = fromJsonNode(validJson)
+  def e1 = validJson.validate(dataOnly = false) must beValid(validJson)
 
-  val validJValueWithInvalidSchema = fromJsonNode(validJsonWithInvalidSchema)
-
-  def e1 = validJson.validate(false) must beValid(validJson)
-
-  def e2 = validJsonWithInvalidSchema.validate(false) must beInvalid
+  def e2 = validJsonWithInvalidSchema.validate(dataOnly = false) must beInvalid
 
 }

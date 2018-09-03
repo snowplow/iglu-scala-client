@@ -13,14 +13,25 @@
 package com.snowplowanalytics.iglu.client
 package utils
 
-// Apache Commons
+import com.snowplowanalytics.iglu.client.repositories.RepositoryRefConfig
+import io.circe.ParsingFailure
 import org.apache.commons.lang3.exception.ExceptionUtils
+import com.snowplowanalytics.iglu.client.validation.ProcessingMessage
 
 /**
  * Provides helpers around converting JVM
- * exceptions to Scalaz Validations.
+ * exceptions to Cats Validated
  */
 object ValidationExceptions {
+
+  def parsingFailureToProcessingMessage(
+    failure: ParsingFailure,
+    schemaKey: SchemaKey,
+    config: RepositoryRefConfig): ProcessingMessage = {
+    ProcessingMessage(
+      s"Problem parsing ${schemaKey} as JSON in Iglu repository ${config.name}: %s"
+        .format(ValidationExceptions.stripInstanceEtc(failure.getMessage)))
+  }
 
   /**
    * Strips the instance information from a Jackson

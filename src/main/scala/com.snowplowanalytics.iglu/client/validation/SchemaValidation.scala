@@ -17,7 +17,10 @@ package validation
 import scala.collection.JavaConverters._
 
 // Jackson
-import com.fasterxml.jackson.databind.{JsonNode, ObjectMapper}
+import com.fasterxml.jackson.databind.ObjectMapper
+
+// circe
+import io.circe.Json
 
 // JsonSchema
 import com.networknt.schema._
@@ -37,8 +40,10 @@ object SchemaValidation {
    * @param schema JSON Schema
    * @return list of Processing Messages with log level above warning
    */
-  def getErrors(schema: JsonNode): List[ProcessingMessage] =
-    v4Schema.validate(schema).asScala.toList.map(m => ProcessingMessage(m.getMessage))
+  def getErrors(schema: Json): List[ProcessingMessage] = {
+    val jacksonJson = new ObjectMapper().readTree(schema.noSpaces)
+    v4Schema.validate(jacksonJson).asScala.toList.map(m => ProcessingMessage(m.getMessage))
+  }
 
   /**
    * Validate JSON Schema against it's own Schema
@@ -48,5 +53,5 @@ object SchemaValidation {
    * @param schema JSON Schema
    * @return true if Schema is valid
    */
-  def isValid(schema: JsonNode): Boolean = getErrors(schema).isEmpty
+  def isValid(schema: Json): Boolean = getErrors(schema).isEmpty
 }

@@ -16,30 +16,22 @@ package repositories
 // Java
 import java.net.{URI, UnknownHostException}
 
+import io.circe.Decoder.Result
+
 // Scala
 import scala.util.control.NonFatal
 
 // Apache Commons
 import org.apache.commons.lang3.exception.ExceptionUtils
 
-// Jackson
-import com.fasterxml.jackson.databind.ObjectMapper
-import com.fasterxml.jackson.core.JsonParseException
-import com.fasterxml.jackson.databind.JsonNode
-
 // Cats
-<<<<<<< HEAD
 import cats.syntax.apply._
 import cats.syntax.option._
 import cats.syntax.validated._
-=======
-import cats._
-import cats.implicits._
->>>>>>> Remove java.net.URL usage (closes #101)
 
-// json4s
-import org.json4s._
-import org.json4s.jackson.JsonMethods._
+// circe
+import io.circe._
+import io.circe.optics.JsonPath._
 
 // scalaj
 import scalaj.http._
@@ -56,22 +48,29 @@ import validation.ProcessingMessage
  */
 object HttpRepositoryRef {
 
-  implicit val formats = DefaultFormats
-
   /**
    * Helper class to extract HTTP URI and api key from config JSON
    */
   private[client] case class HttpConnection(uri: String, apikey: Option[String])
 
+  private implicit val httpConnectionDecoder: Decoder[HttpConnection] =
+    new Decoder[HttpConnection] {
+      def apply(c: HCursor): Result[HttpConnection] =
+        for {
+          uri    <- c.downField("uri").as[String]
+          apikey <- c.downField("apikey").as[Option[String]]
+        } yield HttpConnection(uri, apikey)
+    }
+
   /**
-   * Read a JsonNode from an URI using optional apikey
+   * Read a Json from an URI using optional apikey
    * with added optional header, so it is unsafe as well and throws same exceptions
    *
    * @param uri the URL to fetch the JSON document from
    * @param apikey optional apikey UUID to aunthenticate in Iglu HTTP repo
    * @return The document at that URL
    */
-  private def getFromUri(uri: URI, apikey: Option[String]): Option[JsonNode] = {
+  private def getFromUri(uri: URI, apikey: Option[String]): Option[String] = {
     val request = apikey
       .map(key => Http(uri.toString).header("apikey", key))
       .getOrElse(Http(uri.toString))
@@ -79,7 +78,7 @@ object HttpRepositoryRef {
     val response = request.asString
 
     if (response.is2xx) {
-      new ObjectMapper().readTree(response.body).some
+      response.body.some
     } else {
       None
     }
@@ -93,32 +92,19 @@ object HttpRepositoryRef {
    * @return true if this is the configuration for
    *         an HttpRepositoryRef, else false
    */
-  def isHttp(config: JValue): Boolean =
-    (config \ "connection" \ "http").toSome.isDefined
+  def isHttp(config: Json): Boolean =
+    extractUrl(config).isValid
 
   /**
    * Constructs an EmbeddedRepositoryRef
-   * from a JsonNode.
+   * from a json.
    *
    * @param config The JSON containing the configuration
    *        for this repository reference
    * @return a configured reference to this embedded
    *         repository
    */
-  def parse(config: JsonNode): ValidatedNelType[HttpRepositoryRef] =
-    parse(fromJsonNode(config))
-
-  /**
-   * Constructs an EmbeddedRepositoryRef
-   * from a JValue.
-   *
-   * @param config The JSON containing the configuration
-   *        for this repository reference
-   * @return a configured reference to this embedded
-   *         repository
-   */
-  def parse(config: JValue): ValidatedNelType[HttpRepositoryRef] = {
-
+  def parse(config: Json): ValidatedNelType[HttpRepositoryRef] = {
     val conf = RepositoryRefConfig.parse(config)
     val http = extractUrl(config)
 
@@ -135,13 +121,11 @@ object HttpRepositoryRef {
    * @return the path to the embedded repository on
    *         Success, or an error String on Failure
    */
-  private def extractUrl(config: JValue): ValidatedType[HttpConnection] =
-    try {
-      (config \ "connection" \ "http").extract[HttpConnection].valid
-    } catch {
-      case me: MappingException =>
-        s"Could not extract connection.http from ${compact(render(config))}".invalid.toProcessingMessage
-    }
+  private def extractUrl(config: Json): ValidatedType[HttpConnection] =
+    root.connection.http.json
+      .getOption(config)
+      .flatMap(_.as[HttpConnection].toOption)
+      .toValid(s"Could not extract connection.http from ${config.spaces2}".toProcessingMessage)
 
   /**
    * A wrapper around Java's URL.
@@ -157,19 +141,19 @@ object HttpRepositoryRef {
    *        convert to a URL
    * @return a URLobject, or an
    *         error message, all
-   *         wrapped in a Validation
+   *         wrapped in an Either
    */
-  private def stringToUri(url: String): ValidatedType[URI] =
+  private def stringToUri(url: String): Either[ProcessingMessage, URI] =
     try {
-      URI.create(url).valid
+      URI.create(url).asRight
     } catch {
       case _: NullPointerException =>
-        ProcessingMessage("Provided URL was null").invalid
+        ProcessingMessage("Provided URL was null").asLeft
       case e: IllegalArgumentException =>
         val messageString = "Provided URI string [%s] violates RFC 2396: [%s]"
           .format(url, ExceptionUtils.getRootCause(e).getMessage)
 
-        ProcessingMessage(messageString).invalid
+        ProcessingMessage(messageString).asLeft
     }
 
 }
@@ -198,26 +182,40 @@ case class HttpRepositoryRef(
 
   /**
    * Retrieves an IgluSchema from the Iglu Repo as
-   * a JsonNode.
+   * a Json.
    *
    * @param schemaKey The SchemaKey uniquely identifies
    *        the schema in Iglu
    * @return a Validation boxing either the Schema's
-   *         JsonNode on Success, or an error String
+   *         Json on Success, or an error String
    *         on Failure
    */
   // TODO: this is only intermittently working when there is a network outage (e.g. running test suite on Tube)
-  def lookupSchema(schemaKey: SchemaKey): ValidatedType[Option[JsonNode]] = {
+  def lookupSchema(schemaKey: SchemaKey): ValidatedType[Option[Json]] = {
     try {
       HttpRepositoryRef
         .stringToUri(s"$uri/schemas/${schemaKey.toPath}")
         .map(uri => HttpRepositoryRef.getFromUri(uri, apikey))
+        .flatMap(
+          jsonOpt =>
+            jsonOpt.traverse(
+              jsonString =>
+                parser
+                  .parse(jsonString)
+                  .leftMap(failure =>
+                    VE.parsingFailureToProcessingMessage(failure, schemaKey, config))))
+        .toValidated
     } catch {
+<<<<<<< HEAD
+      // The most common failure case: the schema is not found in the repo
+      case fnf: FileNotFoundException => None.valid
       case jpe: JsonParseException =>
         s"Problem parsing ${schemaKey} as JSON in ${descriptor} Iglu repository ${config.name}: %s"
           .format(VE.stripInstanceEtc(jpe.getMessage))
           .invalid
           .toProcessingMessage
+=======
+>>>>>>> Add circe support (closes #74)
       case uhe: UnknownHostException =>
         s"Unknown host issue fetching ${schemaKey} in ${descriptor} Iglu repository ${config.name}: ${uhe.getMessage}".invalid.toProcessingMessage
       case NonFatal(nfe) =>

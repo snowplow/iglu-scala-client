@@ -13,20 +13,20 @@
 package com.snowplowanalytics.iglu.client
 package validation
 
-// Json4s
-import org.json4s.jackson.JsonMethods.parse
+// circe
+import io.circe.literal._
 
 // This project
-import ValidatableJValue._
+import ValidatableCirceMethods._
 
 // Specs2
 import org.specs2.Specification
 import org.specs2.matcher.ValidatedMatchers
 
-class SchemaJValueValidationSpec extends Specification with ValidatedMatchers {
+class CirceValidationSpec extends Specification with ValidatedMatchers {
   def is = s2"""
 
-  This is a specification to test Schema Validation with json4s AST
+  This is a specification to test Schema Validation with circe AST
 
   validating a correct self-desc JSON should return the JSON in a Success $e1
   validating a correct self-desc JSON with JSON Schema with incorrect $$schema property should return Failure $e2
@@ -34,13 +34,11 @@ class SchemaJValueValidationSpec extends Specification with ValidatedMatchers {
 
   implicit val resolver = SpecHelpers.TestResolver
 
-  val validJson = parse(
-    """{"schema": "iglu:com.snowplowanalytics.iglu-test/stock-item/jsonschema/1-0-0", "data": { "id": "123-12", "name": "t-shirt", "price": 29.99 } }"""
-  )
+  val validJson =
+    json"""{"schema": "iglu:com.snowplowanalytics.iglu-test/stock-item/jsonschema/1-0-0", "data": { "id": "123-12", "name": "t-shirt", "price": 29.99 } }"""
 
-  val validJsonWithInvalidSchema = parse(
-    """{"schema": "iglu:com.snowplowanalytics.iglu-test/invalid-protocol/jsonschema/1-0-0", "data": { "id": 0 } }"""
-  )
+  val validJsonWithInvalidSchema =
+    json"""{"schema": "iglu:com.snowplowanalytics.iglu-test/invalid-protocol/jsonschema/1-0-0", "data": { "id": 0 } }"""
 
   def e1 = validJson.validate(false) must beValid(validJson)
 

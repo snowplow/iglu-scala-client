@@ -35,8 +35,7 @@ lazy val root = (project in file("."))
       Dependencies.Libraries.circeLiteral,
       Dependencies.Libraries.specs2,
       Dependencies.Libraries.specs2Cats,
-      Dependencies.Libraries.specs2Mock,
-      Dependencies.Libraries.mockito
+      Dependencies.Libraries.specs2Mock
     ),
     scalafmtOnCompile := true
   )

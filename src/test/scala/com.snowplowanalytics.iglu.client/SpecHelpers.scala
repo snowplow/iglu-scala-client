@@ -12,14 +12,6 @@
  */
 package com.snowplowanalytics.iglu.client
 
-// JSON Schema
-import com.github.fge.jsonschema.core.report.{LogLevel, ProcessingMessage}
-
-// json4s
-import org.json4s._
-import org.json4s.JsonDSL._
-import org.json4s.jackson.JsonMethods.{parse, asJsonNode => ajn}
-
 // This project
 import repositories.{EmbeddedRepositoryRef, HttpRepositoryRef, RepositoryRefConfig}
 import com.snowplowanalytics.iglu.client.validation.ProcessingMessage
@@ -38,11 +30,6 @@ object SpecHelpers {
 
   val TestResolver = Resolver(cacheSize = 10, EmbeddedTest)
 
-  def asJValue(str: String) =
-    parse(str)
-
-  def asJsonNode(str: String) =
-    ajn(asJValue(str))
 
   // TODO: improve this after ProcessingMessage format is discussed
   def asProcessingMessage(
