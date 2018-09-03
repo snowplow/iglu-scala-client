@@ -28,10 +28,11 @@ lazy val root = (project in file("."))
       Dependencies.Libraries.jsonValidator,
       // Scala
       Dependencies.Libraries.circeParser,
-      Dependencies.Libraries.json4sJackson,
+      Dependencies.Libraries.circeOptics,
       Dependencies.Libraries.lruMap,
       Dependencies.Libraries.scalaj,
       // Scala (test only)
+      Dependencies.Libraries.circeLiteral,
       Dependencies.Libraries.specs2,
       Dependencies.Libraries.specs2Cats,
       Dependencies.Libraries.specs2Mock,
