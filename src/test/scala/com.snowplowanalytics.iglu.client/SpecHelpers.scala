@@ -41,5 +41,6 @@ object SpecHelpers {
     requiredMissing: Option[(String, String)],
     unwanted: Option[String]): ProcessingMessage =
     ProcessingMessage(message = message)
+  }
 
 }

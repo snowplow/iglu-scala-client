@@ -23,6 +23,9 @@ import io.circe.syntax._
 import io.circe.parser.parse
 import io.circe.literal._
 
+// Iglu Core
+import com.snowplowanalytics.iglu.core.{SchemaKey, SchemaVer}
+
 // This project
 import repositories.{EmbeddedRepositoryRef, HttpRepositoryRef, RepositoryRefConfig}
 import validation.ProcessingMessageMethods._
@@ -76,7 +79,8 @@ class ResolverSpec extends Specification with DataTables with ValidatedMatchers 
   def e1 = {
     val resolver =
       Resolver(cacheSize = 0, SpecHelpers.IgluCentral, Repos.one, Repos.two, Repos.three)
-    val schemaKey = SchemaKey("de.acompany.snowplow", "mobile_context", "jsonschema", "1-0-0")
+    val schemaKey =
+      SchemaKey("de.acompany.snowplow", "mobile_context", "jsonschema", SchemaVer.Full(1, 0, 0))
 
     Resolver.prioritizeRepos(schemaKey, resolver.allRepos) must_== List(
       Repos.two,
@@ -124,7 +128,7 @@ class ResolverSpec extends Specification with DataTables with ValidatedMatchers 
 
   def e3 = {
 
-    val schemaKey = SchemaKey("com.acme.icarus", "wing", "jsonschema", "1-0-0")
+    val schemaKey = SchemaKey("com.acme.icarus", "wing", "jsonschema", SchemaVer.Full(1, 0, 0))
     val expected = NonEmptyList.one(
       notFoundError(
         "iglu:com.acme.icarus/wing/jsonschema/1-0-0",
@@ -139,7 +143,11 @@ class ResolverSpec extends Specification with DataTables with ValidatedMatchers 
   def e4 = {
 
     val schemaKey =
-      SchemaKey("com.snowplowanalytics.iglu-test", "corrupted_schema", "jsonschema", "1-0-0")
+      SchemaKey(
+        "com.snowplowanalytics.iglu-test",
+        "corrupted_schema",
+        "jsonschema",
+        SchemaVer.Full(1, 0, 0))
     val expected = NonEmptyList.of(
       notFoundError(
         "iglu:com.snowplowanalytics.iglu-test/corrupted_schema/jsonschema/1-0-0",
@@ -155,7 +163,11 @@ class ResolverSpec extends Specification with DataTables with ValidatedMatchers 
 
   def e5 = {
     val schemaKey =
-      SchemaKey("com.snowplowanalytics.iglu-test", "invalid_schema", "jsonschema", "1-0-0")
+      SchemaKey(
+        "com.snowplowanalytics.iglu-test",
+        "invalid_schema",
+        "jsonschema",
+        SchemaVer.Full(1, 0, 0))
     val expected = NonEmptyList.of(
       notFoundError(
         "iglu:com.snowplowanalytics.iglu-test/invalid_schema/jsonschema/1-0-0",
@@ -170,7 +182,11 @@ class ResolverSpec extends Specification with DataTables with ValidatedMatchers 
 
   def e6 = {
     val schemaKey =
-      SchemaKey("com.snowplowanalytics.iglu-test", "mock_schema", "jsonschema", "1-0-0")
+      SchemaKey(
+        "com.snowplowanalytics.iglu-test",
+        "mock_schema",
+        "jsonschema",
+        SchemaVer.Full(1, 0, 0))
     val timeoutError = ProcessingMessage("Timeout exception").invalid[Option[Json]]
     val correctSchema =
       json"""{
@@ -203,7 +219,11 @@ class ResolverSpec extends Specification with DataTables with ValidatedMatchers 
 
   def e7 = {
     val schemaKey =
-      SchemaKey("com.snowplowanalytics.iglu-test", "future_schema", "jsonschema", "1-0-0")
+      SchemaKey(
+        "com.snowplowanalytics.iglu-test",
+        "future_schema",
+        "jsonschema",
+        SchemaVer.Full(1, 0, 0))
     val timeout      = ProcessingMessage("Timeout exception")
     val timeoutError = timeout.invalid[Option[Json]]
     val correctSchema =
@@ -239,7 +259,7 @@ class ResolverSpec extends Specification with DataTables with ValidatedMatchers 
       case error =>
         error.toList.map(_.toString) must contain(
           notFoundError(
-            schemaKey.toString,
+            schemaKey.toSchemaUri,
             List("Iglu Client Embedded [embedded]", "Mock Repo [null]")),
           timeout.toString
         )
@@ -248,7 +268,11 @@ class ResolverSpec extends Specification with DataTables with ValidatedMatchers 
 
   def e8 = {
     val schemaKey =
-      SchemaKey("com.snowplowanalytics.iglu-test", "future_schema", "jsonschema", "1-0-0")
+      SchemaKey(
+        "com.snowplowanalytics.iglu-test",
+        "future_schema",
+        "jsonschema",
+        SchemaVer.Full(1, 0, 0))
     val error1 = ProcessingMessage("Timeout exception")
     val error2 = ProcessingMessage("Network exception")
     val error3 = ProcessingMessage("Unknown exception")
@@ -283,7 +307,7 @@ class ResolverSpec extends Specification with DataTables with ValidatedMatchers 
       case error =>
         error.toList.map(_.toString) must contain(
           notFoundError(
-            schemaKey.toString,
+            schemaKey.toSchemaUri,
             List("Iglu Client Embedded [embedded]", "Mock Repo 2 [null]", "Mock Repo 1 [null]")),
           error1.toString,
           error2.toString,
@@ -295,7 +319,11 @@ class ResolverSpec extends Specification with DataTables with ValidatedMatchers 
 
   def e9 = {
     val schemaKey =
-      SchemaKey("com.snowplowanalytics.iglu-test", "future_schema", "jsonschema", "1-0-0")
+      SchemaKey(
+        "com.snowplowanalytics.iglu-test",
+        "future_schema",
+        "jsonschema",
+        SchemaVer.Full(1, 0, 0))
     val timeout      = ProcessingMessage("Timeout exception")
     val timeoutError = timeout.invalid[Option[Json]]
     val correctSchema =

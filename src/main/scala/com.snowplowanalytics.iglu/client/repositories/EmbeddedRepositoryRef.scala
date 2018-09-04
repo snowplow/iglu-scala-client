@@ -33,10 +33,13 @@ import io.circe.Json
 import io.circe.parser.parse
 import io.circe.optics.JsonPath._
 
+// Iglu Core
+import com.snowplowanalytics.iglu.core.SchemaKey
+
 // This project
 import validation.ProcessingMessageMethods
 import ProcessingMessageMethods._
-import utils.{ValidationExceptions => VE}
+import utils.{ValidationExceptions => VE, SchemaKeyUtils}
 
 /**
  * Helpers for constructing an EmbeddedRepository.
@@ -119,17 +122,19 @@ case class EmbeddedRepositoryRef(override val config: RepositoryRefConfig, path:
    *         on Failure
    */
   def lookupSchema(schemaKey: SchemaKey): ValidatedType[Option[Json]] = {
-    val schemaPath = s"$path/schemas/${schemaKey.toPath}"
-    val streamOpt  = Option(getClass.getResource(schemaPath)).map(_.openStream())
+    val schemaPath = SchemaKeyUtils.toPath(path, schemaKey)
+    val streamOpt = Option(getClass.getResource(schemaPath))
+      .map(_.openStream())
 
     try {
       streamOpt
         .map(stream => Source.fromInputStream(stream).mkString)
         .traverse(jsonString => parse(jsonString))
-        .leftMap(failure =>
-          s"Problem parsing ${schemaPath} as JSON in ${descriptor} Iglu repository ${config.name}: %s"
-            .format(VE.stripInstanceEtc(failure.message))
-            .toProcessingMessage)
+        .leftMap(
+          failure =>
+            s"Problem parsing $schemaPath as JSON in $descriptor Iglu repository ${config.name}: %s"
+              .format(VE.stripInstanceEtc(failure.message))
+              .toProcessingMessage)
         .toValidated
     } catch {
       case jpe: JsonParseException => // Child of IOException so match first
@@ -144,4 +149,5 @@ case class EmbeddedRepositoryRef(override val config: RepositoryRefConfig, path:
       streamOpt.foreach(_.close())
     }
   }
+
 }

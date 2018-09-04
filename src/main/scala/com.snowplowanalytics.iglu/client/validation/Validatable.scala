@@ -16,6 +16,9 @@ package validation
 // Scala
 import scala.language.implicitConversions
 
+// Iglu Core
+import com.snowplowanalytics.iglu.core.{SchemaCriterion, SchemaKey}
+
 /**
  * Interface common for JSON AST that can be validated with Resolver
  *
