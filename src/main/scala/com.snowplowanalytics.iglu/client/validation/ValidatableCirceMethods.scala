@@ -14,9 +14,12 @@ package com.snowplowanalytics.iglu.client
 package validation
 
 // Scala
-import com.fasterxml.jackson.databind.ObjectMapper
+import com.snowplowanalytics.iglu.client.utils.SchemaKeyUtils
 
 import scala.collection.JavaConverters._
+
+// Jackson
+import com.fasterxml.jackson.databind.ObjectMapper
 
 // circe
 import io.circe.Json
@@ -29,6 +32,9 @@ import com.networknt.schema._
 import cats.syntax.either._
 import cats.syntax.validated._
 import cats.data.NonEmptyList
+
+// Iglu Core
+import com.snowplowanalytics.iglu.core.{SchemaCriterion, SchemaKey, SchemaVer}
 
 // This project
 import ProcessingMessageMethods._
@@ -95,7 +101,7 @@ object ValidatableCirceMethods extends Validatable[Json] {
       }
       .andThen {
         case (key, data) =>
-          SchemaKey
+          SchemaKeyUtils
             .parseNel(key)
             .andThen(
               schemaKey =>
@@ -120,13 +126,13 @@ object ValidatableCirceMethods extends Validatable[Json] {
       }
       .andThen {
         case (key, data) =>
-          SchemaKey
+          SchemaKeyUtils
             .parseNel(key)
             .andThen(schemaKey =>
               if (schemaCriterion.matches(schemaKey))
                 schemaKey.valid
               else
-                s"Verifying schema as $schemaCriterion failed: found $schemaKey".toProcessingMessageNel.invalid)
+                s"Verifying schema as ${schemaCriterion.asString} failed: found ${schemaKey.toSchemaUri}".toProcessingMessageNel.invalid)
             .andThen(schemaKey => resolver.lookupSchema(schemaKey))
             .andThen(schema => validateAgainstSchema(data, schema))
             .map(_ => if (dataOnly) data else instance)
@@ -141,7 +147,11 @@ object ValidatableCirceMethods extends Validatable[Json] {
    */
   private[validation] def getSelfDescribingSchema(implicit resolver: Resolver): Json =
     resolver.unsafeLookupSchema(
-      SchemaKey("com.snowplowanalytics.self-desc", "instance-iglu-only", "jsonschema", "1-0-0")
+      SchemaKey(
+        "com.snowplowanalytics.self-desc",
+        "instance-iglu-only",
+        "jsonschema",
+        SchemaVer.Full(1, 0, 0))
     )
 
   /**

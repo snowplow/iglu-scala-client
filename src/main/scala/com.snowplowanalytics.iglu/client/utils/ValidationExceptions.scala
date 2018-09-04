@@ -13,10 +13,14 @@
 package com.snowplowanalytics.iglu.client
 package utils
 
-import com.snowplowanalytics.iglu.client.repositories.RepositoryRefConfig
-import io.circe.ParsingFailure
 import org.apache.commons.lang3.exception.ExceptionUtils
-import com.snowplowanalytics.iglu.client.validation.ProcessingMessage
+
+import io.circe.ParsingFailure
+
+import com.snowplowanalytics.iglu.core.SchemaKey
+
+import repositories.RepositoryRefConfig
+import validation.ProcessingMessage
 
 /**
  * Provides helpers around converting JVM

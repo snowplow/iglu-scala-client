@@ -22,6 +22,9 @@ import io.circe.Json
 // LRU
 import com.snowplowanalytics.lrumap.LruMap
 
+// Iglu Core
+import com.snowplowanalytics.iglu.core.SchemaKey
+
 // This project
 import client.repositories.RepositoryRef
 import client.Resolver.RepoError
@@ -79,21 +82,7 @@ package object client {
   type RepositoryRefs = List[RepositoryRef]
 
   /**
-   * Our list (possibly empty) of Processing Messages
-   */
-  type ProcessingMessages = List[ProcessingMessage]
-
-  /**
    * Our non-empty list of Processing Messages
    */
   type ProcessingMessageNel = NonEmptyList[ProcessingMessage]
-
-  /**
-   * Type alias for a SchemaVer-based version.
-   *
-   * TODO: update this in the future to be
-   * a full-fledged case class or similar:
-   * https://github.com/snowplow/iglu-scala-client/issues/20
-   */
-  type SchemaVer = String
 }

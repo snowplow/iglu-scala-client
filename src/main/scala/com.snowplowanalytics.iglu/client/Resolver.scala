@@ -39,7 +39,11 @@ import io.circe.optics.JsonPath._
 // LruMap
 import com.snowplowanalytics.lrumap.LruMap
 
+// Iglu Core
+import com.snowplowanalytics.iglu.core.{SchemaCriterion, SchemaKey}
+
 // This project
+import utils.SchemaKeyUtils
 import repositories.{EmbeddedRepositoryRef, HttpRepositoryRef, RepositoryRef}
 import validation.SchemaValidation.{getErrors, isValid}
 import validation.ValidatableCirceMethods
@@ -54,7 +58,7 @@ import validation.ProcessingMessageMethods._
 object Resolver {
 
   private val ConfigurationSchema =
-    SchemaCriterion("com.snowplowanalytics.iglu", "resolver-config", "jsonschema", 1, 0, 2)
+    SchemaCriterion("com.snowplowanalytics.iglu", "resolver-config", "jsonschema", 1, 0)
 
   /**
    * Helper class responsible for aggregating repository lookup errors
@@ -261,7 +265,7 @@ object Resolver {
         .map(repo => s"${repo.config.name} [${repo.descriptor}]")
 
     val notFound = ProcessingMessage(
-      message = s"Could not find schema with key $schemaKey in any repository, tried:",
+      message = s"Could not find schema with key ${schemaKey.toSchemaUri} in any repository, tried:",
       repositories = Some(repos.asJson)
     )
 
@@ -293,9 +297,7 @@ case class Resolver(
 
   private[client] val allRepos = Bootstrap.Repo :: repos
 
-  /**
-   * Our LRU cache.
-   */
+  // TODO: ideally replace unsafeRunSync() with referentially transparent API
   object cache {
 
     private val lru: Option[SchemaLruMap] =
@@ -389,7 +391,7 @@ case class Resolver(
    *         on Failure
    */
   def lookupSchema(schemaUri: String): ValidatedNelType[Json] =
-    SchemaKey
+    SchemaKeyUtils
       .parseNel(schemaUri)
       .andThen(k => lookupSchema(k))
 
