@@ -12,17 +12,6 @@
  */
 package com.snowplowanalytics.iglu.client
 
-<<<<<<< HEAD
-// JSON Schema
-import com.github.fge.jsonschema.core.report.{LogLevel, ProcessingMessage}
-
-// json4s
-import org.json4s._
-import org.json4s.JsonDSL._
-import org.json4s.jackson.JsonMethods.{parse, asJsonNode => ajn}
-
-=======
->>>>>>> Add circe support (closes #74)
 // This project
 import repositories.{EmbeddedRepositoryRef, HttpRepositoryRef, RepositoryRefConfig}
 import com.snowplowanalytics.iglu.client.validation.ProcessingMessage
@@ -41,16 +30,8 @@ object SpecHelpers {
 
   val TestResolver = Resolver(cacheSize = 10, EmbeddedTest)
 
-<<<<<<< HEAD
-  def asJValue(str: String) =
-    parse(str)
-
-  def asJsonNode(str: String) =
-    ajn(asJValue(str))
 
   // TODO: improve this after ProcessingMessage format is discussed
-=======
->>>>>>> Add circe support (closes #74)
   def asProcessingMessage(
     message: String,
     schema: String,
@@ -58,14 +39,11 @@ object SpecHelpers {
     keyword: String,
     foundExpected: Option[(String, String)],
     requiredMissing: Option[(String, String)],
-<<<<<<< HEAD
     unwanted: Option[String]): ProcessingMessage =
-    ProcessingMessage(message = message)
+<<<<<<< HEAD
 =======
-    unwanted: Option[String]): ProcessingMessage = {
     // TODO: do actual construction here
+>>>>>>> Use Iglu Core (closes #20)
     ProcessingMessage(message = message)
-  }
->>>>>>> Add circe support (closes #74)
 
 }

@@ -20,6 +20,9 @@ import cats.data.NonEmptyList
 import io.circe.Json
 import io.circe.literal._
 
+// Iglu Core
+import com.snowplowanalytics.iglu.core.{SchemaCriterion, SchemaKey, SchemaVer}
+
 // This project
 import ValidatableCirceMethods._
 import validation.ProcessingMessageMethods._
@@ -92,7 +95,11 @@ class SelfDescValidationSpec extends Specification with ValidatedMatchers {
       .leftMap(_.map(_.toString)) must beInvalid // TODO: check expected messages
 
   val expectedKey =
-    SchemaKey("com.snowplowanalytics.iglu-test", "stock-item", "jsonschema", "1-0-0")
+    SchemaKey(
+      "com.snowplowanalytics.iglu-test",
+      "stock-item",
+      "jsonschema",
+      SchemaVer.Full(1, 0, 0))
 
   val expectedCriterion =
     SchemaCriterion("com.snowplowanalytics.iglu-test", "stock-item", "jsonschema", 1, 0, 0)
