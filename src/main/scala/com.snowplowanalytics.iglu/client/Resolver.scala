@@ -23,6 +23,7 @@ import cats.instances.map._
 import cats.instances.option._
 import cats.syntax.apply._
 import cats.syntax.applicativeError._
+import cats.syntax.either._
 import cats.syntax.semigroup._
 import cats.syntax.option._
 import cats.syntax.traverse._
@@ -196,14 +197,14 @@ object Resolver {
       case Nil => tried.invalid
       case repo :: repos => {
         repo.lookupSchema(schemaKey) match {
-          case Valid(Some(schema)) if isValid(schema) => schema.valid
-          case Valid(Some(schema)) =>
+          case Right(Some(schema)) if isValid(schema) => schema.valid
+          case Right(Some(schema)) =>
             val error = RepoError(getErrors(schema).toSet, 1, unrecoverable = true).some
             traverseRepos(schemaKey, repos, Map(repo -> error) |+| tried)
-          case Valid(None) =>
+          case Right(None) =>
             val error = none[RepoError]
             traverseRepos(schemaKey, repos, Map(repo -> error) |+| tried)
-          case Invalid(e) =>
+          case Left(e) =>
             val error = RepoError(Set(e), 1, unrecoverable = false).some
             traverseRepos(schemaKey, repos, Map(repo -> error) |+| tried)
         }
@@ -392,7 +393,8 @@ case class Resolver(
    */
   def lookupSchema(schemaUri: String): ValidatedNelType[Json] =
     SchemaKeyUtils
-      .parseNel(schemaUri)
+      .parse(schemaUri)
+      .toValidatedNel
       .andThen(k => lookupSchema(k))
 
   /**

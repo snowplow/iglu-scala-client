@@ -13,7 +13,6 @@
 package com.snowplowanalytics.iglu.client
 package utils
 
-import cats.implicits._
 import com.snowplowanalytics.iglu.core.SchemaKey
 
 import validation.ProcessingMessage
@@ -23,9 +22,9 @@ private[client] object SchemaKeyUtils {
   def toPath(prefix: String, key: SchemaKey): String =
     s"$prefix/schemas/${key.vendor}/${key.name}/${key.format}/${key.version.asString}"
 
-  def parseNel(uri: String): ValidatedNelType[SchemaKey] =
+  def parse(uri: String): Either[ProcessingMessage, SchemaKey] =
     SchemaKey
       .fromUri(uri)
-      .toValidNel(ProcessingMessage(s"$uri is not a valid Iglu-format schema URI"))
+      .toRight(ProcessingMessage(s"$uri is not a valid Iglu-format schema URI"))
 
 }

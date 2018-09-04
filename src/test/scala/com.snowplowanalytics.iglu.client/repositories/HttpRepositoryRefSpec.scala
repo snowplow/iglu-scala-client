@@ -114,12 +114,12 @@ class HttpRepositoryRefSpec extends Specification with DataTables with Validated
           }"""
 
     val actual = SpecHelpers.IgluCentral.lookupSchema(schemaKey)
-    actual.map(_.map(_.toString)) must beValid(expected.toString.some)
+    actual.map(_.map(_.toString)) must beRight(expected.toString.some)
   }
 
   def e4 = {
     val schemaKey = SchemaKey("de.ersatz.n-a", "null", "jsonschema", SchemaVer.Full(1, 0, 0))
-    SpecHelpers.IgluCentral.lookupSchema(schemaKey) must beValid(None)
+    SpecHelpers.IgluCentral.lookupSchema(schemaKey) must beRight(None)
   }
 
   def e5 = {

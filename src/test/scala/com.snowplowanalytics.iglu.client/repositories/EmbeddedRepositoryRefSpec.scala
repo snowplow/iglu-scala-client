@@ -13,14 +13,14 @@
 package com.snowplowanalytics.iglu.client
 package repositories
 
+// Cats
+import cats.syntax.either._
+
 // circe
 import io.circe.literal._
 
 // Iglu Core
 import com.snowplowanalytics.iglu.core.{SchemaKey, SchemaVer}
-
-// This project
-import validation.ProcessingMessageMethods._
 
 // Specs2
 import org.specs2.Specification
@@ -93,12 +93,12 @@ class EmbeddedRepositoryRefSpec extends Specification with DataTables with Valid
         "additionalProperties":false
       }"""
 
-    SpecHelpers.EmbeddedTest.lookupSchema(schemaKey) must beValid(Some(expected))
+    SpecHelpers.EmbeddedTest.lookupSchema(schemaKey) must beRight(Some(expected))
   }
 
   def e4 = {
     val schemaKey = SchemaKey("com.acme.n-a", "null", "jsonschema", SchemaVer.Full(1, 0, 0))
-    SpecHelpers.EmbeddedTest.lookupSchema(schemaKey) must beValid(None)
+    SpecHelpers.EmbeddedTest.lookupSchema(schemaKey) must beRight(None)
   }
 
   def e5 = {
@@ -108,7 +108,7 @@ class EmbeddedRepositoryRefSpec extends Specification with DataTables with Valid
         "corrupted_schema",
         "jsonschema",
         SchemaVer.Full(1, 0, 0))
-    SpecHelpers.EmbeddedTest.lookupSchema(schemaKey).leftMap(_.toString) must beInvalid
+    SpecHelpers.EmbeddedTest.lookupSchema(schemaKey).leftMap(_.toString) must beLeft
   }
 
 }

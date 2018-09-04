@@ -14,7 +14,6 @@ package com.snowplowanalytics.iglu.client
 package repositories
 
 // Java
-import com.fasterxml.jackson.databind.ObjectMapper
 import com.snowplowanalytics.iglu.client.validation.ProcessingMessage
 
 // Scala
@@ -24,8 +23,9 @@ import scala.io.Source
 import cats.instances.option._
 import cats.instances.either._
 import cats.syntax.apply._
-import cats.syntax.validated._
 import cats.syntax.either._
+import cats.syntax.option._
+import cats.syntax.validated._
 import cats.syntax.traverse._
 
 // circe
@@ -37,8 +37,6 @@ import io.circe.optics.JsonPath._
 import com.snowplowanalytics.iglu.core.SchemaKey
 
 // This project
-import validation.ProcessingMessageMethods
-import ProcessingMessageMethods._
 import utils.{ValidationExceptions => VE, SchemaKeyUtils}
 
 /**
@@ -46,8 +44,6 @@ import utils.{ValidationExceptions => VE, SchemaKeyUtils}
  * See below for the definition.
  */
 object EmbeddedRepositoryRef {
-
-  implicit val formats = DefaultFormats
 
   /**
    * Sniffs a config JSON to determine if this is
@@ -72,7 +68,7 @@ object EmbeddedRepositoryRef {
   def parse(config: Json): ValidatedNelType[EmbeddedRepositoryRef] = {
     val conf = RepositoryRefConfig.parse(config)
     val path = extractPath(config)
-    (conf, path.toValidatedNel).mapN { EmbeddedRepositoryRef(_, _) }
+    (conf, path).mapN { EmbeddedRepositoryRef(_, _) }
   }
 
   /**
@@ -83,12 +79,11 @@ object EmbeddedRepositoryRef {
    * @return the path to the embedded repository on
    *         Success, or an error String on Failure
    */
-  private def extractPath(config: Json): ValidatedType[String] =
+  private def extractPath(config: Json): ValidatedNelType[String] =
     root.connection.embedded.path.string
       .getOption(config)
-      .toValid(
-        s"Could not extract connection.embedded.path from ${config.spaces2}".toProcessingMessage)
-
+      .toValidNel(
+        ProcessingMessage(s"Could not extract connection.embedded.path from ${config.spaces2}"))
 }
 
 /**
@@ -115,13 +110,10 @@ case class EmbeddedRepositoryRef(override val config: RepositoryRefConfig, path:
    * Retrieves an IgluSchema from the Iglu Repo as
    * a json.
    *
-   * @param schemaKey The SchemaKey uniquely identifies
-   *        the schema in Iglu
-   * @return a Validated boxing either the Schema's
-   *         Json on Success, or an error String
-   *         on Failure
+   * @param schemaKey The SchemaKey uniquely identifying the schema in Iglu
+   * @return either a schema Json on success, or a ProcessingMessage on Failure
    */
-  def lookupSchema(schemaKey: SchemaKey): ValidatedType[Option[Json]] = {
+  def lookupSchema(schemaKey: SchemaKey): Either[ProcessingMessage, Option[Json]] = {
     val schemaPath = SchemaKeyUtils.toPath(path, schemaKey)
     val streamOpt = Option(getClass.getResource(schemaPath))
       .map(_.openStream())
@@ -130,21 +122,15 @@ case class EmbeddedRepositoryRef(override val config: RepositoryRefConfig, path:
       streamOpt
         .map(stream => Source.fromInputStream(stream).mkString)
         .traverse(jsonString => parse(jsonString))
-        .leftMap(
-          failure =>
+        .leftMap(failure =>
+          ProcessingMessage(
             s"Problem parsing $schemaPath as JSON in $descriptor Iglu repository ${config.name}: %s"
-              .format(VE.stripInstanceEtc(failure.message))
-              .toProcessingMessage)
-        .toValidated
+              .format(VE.stripInstanceEtc(failure.message))))
     } catch {
-      case jpe: JsonParseException => // Child of IOException so match first
-        s"Problem parsing ${schemaPath} as JSON in ${descriptor} Iglu repository ${config.name}: %s"
-          .format(VE.stripInstanceEtc(jpe.getMessage))
-          .invalid
-          .toProcessingMessage
       case e: Throwable =>
-        s"Unknown problem reading and parsing ${schemaPath} in ${descriptor} Iglu repository ${config.name}: ${VE
-          .getThrowableMessage(e)}".invalid.toProcessingMessage
+        ProcessingMessage(
+          s"Unknown problem reading and parsing ${schemaPath} in ${descriptor} Iglu repository ${config.name}: ${VE
+            .getThrowableMessage(e)}").asLeft
     } finally {
       streamOpt.foreach(_.close())
     }
