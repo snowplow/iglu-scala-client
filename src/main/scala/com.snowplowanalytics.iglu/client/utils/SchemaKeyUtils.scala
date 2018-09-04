@@ -10,18 +10,22 @@
  * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the Apache License Version 2.0 for the specific language governing permissions and limitations there under.
  */
-package com.snowplowanalytics.iglu.client.utils
+package com.snowplowanalytics.iglu.client
+package utils
 
-// Jackson
-import com.fasterxml.jackson.databind.{JsonNode, ObjectMapper}
+import cats.implicits._
+import com.snowplowanalytics.iglu.core.SchemaKey
 
-// circe
-import io.circe.Json
+import validation.ProcessingMessage
 
-object JacksonCatsUtils {
+private[client] object SchemaKeyUtils {
 
-  // TODO: make it a real conversion
-  def circeToJackson(circeJson: Json): JsonNode =
-    new ObjectMapper().readTree(circeJson.noSpaces)
+  def toPath(prefix: String, key: SchemaKey): String =
+    s"$prefix/schemas/${key.vendor}/${key.name}/${key.format}/${key.version.asString}"
+
+  def parseNel(uri: String): ValidatedNelType[SchemaKey] =
+    SchemaKey
+      .fromUri(uri)
+      .toValidNel(ProcessingMessage(s"$uri is not a valid Iglu-format schema URI"))
 
 }

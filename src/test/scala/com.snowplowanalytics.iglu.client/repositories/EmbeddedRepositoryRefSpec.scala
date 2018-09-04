@@ -16,6 +16,12 @@ package repositories
 // circe
 import io.circe.literal._
 
+// Iglu Core
+import com.snowplowanalytics.iglu.core.{SchemaKey, SchemaVer}
+
+// This project
+import validation.ProcessingMessageMethods._
+
 // Specs2
 import org.specs2.Specification
 import org.specs2.matcher.{DataTables, ValidatedMatchers}
@@ -56,7 +62,11 @@ class EmbeddedRepositoryRefSpec extends Specification with DataTables with Valid
 
   def e3 = {
     val schemaKey =
-      SchemaKey("com.snowplowanalytics.iglu-test", "stock-item", "jsonschema", "1-0-0")
+      SchemaKey(
+        "com.snowplowanalytics.iglu-test",
+        "stock-item",
+        "jsonschema",
+        SchemaVer.Full(1, 0, 0))
     val expected =
       json"""{
         "$$schema":"http://iglucentral.com/schemas/com.snowplowanalytics.self-desc/schema/jsonschema/1-0-0#",
@@ -87,13 +97,17 @@ class EmbeddedRepositoryRefSpec extends Specification with DataTables with Valid
   }
 
   def e4 = {
-    val schemaKey = SchemaKey("com.acme.n-a", "null", "jsonschema", "1-0-0")
+    val schemaKey = SchemaKey("com.acme.n-a", "null", "jsonschema", SchemaVer.Full(1, 0, 0))
     SpecHelpers.EmbeddedTest.lookupSchema(schemaKey) must beValid(None)
   }
 
   def e5 = {
     val schemaKey =
-      SchemaKey("com.snowplowanalytics.iglu-test", "corrupted_schema", "jsonschema", "1-0-0")
+      SchemaKey(
+        "com.snowplowanalytics.iglu-test",
+        "corrupted_schema",
+        "jsonschema",
+        SchemaVer.Full(1, 0, 0))
     SpecHelpers.EmbeddedTest.lookupSchema(schemaKey).leftMap(_.toString) must beInvalid
   }
 
