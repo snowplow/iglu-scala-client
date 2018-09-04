@@ -16,8 +16,6 @@ package repositories
 // Java
 import java.net.{URI, UnknownHostException}
 
-import io.circe.Decoder.Result
-
 // Scala
 import scala.util.control.NonFatal
 
@@ -36,15 +34,20 @@ import cats.syntax.validated._
 
 // circe
 import io.circe._
+import io.circe.Decoder.Result
 import io.circe.optics.JsonPath._
 
 // scalaj
 import scalaj.http._
 
+// Iglu Core
+import com.snowplowanalytics.iglu.core.SchemaKey
+
 // This project
 import validation.ProcessingMessageMethods
 import ProcessingMessageMethods._
 import utils.{ValidationExceptions => VE}
+import utils.SchemaKeyUtils
 import validation.ProcessingMessage
 
 /**
@@ -133,18 +136,11 @@ object HttpRepositoryRef {
       .toValid(s"Could not extract connection.http from ${config.spaces2}".toProcessingMessage)
 
   /**
-   * A wrapper around Java's URL.
-   *
-   * Exceptions thrown by
-   * URI.create():
-   * 1. NullPointerException
-   *    if uri is null
-   * 2. IllegalArgumentException
-   *    if uri violates RFC 2396
+   * A wrapper around Java's URI.
    *
    * @param url The String to
-   *        convert to a URL
-   * @return a URLobject, or an
+   *        convert to a URI
+   * @return an URI, or an
    *         error message, all
    *         wrapped in an Either
    */
@@ -199,7 +195,7 @@ case class HttpRepositoryRef(
   def lookupSchema(schemaKey: SchemaKey): ValidatedType[Option[Json]] = {
     try {
       HttpRepositoryRef
-        .stringToUri(s"$uri/schemas/${schemaKey.toPath}")
+        .stringToUri(SchemaKeyUtils.toPath(uri, schemaKey))
         .map(uri => HttpRepositoryRef.getFromUri(uri, apikey))
         .flatMap(
           jsonOpt =>

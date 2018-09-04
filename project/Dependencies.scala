@@ -19,7 +19,9 @@ object Dependencies {
     val jacksonDatabind = "2.2.3"
     val jsonValidator   = "0.1.21"
     // Scala
+    val igluCore        = "0.4.0"
     val circe           = "0.11.1"
+    val json4s          = "3.2.11"
     val lruMap          = "0.1.0"
     val scalaj          = "2.4.1"
     // Scala (test only)
@@ -32,8 +34,10 @@ object Dependencies {
     val jacksonDatabind  = "com.fasterxml.jackson.core" %  "jackson-databind"        % V.jacksonDatabind
     val jsonValidator    = "com.networknt"              %  "json-schema-validator"   % V.jsonValidator
     // Scala
+    val igluCore         = "com.snowplowanalytics"      %% "iglu-core"               % V.igluCore
     val circeParser      = "io.circe"                   %% "circe-parser"            % V.circe
     val circeOptics      = "io.circe"                   %% "circe-optics"            % V.circe
+    val json4sJackson    = "org.json4s"                 %% "json4s-jackson"          % V.json4s
     val lruMap           = "com.snowplowanalytics"      %% "scala-lru-map"           % V.lruMap
     val scalaj           = "org.scalaj"                 %% "scalaj-http"             % V.scalaj
     // Scala (test only)

@@ -19,6 +19,9 @@ import cats.syntax.option._
 // circe
 import io.circe.literal._
 
+// Iglu Core
+import com.snowplowanalytics.iglu.core.{SchemaKey, SchemaVer}
+
 // Specs2
 import org.specs2.Specification
 import org.specs2.matcher.{DataTables, ValidatedMatchers}
@@ -71,7 +74,11 @@ class HttpRepositoryRefSpec extends Specification with DataTables with Validated
   }
 
   def e3 = {
-    val schemaKey = SchemaKey("com.snowplowanalytics.snowplow", "link_click", "jsonschema", "1-0-0")
+    val schemaKey = SchemaKey(
+      "com.snowplowanalytics.snowplow",
+      "link_click",
+      "jsonschema",
+      SchemaVer.Full(1, 0, 0))
 
     val expected =
       json"""{
@@ -111,7 +118,7 @@ class HttpRepositoryRefSpec extends Specification with DataTables with Validated
   }
 
   def e4 = {
-    val schemaKey = SchemaKey("de.ersatz.n-a", "null", "jsonschema", "1-0-0")
+    val schemaKey = SchemaKey("de.ersatz.n-a", "null", "jsonschema", SchemaVer.Full(1, 0, 0))
     SpecHelpers.IgluCentral.lookupSchema(schemaKey) must beValid(None)
   }
 
