@@ -14,12 +14,12 @@ package com.snowplowanalytics.iglu.client
 package validation
 
 // Scala
-import com.snowplowanalytics.iglu.client.utils.SchemaKeyUtils
-
 import scala.collection.JavaConverters._
 
-// Jackson
-import com.fasterxml.jackson.databind.ObjectMapper
+// Cats
+import cats.instances.option._
+import cats.syntax.all._
+import cats.data.NonEmptyList
 
 // circe
 import io.circe.Json
@@ -28,17 +28,12 @@ import io.circe.optics.JsonPath._
 // JSON Schema
 import com.networknt.schema._
 
-// Cats
-import cats.syntax.either._
-import cats.syntax.validated._
-import cats.data.NonEmptyList
-
 // Iglu Core
 import com.snowplowanalytics.iglu.core.{SchemaCriterion, SchemaKey, SchemaVer}
 
 // This project
-import ProcessingMessageMethods._
 import utils.JacksonCatsUtils.circeToJackson
+import utils.SchemaKeyUtils
 
 object ValidatableCirceMethods extends Validatable[Json] {
 
@@ -76,12 +71,7 @@ object ValidatableCirceMethods extends Validatable[Json] {
     implicit resolver: Resolver): ValidatedNelType[Json] = {
 
     validateAsSelfDescribing(instance)
-      .andThen { json =>
-        val keyOpt  = root.schema.string.getOption(json)
-        val dataOpt = root.data.json.getOption(json)
-
-        (keyOpt product dataOpt).toValidNel(s"Malformed JSON: ${json.spaces2}".toProcessingMessage)
-      }
+      .andThen(json => splitJson(json).toValidatedNel)
       .andThen { case (key, data) => resolver.lookupSchema(key).map(schema => (data, schema)) }
       .andThen {
         case (data, schema) =>
@@ -93,22 +83,13 @@ object ValidatableCirceMethods extends Validatable[Json] {
     implicit resolver: Resolver): ValidatedNelType[(SchemaKey, Json)] = {
 
     validateAsSelfDescribing(instance)
-      .andThen { json =>
-        val keyOpt  = root.schema.string.getOption(json)
-        val dataOpt = root.data.json.getOption(json)
-
-        (keyOpt product dataOpt).toValidNel(s"Malformed JSON: ${json.spaces2}".toProcessingMessage)
-      }
+      .andThen(json => splitJson(json).toValidatedNel)
       .andThen {
         case (key, data) =>
-          SchemaKeyUtils
-            .parseNel(key)
-            .andThen(
-              schemaKey =>
-                resolver
-                  .lookupSchema(schemaKey)
-                  .andThen(schema => validateAgainstSchema(data, schema))
-                  .map(_ => if (dataOnly) (schemaKey, data) else (schemaKey, instance)))
+          resolver
+            .lookupSchema(key)
+            .andThen(schema => validateAgainstSchema(data, schema))
+            .map(_ => if (dataOnly) (key, data) else (key, instance))
       }
   }
 
@@ -118,22 +99,17 @@ object ValidatableCirceMethods extends Validatable[Json] {
     dataOnly: Boolean = false)(implicit resolver: Resolver): ValidatedNelType[Json] = {
 
     validateAsSelfDescribing(instance)
-      .andThen { json =>
-        val keyOpt  = root.schema.string.getOption(json)
-        val dataOpt = root.data.json.getOption(json)
-
-        (keyOpt product dataOpt).toValidNel(s"Malformed JSON: ${json.spaces2}".toProcessingMessage)
-      }
+      .andThen(json => splitJson(json).toValidatedNel)
       .andThen {
         case (key, data) =>
-          SchemaKeyUtils
-            .parseNel(key)
-            .andThen(schemaKey =>
-              if (schemaCriterion.matches(schemaKey))
-                schemaKey.valid
-              else
-                s"Verifying schema as ${schemaCriterion.asString} failed: found ${schemaKey.toSchemaUri}".toProcessingMessageNel.invalid)
-            .andThen(schemaKey => resolver.lookupSchema(schemaKey))
+          Either
+            .cond(
+              schemaCriterion.matches(key),
+              key,
+              ProcessingMessage(
+                s"Verifying schema as ${schemaCriterion.asString} failed: found ${key.toSchemaUri}"))
+            .toValidatedNel
+            .andThen(schemaKey => resolver.lookupSchema(key))
             .andThen(schema => validateAgainstSchema(data, schema))
             .map(_ => if (dataOnly) data else instance)
       }
@@ -153,6 +129,18 @@ object ValidatableCirceMethods extends Validatable[Json] {
         "jsonschema",
         SchemaVer.Full(1, 0, 0))
     )
+
+  private def splitJson(json: Json): Either[ProcessingMessage, (SchemaKey, Json)] = {
+    val keyOpt  = root.schema.string.getOption(json)
+    val dataOpt = root.data.json.getOption(json)
+
+    (keyOpt, dataOpt).tupled
+      .toRight(ProcessingMessage(s"Malformed JSON: ${json.spaces2}"))
+      .flatMap {
+        case (keyString, data) =>
+          SchemaKeyUtils.parse(keyString).map(key => (key, data))
+      }
+  }
 
   /**
    * Validates that this JSON is a self-
