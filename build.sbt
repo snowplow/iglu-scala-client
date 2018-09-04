@@ -27,6 +27,7 @@ lazy val root = (project in file("."))
       Dependencies.Libraries.jacksonDatabind,
       Dependencies.Libraries.jsonValidator,
       // Scala
+      Dependencies.Libraries.igluCore,
       Dependencies.Libraries.circeParser,
       Dependencies.Libraries.circeOptics,
       Dependencies.Libraries.lruMap,
