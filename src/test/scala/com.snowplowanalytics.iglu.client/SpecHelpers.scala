@@ -30,7 +30,6 @@ object SpecHelpers {
 
   val TestResolver = Resolver(cacheSize = 10, EmbeddedTest)
 
-
   // TODO: improve this after ProcessingMessage format is discussed
   def asProcessingMessage(
     message: String,
@@ -41,6 +40,5 @@ object SpecHelpers {
     requiredMissing: Option[(String, String)],
     unwanted: Option[String]): ProcessingMessage =
     ProcessingMessage(message = message)
-  }
 
 }
