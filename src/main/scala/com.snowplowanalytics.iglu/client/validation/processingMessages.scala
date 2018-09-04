@@ -43,22 +43,6 @@ case class ProcessingMessage(
 object ProcessingMessageMethods {
 
   /**
-   * Implicit to pimp a Cats Validated to a
-   * version that makes it easy to convert
-   * Failure Strings to Failure ProcessingMessages.
-   *
-   * @param instance A Json
-   * @return the pimped ValidatableJson
-   */
-  implicit def pimpValidated[A](validation: Validated[String, A]) =
-    new ProcMsgValidation[A](validation)
-
-  implicit def pimpValidatedNel[A](validation: ValidatedNel[String, A]) =
-    new ProcMsgValidationNel[A](validation)
-
-  implicit def pimpString(str: String) = new ProcMsgString(str)
-
-  /**
    * A helper method to convert a String into
    * a ProcessingMessage. Assume that the
    * String is coming from a Validation's
@@ -81,45 +65,45 @@ object ProcessingMessageMethods {
   def toProcMsgNel(message: String): ProcessingMessageNel =
     NonEmptyList.one(toProcMsg(message))
 
-}
+  /**
+   * A wrapper for the Cats Validated, to make it easy to convert
+   * Strings to ProcessingMessages on the Failure side of
+   * Validations.
+   */
+  implicit class ProcMsgValidation[+A](val validation: Validated[String, A]) extends AnyVal {
 
-/**
- * A wrapper for the Cats Validated, to make it easy to convert
- * Strings to ProcessingMessages on the Failure side of
- * Validations.
- */
-class ProcMsgValidation[+A](validation: Validated[String, A]) {
+    def toProcessingMessage: Validated[ProcessingMessage, A] =
+      validation.leftMap { err =>
+        ProcessingMessageMethods.toProcMsg(err)
+      }
 
-  def toProcessingMessage: Validated[ProcessingMessage, A] =
-    validation.leftMap { err =>
-      ProcessingMessageMethods.toProcMsg(err)
-    }
+    def toProcessingMessageNel: ValidatedNel[ProcessingMessage, A] =
+      toProcessingMessage.toValidatedNel
+  }
 
-  def toProcessingMessageNel: ValidatedNel[ProcessingMessage, A] =
-    toProcessingMessage.toValidatedNel
-}
+  /**
+   * A wrapper for the Scalaz Validation, to make it easy to convert
+   * Strings to ProcessingMessages on the Failure side of
+   * Validations.
+   */
+  implicit class ProcMsgValidationNel[+A](val validation: ValidatedNel[String, A]) extends AnyVal {
 
-/**
- * A wrapper for the Scalaz Validation, to make it easy to convert
- * Strings to ProcessingMessages on the Failure side of
- * Validations.
- */
-class ProcMsgValidationNel[+A](validation: ValidatedNel[String, A]) {
+    def toProcessingMessages: ValidatedNel[ProcessingMessage, A] =
+      validation.leftMap { err =>
+        ProcessingMessageMethods.toProcMsg(err)
+      }
+  }
 
-  def toProcessingMessages: ValidatedNel[ProcessingMessage, A] =
-    validation.leftMap { err =>
-      ProcessingMessageMethods.toProcMsg(err)
-    }
-}
+  /**
+   * A wrapper to make it easy to convert a String to a ProcessingMessage.
+   */
+  implicit class ProcMsgString(val str: String) extends AnyVal {
 
-/**
- * A wrapper to make it easy to convert a String to a ProcessingMessage.
- */
-class ProcMsgString(str: String) {
+    def toProcessingMessage: ProcessingMessage =
+      ProcessingMessageMethods.toProcMsg(str)
 
-  def toProcessingMessage: ProcessingMessage =
-    ProcessingMessageMethods.toProcMsg(str)
+    def toProcessingMessageNel: ProcessingMessageNel =
+      ProcessingMessageMethods.toProcMsgNel(str)
+  }
 
-  def toProcessingMessageNel: ProcessingMessageNel =
-    ProcessingMessageMethods.toProcMsgNel(str)
 }

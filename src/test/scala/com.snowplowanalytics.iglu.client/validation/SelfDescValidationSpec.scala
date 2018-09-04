@@ -14,6 +14,7 @@ package com.snowplowanalytics.iglu.client
 package validation
 
 // Cats
+import cats.syntax.either._
 import cats.data.NonEmptyList
 
 // circe

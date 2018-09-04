@@ -22,14 +22,13 @@ import scala.util.control.NonFatal
 // Apache Commons
 import org.apache.commons.lang3.exception.ExceptionUtils
 
-// Jackson
-import com.fasterxml.jackson.databind.ObjectMapper
-import com.fasterxml.jackson.core.JsonParseException
-import com.fasterxml.jackson.databind.JsonNode
-
 // Cats
+import cats.instances.either._
+import cats.instances.option._
 import cats.syntax.apply._
+import cats.syntax.either._
 import cats.syntax.option._
+import cats.syntax.traverse._
 import cats.syntax.validated._
 
 // circe
@@ -192,7 +191,7 @@ case class HttpRepositoryRef(
    *         on Failure
    */
   // TODO: this is only intermittently working when there is a network outage (e.g. running test suite on Tube)
-  def lookupSchema(schemaKey: SchemaKey): ValidatedType[Option[Json]] = {
+  def lookupSchema(schemaKey: SchemaKey): Either[ProcessingMessage, Option[Json]] = {
     try {
       HttpRepositoryRef
         .stringToUri(SchemaKeyUtils.toPath(uri, schemaKey))
@@ -205,12 +204,13 @@ case class HttpRepositoryRef(
                   .parse(jsonString)
                   .leftMap(failure =>
                     VE.parsingFailureToProcessingMessage(failure, schemaKey, config))))
-        .toValidated
     } catch {
       case uhe: UnknownHostException =>
-        s"Unknown host issue fetching ${schemaKey} in ${descriptor} Iglu repository ${config.name}: ${uhe.getMessage}".invalid.toProcessingMessage
+        ProcessingMessage(
+          s"Unknown host issue fetching ${schemaKey} in ${descriptor} Iglu repository ${config.name}: ${uhe.getMessage}").asLeft
       case NonFatal(nfe) =>
-        s"Unexpected exception fetching $schemaKey in ${descriptor} Iglu repository ${config.name}: $nfe".invalid.toProcessingMessage
+        ProcessingMessage(
+          s"Unexpected exception fetching $schemaKey in ${descriptor} Iglu repository ${config.name}: $nfe").asLeft
     }
   }
 }
