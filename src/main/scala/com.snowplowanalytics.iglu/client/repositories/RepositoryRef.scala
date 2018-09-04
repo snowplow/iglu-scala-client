@@ -14,7 +14,10 @@ package com.snowplowanalytics.iglu.client
 package repositories
 
 // Cats
+import cats.instances.option._
 import cats.syntax.apply._
+import cats.syntax.option._
+import cats.syntax.validated._
 import cats.data.Validated.{Invalid, Valid}
 
 // circe
@@ -106,7 +109,7 @@ trait RepositoryRef {
    *         Json on Success, or an error String
    *         on Failure
    */
-  def lookupSchema(schemaKey: SchemaKey): ValidatedType[Option[Json]]
+  def lookupSchema(schemaKey: SchemaKey): Either[ProcessingMessage, Option[Json]]
 
   /**
    * Retrieves an IgluSchema from the Iglu Repo as
@@ -123,9 +126,9 @@ trait RepositoryRef {
         s"Unsafe lookup of schema ${schemaKey} in ${descriptor} Iglu repository ${config.name} failed: ${msg}")
 
     lookupSchema(schemaKey) match {
-      case Valid(Some(schema)) => schema
-      case Valid(None)         => throw exception("not found".toProcessingMessage)
-      case Invalid(err)        => throw exception(err)
+      case Right(Some(schema)) => schema
+      case Right(None)         => throw exception("not found".toProcessingMessage)
+      case Left(err)           => throw exception(err)
     }
   }
 
