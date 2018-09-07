@@ -15,6 +15,7 @@ package repositories
 
 // Cats
 import cats.syntax.either._
+import cats.effect.IO
 
 // circe
 import io.circe.literal._
@@ -93,12 +94,18 @@ class EmbeddedRepositoryRefSpec extends Specification with DataTables with Valid
         "additionalProperties":false
       }"""
 
-    SpecHelpers.EmbeddedTest.lookupSchema(schemaKey) must beRight(Some(expected))
+    SpecHelpers.EmbeddedTest
+      .lookupSchema[IO](schemaKey)
+      .map(_ must beRight(Some(expected)))
+      .unsafeRunSync()
   }
 
   def e4 = {
     val schemaKey = SchemaKey("com.acme.n-a", "null", "jsonschema", SchemaVer.Full(1, 0, 0))
-    SpecHelpers.EmbeddedTest.lookupSchema(schemaKey) must beRight(None)
+    SpecHelpers.EmbeddedTest
+      .lookupSchema[IO](schemaKey)
+      .map(_ must beRight(None))
+      .unsafeRunSync()
   }
 
   def e5 = {
@@ -108,7 +115,10 @@ class EmbeddedRepositoryRefSpec extends Specification with DataTables with Valid
         "corrupted_schema",
         "jsonschema",
         SchemaVer.Full(1, 0, 0))
-    SpecHelpers.EmbeddedTest.lookupSchema(schemaKey).leftMap(_.toString) must beLeft
+    SpecHelpers.EmbeddedTest
+      .lookupSchema[IO](schemaKey)
+      .map(_ must beLeft)
+      .unsafeRunSync
   }
 
 }

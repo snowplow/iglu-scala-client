@@ -16,6 +16,11 @@ package validation
 // Scala
 import scala.language.implicitConversions
 
+// Cats
+import cats.syntax.functor._
+import cats.data.NonEmptyList
+import cats.effect.Sync
+
 // Iglu Core
 import com.snowplowanalytics.iglu.core.{SchemaCriterion, SchemaKey}
 
@@ -41,7 +46,9 @@ trait Validatable[JsonAST] { self =>
    *         a NonEmptyList of
    *         ProcessingMessages
    */
-  def validateAgainstSchema(instance: JsonAST, schema: JsonAST): ValidatedNelType[JsonAST]
+  def validateAgainstSchema(
+    instance: JsonAST,
+    schema: JsonAST): Either[NonEmptyList[ProcessingMessage], JsonAST]
 
   /**
    * Validates a self-describing JSON against
@@ -60,8 +67,9 @@ trait Validatable[JsonAST] { self =>
    *         or a Failure boxing a NonEmptyList
    *         of ProcessingMessages
    */
-  def validate(instance: JsonAST, dataOnly: Boolean = false)(
-    implicit resolver: Resolver): ValidatedNelType[JsonAST]
+  def validate[F[_]: Sync](instance: JsonAST, dataOnly: Boolean = false)(
+    implicit resolver: Resolver[F]): F[Either[NonEmptyList[ProcessingMessage], JsonAST]] =
+    validateAndIdentifySchema(instance, dataOnly).map(_.map(_._2))
 
   /**
    * The same as validate(), but on Success returns
@@ -82,8 +90,9 @@ trait Validatable[JsonAST] { self =>
    *         or a Failure boxing a NonEmptyList
    *         of ProcessingMessages
    */
-  def validateAndIdentifySchema(instance: JsonAST, dataOnly: Boolean = false)(
-    implicit resolver: Resolver): ValidatedNelType[(SchemaKey, JsonAST)]
+  def validateAndIdentifySchema[F[_]: Sync](instance: JsonAST, dataOnly: Boolean = false)(
+    implicit resolver: Resolver[F]): F[
+    Either[NonEmptyList[ProcessingMessage], (SchemaKey, JsonAST)]]
 
   /**
    * Verify that this JSON is of the expected schema,
@@ -104,10 +113,11 @@ trait Validatable[JsonAST] { self =>
    *         or a Failure boxing a NonEmptyList
    *         of ProcessingMessages
    */
-  def verifySchemaAndValidate(
+  def verifySchemaAndValidate[F[_]: Sync](
     instance: JsonAST,
     schemaCriterion: SchemaCriterion,
-    dataOnly: Boolean = false)(implicit resolver: Resolver): ValidatedNelType[JsonAST]
+    dataOnly: Boolean = false)(
+    implicit resolver: Resolver[F]): F[Either[NonEmptyList[ProcessingMessage], JsonAST]]
 
   /**
    * Operations available as postfix-ops
@@ -115,7 +125,7 @@ trait Validatable[JsonAST] { self =>
    *
    * @param instance JSON instance, supposed to be self-describing
    */
-  implicit class ValidatableOps(instance: JsonAST) {
+  implicit class ValidatableOps(val instance: JsonAST) {
 
     /**
      * Validates a JSON against a given JSON Schema. On Success, simply
@@ -126,8 +136,7 @@ trait Validatable[JsonAST] { self =>
      * @return either Success boxing the Json, or a Failure boxing
      *         a NonEmptyList of ProcessingMessages
      */
-    def validateAgainstSchema(schema: JsonAST)(
-      implicit resolver: Resolver): ValidatedNelType[JsonAST] =
+    def validateAgainstSchema(schema: JsonAST): Either[NonEmptyList[ProcessingMessage], JsonAST] =
       self.validateAgainstSchema(instance, schema)
 
     /**
@@ -138,7 +147,8 @@ trait Validatable[JsonAST] { self =>
      * @return either Success boxing the Json or a Failure boxing a NonEmptyList
      *         of ProcessingMessages
      */
-    def validate(dataOnly: Boolean)(implicit resolver: Resolver): ValidatedNelType[JsonAST] =
+    def validate[F[_]: Sync](dataOnly: Boolean)(
+      implicit resolver: Resolver[F]): F[Either[NonEmptyList[ProcessingMessage], JsonAST]] =
       self.validate(instance, dataOnly)
 
     /**
@@ -150,8 +160,8 @@ trait Validatable[JsonAST] { self =>
      * @return either Success boxing a Tuple2 of the JSON's SchemaKey plus its Json,
      *         or a Failure boxing a NonEmptyList of ProcessingMessages
      */
-    def validateAndIdentifySchema(dataOnly: Boolean)(
-      implicit resolver: Resolver): ValidatedNelType[(SchemaKey, JsonAST)] =
+    def validateAndIdentifySchema[F[_]: Sync](dataOnly: Boolean)(implicit resolver: Resolver[F]): F[
+      Either[NonEmptyList[ProcessingMessage], (SchemaKey, JsonAST)]] =
       self.validateAndIdentifySchema(instance, dataOnly)
 
     /**
@@ -163,8 +173,8 @@ trait Validatable[JsonAST] { self =>
      * @return either Success boxing the Json or a Failure boxing a NonEmptyList
      *         of ProcessingMessages
      */
-    def verifySchemaAndValidate(schemaCriterion: SchemaCriterion, dataOnly: Boolean)(
-      implicit resolver: Resolver): ValidatedNelType[JsonAST] =
+    def verifySchemaAndValidate[F[_]: Sync](schemaCriterion: SchemaCriterion, dataOnly: Boolean)(
+      implicit resolver: Resolver[F]): F[Either[NonEmptyList[ProcessingMessage], JsonAST]] =
       self.verifySchemaAndValidate(instance, schemaCriterion, dataOnly)
   }
 }
