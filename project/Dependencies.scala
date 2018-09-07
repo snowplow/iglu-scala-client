@@ -37,7 +37,6 @@ object Dependencies {
     val igluCore         = "com.snowplowanalytics"      %% "iglu-core"               % V.igluCore
     val circeParser      = "io.circe"                   %% "circe-parser"            % V.circe
     val circeOptics      = "io.circe"                   %% "circe-optics"            % V.circe
-    val json4sJackson    = "org.json4s"                 %% "json4s-jackson"          % V.json4s
     val lruMap           = "com.snowplowanalytics"      %% "scala-lru-map"           % V.lruMap
     val scalaj           = "org.scalaj"                 %% "scalaj-http"             % V.scalaj
     // Scala (test only)

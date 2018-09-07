@@ -17,7 +17,7 @@ package validation
 import cats._
 import cats.implicits._
 import cats.data.NonEmptyList
-import cats.data.Validated._
+import cats.effect.IO
 
 // circe
 import io.circe.literal._
@@ -26,9 +26,8 @@ import io.circe.parser.parse
 // Specs2
 import org.specs2.Specification
 import org.specs2.matcher.DataTables
-import org.specs2.matcher.ValidatedMatchers
 
-class RawValidationSpec extends Specification with DataTables with ValidatedMatchers {
+class RawValidationSpec extends Specification with DataTables {
   def is = s2"""
 
   This is a specification to test the basic Validatable functionality
@@ -42,18 +41,18 @@ class RawValidationSpec extends Specification with DataTables with ValidatedMatc
     parse(
       scala.io.Source
         .fromInputStream(getClass.getResourceAsStream("/raw-jsonschema/beer-schema.json"))
-        .mkString).leftMap(_ => ProcessingMessage("foo")).toValidatedNel
+        .mkString).leftMap(_ => ProcessingMessage("foo"))
 
   import ValidatableCirceMethods._
-  implicit val resolver = Bootstrap.Resolver
+  implicit val resolver = Bootstrap.resolver[IO].unsafeRunSync()
 
   def e1 = {
     val json = json"""{"country": "JP", "beers": ["Asahi", "Orion", "..."]}"""
 
     val result =
-      simpleSchemaResult.andThen(simpleSchema => json.validateAgainstSchema(simpleSchema))
+      simpleSchemaResult.flatMap(simpleSchema => json.validateAgainstSchema(simpleSchema))
 
-    result must beValid(json)
+    result must beRight(json)
   }
 
   def e2 =
@@ -64,9 +63,9 @@ class RawValidationSpec extends Specification with DataTables with ValidatedMatc
         json"""{"country": "fr","beers": ["Jenlain"]}"""
       )) { json =>
       val result =
-        simpleSchemaResult.andThen(simpleSchema => json.validateAgainstSchema(simpleSchema))
+        simpleSchemaResult.flatMap(simpleSchema => json.validateAgainstSchema(simpleSchema))
 
-      result must beValid(json)
+      result must beRight(json)
     }
 
   def e3 =
@@ -81,24 +80,9 @@ class RawValidationSpec extends Specification with DataTables with ValidatedMatc
       (_, input, message, schema, instance, keyword, foundExpected, requiredMissing) =>
         {
           val result =
-            simpleSchemaResult.andThen(simpleSchema => input.validateAgainstSchema(simpleSchema))
+            simpleSchemaResult.flatMap(simpleSchema => input.validateAgainstSchema(simpleSchema))
 
-          result must beInvalid
-
-          /* TODO: check this
-          json.validateAgainstSchema(simpleSchema) must beLike {
-            case Invalid(NonEmptyList(head, tail)) if tail.isEmpty =>
-              head.toString must_== SpecHelpers
-                .asProcessingMessage(
-                  message,
-                  schema,
-                  instance,
-                  keyword,
-                  foundExpected,
-                  requiredMissing,
-                  None)
-                .toString
-          }*/
+          result must beLeft
         }
     }
 

@@ -16,6 +16,7 @@ package validation
 // Cats
 import cats.syntax.either._
 import cats.data.NonEmptyList
+import cats.effect.IO
 
 // circe
 import io.circe.Json
@@ -49,19 +50,21 @@ class SelfDescValidationSpec extends Specification with ValidatedMatchers {
   verifying an incorrect self-desc JSON vs the incorrect schema should return an error message in a Failure  $e10
   """
 
-  implicit val resolver = SpecHelpers.TestResolver
+  implicit val resolver = SpecHelpers.TestResolver.unsafeRunSync()
 
   val validJson =
     json"""{"schema": "iglu:com.snowplowanalytics.iglu-test/stock-item/jsonschema/1-0-0", "data": { "id": "123-12", "name": "t-shirt", "price": 29.99 } }"""
 
   val validJsonExpectedData = validJson.hcursor
     .get[Json]("data")
-    .toValidatedNel
 
-  def e1 = validJson.validate(false) must beValid(validJson)
+  def e1 = validJson.validate[IO](dataOnly = false).map(_ must beRight(validJson)).unsafeRunSync()
 
   def e2 =
-    validJson.validate(true) must beEqualTo(validJsonExpectedData)
+    validJson
+      .validate[IO](dataOnly = true)
+      .map(_ must beEqualTo(validJsonExpectedData))
+      .unsafeRunSync()
 
   val invalidJson =
     json"""{"schema": "iglu:com.snowplowanalytics.iglu-test/stock-item/jsonschema/1-0-0", "data": { "id": "123-12", "newName": "t-shirt", "price": "tbc" } }"""
@@ -92,8 +95,10 @@ class SelfDescValidationSpec extends Specification with ValidatedMatchers {
 
   def e3 =
     invalidJson
-      .validate(false)
-      .leftMap(_.map(_.toString)) must beInvalid // TODO: check expected messages
+      .validate[IO](dataOnly = false)
+      .map(_.leftMap(_.map(_.toString)))
+      .map(_ must beLeft) // TODO: check expected messages
+      .unsafeRunSync()
 
   val expectedKey =
     SchemaKey(
@@ -105,21 +110,36 @@ class SelfDescValidationSpec extends Specification with ValidatedMatchers {
   val expectedCriterion =
     SchemaCriterion("com.snowplowanalytics.iglu-test", "stock-item", "jsonschema", 1, 0, 0)
 
-  def e4 = validJson.validateAndIdentifySchema(false) must beValid((expectedKey, validJson))
+  def e4 =
+    validJson
+      .validateAndIdentifySchema[IO](dataOnly = false)
+      .map(_ must beRight((expectedKey, validJson)))
+      .unsafeRunSync()
 
   def e5 =
-    validJson.validateAndIdentifySchema(true) must beEqualTo(
-      validJsonExpectedData.map(data => (expectedKey, data)))
+    validJson
+      .validateAndIdentifySchema[IO](dataOnly = true)
+      .map(_ must beEqualTo(validJsonExpectedData.map(data => (expectedKey, data))))
+      .unsafeRunSync()
 
   def e6 =
     invalidJson
-      .validateAndIdentifySchema(false)
-      .leftMap(_.map(_.toString)) must beInvalid // TODO: Check expected messages
+      .validateAndIdentifySchema[IO](dataOnly = false)
+      .map(_.leftMap(_.map(_.toString)))
+      .map(_ must beLeft) // TODO: Check expected messages
+      .unsafeRunSync()
 
-  def e7 = validJson.verifySchemaAndValidate(expectedCriterion, false) must beValid(validJson)
+  def e7 =
+    validJson
+      .verifySchemaAndValidate[IO](expectedCriterion, dataOnly = false)
+      .map(_ must beRight(validJson))
+      .unsafeRunSync()
 
   def e8 =
-    validJson.verifySchemaAndValidate(expectedCriterion, true) must beEqualTo(validJsonExpectedData)
+    validJson
+      .verifySchemaAndValidate[IO](expectedCriterion, dataOnly = true)
+      .map(_ must beEqualTo(validJsonExpectedData))
+      .unsafeRunSync()
 
   val incorrectKey =
     SchemaCriterion("com.snowplowanalytics.iglu-test", "stock-item", "jsonschema", 2, 0, 0)
@@ -129,11 +149,15 @@ class SelfDescValidationSpec extends Specification with ValidatedMatchers {
 
   def e9 =
     validJson
-      .verifySchemaAndValidate(incorrectKey, false)
-      .leftMap(_.map(_.toString)) must beInvalid(verifyExpected)
+      .verifySchemaAndValidate[IO](incorrectKey, dataOnly = false)
+      .map(_.leftMap(_.map(_.toString)))
+      .map(_ must beLeft(verifyExpected))
+      .unsafeRunSync()
 
   def e10 =
     invalidJson
-      .verifySchemaAndValidate(incorrectKey, false)
-      .leftMap(_.map(_.toString)) must beInvalid(verifyExpected)
+      .verifySchemaAndValidate[IO](incorrectKey, dataOnly = false)
+      .map(_.leftMap(_.map(_.toString)))
+      .map(_ must beLeft(verifyExpected))
+      .unsafeRunSync()
 }
