@@ -53,7 +53,7 @@ which itself is left side of `ValidatedNel`, structure isomorphic to native Scal
 
 ## Copyright and license
 
-Iglu Scala Client is copyright 2014-2017 Snowplow Analytics Ltd.
+Iglu Scala Client is copyright 2014-2019 Snowplow Analytics Ltd.
 
 Licensed under the **[Apache License, Version 2.0] [license]** (the "License");
 you may not use this software except in compliance with the License.
