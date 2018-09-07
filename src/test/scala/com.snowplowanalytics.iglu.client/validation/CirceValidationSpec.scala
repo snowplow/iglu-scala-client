@@ -13,6 +13,9 @@
 package com.snowplowanalytics.iglu.client
 package validation
 
+// Cats
+import cats.effect.IO
+
 // circe
 import io.circe.literal._
 
@@ -21,9 +24,8 @@ import ValidatableCirceMethods._
 
 // Specs2
 import org.specs2.Specification
-import org.specs2.matcher.ValidatedMatchers
 
-class CirceValidationSpec extends Specification with ValidatedMatchers {
+class CirceValidationSpec extends Specification {
   def is = s2"""
 
   This is a specification to test Schema Validation with circe AST
@@ -32,7 +34,7 @@ class CirceValidationSpec extends Specification with ValidatedMatchers {
   validating a correct self-desc JSON with JSON Schema with incorrect $$schema property should return Failure $e2
   """
 
-  implicit val resolver = SpecHelpers.TestResolver
+  implicit val resolver = SpecHelpers.TestResolver.unsafeRunSync()
 
   val validJson =
     json"""{"schema": "iglu:com.snowplowanalytics.iglu-test/stock-item/jsonschema/1-0-0", "data": { "id": "123-12", "name": "t-shirt", "price": 29.99 } }"""
@@ -40,7 +42,15 @@ class CirceValidationSpec extends Specification with ValidatedMatchers {
   val validJsonWithInvalidSchema =
     json"""{"schema": "iglu:com.snowplowanalytics.iglu-test/invalid-protocol/jsonschema/1-0-0", "data": { "id": 0 } }"""
 
-  def e1 = validJson.validate(false) must beValid(validJson)
+  def e1 =
+    validJson
+      .validate[IO](dataOnly = false)
+      .map(_ must beRight(validJson))
+      .unsafeRunSync()
 
-  def e2 = validJsonWithInvalidSchema.validate(false) must beInvalid
+  def e2 =
+    validJsonWithInvalidSchema
+      .validate[IO](dataOnly = false)
+      .map(_ must beLeft)
+      .unsafeRunSync()
 }
