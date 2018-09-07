@@ -18,7 +18,7 @@ import cats.instances.option._
 import cats.syntax.apply._
 import cats.syntax.option._
 import cats.syntax.validated._
-import cats.data.Validated.{Invalid, Valid}
+import cats.effect.Sync
 
 // circe
 import io.circe.Json
@@ -109,28 +109,7 @@ trait RepositoryRef {
    *         Json on Success, or an error String
    *         on Failure
    */
-  def lookupSchema(schemaKey: SchemaKey): Either[ProcessingMessage, Option[Json]]
-
-  /**
-   * Retrieves an IgluSchema from the Iglu Repo as
-   * a Json. Unsafe - only use when you know the
-   * schema is available locally.
-   *
-   * @param schemaKey The SchemaKey uniquely identifies
-   *        the schema in Iglu
-   * @return the Json representing this schema
-   */
-  def unsafeLookupSchema(schemaKey: SchemaKey): Json = {
-    def exception(msg: ProcessingMessage) =
-      new RuntimeException(
-        s"Unsafe lookup of schema ${schemaKey} in ${descriptor} Iglu repository ${config.name} failed: ${msg}")
-
-    lookupSchema(schemaKey) match {
-      case Right(Some(schema)) => schema
-      case Right(None)         => throw exception("not found".toProcessingMessage)
-      case Left(err)           => throw exception(err)
-    }
-  }
+  def lookupSchema[F[_]: Sync](schemaKey: SchemaKey): F[Either[ProcessingMessage, Option[Json]]]
 
   /**
    * Helper to check if this repository should take

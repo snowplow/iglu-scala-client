@@ -26,10 +26,13 @@ import org.apache.commons.lang3.exception.ExceptionUtils
 import cats.instances.either._
 import cats.instances.option._
 import cats.syntax.apply._
+import cats.syntax.applicativeError._
 import cats.syntax.either._
 import cats.syntax.option._
 import cats.syntax.traverse._
-import cats.syntax.validated._
+import cats.syntax.functor._
+import cats.data.OptionT
+import cats.effect.Sync
 
 // circe
 import io.circe._
@@ -77,18 +80,14 @@ object HttpRepositoryRef {
    * @param apikey optional apikey UUID to aunthenticate in Iglu HTTP repo
    * @return The document at that URL
    */
-  private def getFromUri(uri: URI, apikey: Option[String]): Option[String] = {
+  private def getFromUri[F[_]: Sync](uri: URI, apikey: Option[String]): F[Option[String]] = {
     val request = apikey
       .map(key => Http(uri.toString).header("apikey", key))
       .getOrElse(Http(uri.toString))
 
-    val response = request.asString
-
-    if (response.is2xx) {
-      response.body.some
-    } else {
-      None
-    }
+    Sync[F]
+      .delay(request.asString)
+      .map(response => if (response.is2xx) response.body.some else None)
   }
 
   /**
@@ -190,27 +189,28 @@ case class HttpRepositoryRef(
    *         Json on Success, or an error String
    *         on Failure
    */
-  // TODO: this is only intermittently working when there is a network outage (e.g. running test suite on Tube)
-  def lookupSchema(schemaKey: SchemaKey): Either[ProcessingMessage, Option[Json]] = {
-    try {
-      HttpRepositoryRef
-        .stringToUri(SchemaKeyUtils.toPath(uri, schemaKey))
-        .map(uri => HttpRepositoryRef.getFromUri(uri, apikey))
-        .flatMap(
-          jsonOpt =>
-            jsonOpt.traverse(
-              jsonString =>
-                parser
-                  .parse(jsonString)
-                  .leftMap(failure =>
-                    VE.parsingFailureToProcessingMessage(failure, schemaKey, config))))
-    } catch {
-      case uhe: UnknownHostException =>
-        ProcessingMessage(
-          s"Unknown host issue fetching ${schemaKey} in ${descriptor} Iglu repository ${config.name}: ${uhe.getMessage}").asLeft
-      case NonFatal(nfe) =>
-        ProcessingMessage(
-          s"Unexpected exception fetching $schemaKey in ${descriptor} Iglu repository ${config.name}: $nfe").asLeft
-    }
+  def lookupSchema[F[_]: Sync](schemaKey: SchemaKey): F[Either[ProcessingMessage, Option[Json]]] = {
+    HttpRepositoryRef
+      .stringToUri(SchemaKeyUtils.toPath(uri, schemaKey))
+      .traverse(uri => HttpRepositoryRef.getFromUri(uri, apikey))
+      .map { jsonEither =>
+        val result = for {
+          jsonString <- OptionT(jsonEither)
+          json <- OptionT.liftF(
+            parser
+              .parse(jsonString)
+              .leftMap(failure => VE.parsingFailureToProcessingMessage(failure, schemaKey, config)))
+        } yield json
+
+        result.value
+      }
+      .handleError {
+        case uhe: UnknownHostException =>
+          ProcessingMessage(
+            s"Unknown host issue fetching ${schemaKey} in ${descriptor} Iglu repository ${config.name}: ${uhe.getMessage}").asLeft
+        case NonFatal(nfe) =>
+          ProcessingMessage(
+            s"Unexpected exception fetching $schemaKey in ${descriptor} Iglu repository ${config.name}: $nfe").asLeft
+      }
   }
 }
