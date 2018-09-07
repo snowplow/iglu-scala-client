@@ -69,7 +69,7 @@ package object client {
    * Json in case of Success or Map of all currently failed repositories
    * in case of Failure
    */
-  type SchemaLookup = Validated[RepoFailuresMap, Json]
+  type SchemaLookup = Either[RepoFailuresMap, Json]
 
   /**
    * Schema lookup result associated with timestamp (in seconds) it was stored at

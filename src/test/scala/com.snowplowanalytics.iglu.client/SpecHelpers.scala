@@ -12,6 +12,9 @@
  */
 package com.snowplowanalytics.iglu.client
 
+// Cats
+import cats.effect.IO
+
 // This project
 import repositories.{EmbeddedRepositoryRef, HttpRepositoryRef, RepositoryRefConfig}
 import com.snowplowanalytics.iglu.client.validation.ProcessingMessage
@@ -28,7 +31,7 @@ object SpecHelpers {
       RepositoryRefConfig("Iglu Test Embedded", 0, List("com.snowplowanalytics")),
       path = "/iglu-test-embedded")
 
-  val TestResolver = Resolver(cacheSize = 10, EmbeddedTest)
+  val TestResolver = Resolver[IO](cacheSize = 10, EmbeddedTest)
 
   // TODO: improve this after ProcessingMessage format is discussed
   def asProcessingMessage(

@@ -60,6 +60,12 @@ object ValidationExceptions {
       .trim
   }
 
+  private def getRootCauseIfExists(throwable: Throwable): Throwable =
+    Option(ExceptionUtils.getRootCause(throwable)) match {
+      case Some(root) => root
+      case None       => throwable
+    }
+
   /**
    * Get the message out of a Throwable's root cause
    * (or failing that the Throwable itself) in a
@@ -67,21 +73,9 @@ object ValidationExceptions {
    *
    * @param throwable The throwable to extract a message from
    * @return the message from either the Throwable or
-   *         preferably its root cause, Option-boxed
+   *         preferably its root cause
    */
-  def getThrowableMessage(throwable: Throwable): Option[String] = {
-
-    def getRootCauseIfExists(throwable: Throwable): Throwable =
-      Option(ExceptionUtils.getRootCause(throwable)) match {
-        case Some(root) => root
-        case None       => throwable
-      }
-
-    for {
-      t <- Option(throwable)
-      rc = getRootCauseIfExists(t)
-      m <- Option(rc.getMessage)
-    } yield m
-  }
+  def getThrowableMessage(throwable: Throwable): String =
+    getRootCauseIfExists(throwable).getMessage
 
 }

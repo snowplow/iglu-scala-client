@@ -12,6 +12,9 @@
  */
 package com.snowplowanalytics.iglu.client
 
+// Cats
+import cats.effect.Sync
+
 // This project
 import com.snowplowanalytics.iglu.client.{Resolver => UrResolver}
 import repositories.{EmbeddedRepositoryRef, RepositoryRefConfig}
@@ -37,5 +40,5 @@ object Bootstrap {
   }
 
   // A Resolver which only looks at our embedded repo.
-  lazy val Resolver = UrResolver(cacheSize = EmbeddedSchemaCount, repos = Nil, cacheTtl = None)
+  def resolver[F[_]: Sync] = Resolver[F](EmbeddedSchemaCount)
 }

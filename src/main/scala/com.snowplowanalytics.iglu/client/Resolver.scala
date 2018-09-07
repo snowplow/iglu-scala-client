@@ -13,27 +13,23 @@
 package com.snowplowanalytics.iglu.client
 
 // Scala
+import com.snowplowanalytics.iglu.client.utils.ValidationExceptions
+import io.circe.Decoder.Result
+import io.circe.{AccumulatingDecoder, DecodingFailure, HCursor}
+
 import scala.annotation.tailrec
+import scala.concurrent.ExecutionContext.Implicits.global
 
 // Cats
 import cats.Semigroup
-import cats.instances.list._
-import cats.instances.set._
-import cats.instances.map._
-import cats.instances.option._
-import cats.syntax.apply._
-import cats.syntax.applicativeError._
-import cats.syntax.either._
-import cats.syntax.semigroup._
-import cats.syntax.option._
-import cats.syntax.traverse._
-import cats.syntax.validated._
-import cats.data.NonEmptyList
+import cats.implicits._
+import cats.data.{EitherT, NonEmptyList}
 import cats.data.Validated._
-import cats.effect.IO
+import cats.effect.Sync
+import cats.effect.{IO, LiftIO}
 
 // circe
-import io.circe.Json
+import io.circe.{Decoder, Json}
 import io.circe.syntax._
 import io.circe.optics.JsonPath._
 
@@ -94,8 +90,21 @@ object Resolver {
    *        resolver
    * @return a configured Resolver instance
    */
-  def apply(cacheSize: Int, refs: RepositoryRef*): Resolver =
-    Resolver(cacheSize, List[RepositoryRef](refs: _*))
+  def apply[F[_]: Sync](cacheSize: Int, refs: RepositoryRef*): F[Resolver[F]] =
+    SchemaCache[F](cacheSize).map(cacheOpt => new Resolver(cacheOpt, List(refs: _*)))
+
+  final case class ResolverConfig(cacheSize: Int, cacheTtl: Option[Int], repositoryRefs: List[Json])
+
+  val resolverConfigDecoder: AccumulatingDecoder[ResolverConfig] =
+    new Decoder[ResolverConfig] {
+      override final def apply(c: HCursor): Result[ResolverConfig] = {
+        for {
+          cacheSize <- c.downField("cacheSize").as[Int]
+          cacheTtl  <- c.downField("cacheTtl").as[Option[Int]]
+          repos     <- c.downField("repositories").as[List[Json]]
+        } yield ResolverConfig(cacheSize, cacheTtl, repos)
+      }
+    }.accumulating
 
   /**
    * Constructs a Resolver instance from a Json.
@@ -104,36 +113,26 @@ object Resolver {
    *        for this resolver
    * @return a configured Resolver instance
    */
-  def parse(config: Json): ValidatedNelType[Resolver] = {
+  def parse[F[_]: Sync](config: Json): F[Either[NonEmptyList[ProcessingMessage], Resolver[F]]] = {
+    import ValidatableCirceMethods._
+    import ValidationExceptions._
 
     // We can use the bootstrap Resolver for working
     // with JSON Schemas here.
-    implicit val resolver = Bootstrap.Resolver
+    val resolver = Bootstrap.resolver[F]
 
-    import ValidatableCirceMethods._
+    resolver.flatMap { implicit resolver =>
+      val result = for {
+        json <- EitherT(config.verifySchemaAndValidate(ConfigurationSchema, dataOnly = true))
+        config <- EitherT
+          .fromEither(resolverConfigDecoder(json.hcursor).toEither)
+          .leftMap(nel => nel.map(failure => ProcessingMessage(failure.getMessage)))
+        cacheOpt <- EitherT.liftF(SchemaCache(config.cacheSize, config.cacheTtl))
+        refs     <- EitherT.fromEither(getRepositoryRefs(config.repositoryRefs).toEither)
+      } yield Resolver(cacheOpt, refs)
 
-    // Check it passes validation
-    config
-      .verifySchemaAndValidate(ConfigurationSchema, dataOnly = true)
-      .andThen { json =>
-        val cacheSize =
-          root.cacheSize.int
-            .getOption(json)
-            .toValidNel("Could not retrieve field 'cacheSize'".toProcessingMessage)
-        val cacheTtl =
-          root.cacheTtl.int.getOption(json).validNel[ProcessingMessage]
-        val repositoryRefs =
-          root.repositories.arr
-            .getOption(json)
-            .toValidNel("Could not retrieve field 'repositories'".toProcessingMessage)
-            .andThen(arr => getRepositoryRefs(arr.toList))
-
-        (cacheSize, repositoryRefs, cacheTtl).mapN {
-          Resolver(_, _, _)
-        }
-      }
-      .leftMap(errors =>
-        errors.prepend("Resolver configuration failed JSON Schema validation".toProcessingMessage))
+      result.value
+    }
   }
 
   /**
@@ -172,43 +171,6 @@ object Resolver {
       HttpRepositoryRef.parse(rc)
     } else {
       s"Configuration unrecognizable as either embedded or HTTP repository".invalid.toProcessingMessageNel
-    }
-  }
-
-  /**
-   * Tail-recursive function to find our schema in one
-   * of our repositories.
-   *
-   * @param schemaKey The SchemaKey uniquely identifying
-   *                  this schema in Iglu
-   * @param remaining A List of repositories we have to look in
-   *                  (not-tried yet or with non-404 error)
-   * @param tried A Map of repositories with their accumulated errors
-   *              we have looked in fruitlessly so far
-   * @return either a Success-boxed schema (as a Json),
-   *         or a Failure-boxing of Map of repositories with all their
-   *         accumulated errors
-   */
-  @tailrec def traverseRepos(
-    schemaKey: SchemaKey,
-    remaining: RepositoryRefs,
-    tried: RepoFailuresMap): SchemaLookup = {
-    remaining match {
-      case Nil => tried.invalid
-      case repo :: repos => {
-        repo.lookupSchema(schemaKey) match {
-          case Right(Some(schema)) if isValid(schema) => schema.valid
-          case Right(Some(schema)) =>
-            val error = RepoError(getErrors(schema).toSet, 1, unrecoverable = true).some
-            traverseRepos(schemaKey, repos, Map(repo -> error) |+| tried)
-          case Right(None) =>
-            val error = none[RepoError]
-            traverseRepos(schemaKey, repos, Map(repo -> error) |+| tried)
-          case Left(e) =>
-            val error = RepoError(Set(e), 1, unrecoverable = false).some
-            traverseRepos(schemaKey, repos, Map(repo -> error) |+| tried)
-        }
-      }
     }
   }
 
@@ -272,12 +234,6 @@ object Resolver {
 
     NonEmptyList(notFound, failures)
   }
-
-  /**
-   * Get Unix epoch timestamp in seconds
-   */
-  private def currentSeconds: Int =
-    (System.currentTimeMillis() / 1000).toInt
 }
 
 /**
@@ -289,68 +245,13 @@ object Resolver {
  * specified by the exact same version (i.e.
  * MODEL-REVISION-ADDITION).
  */
-case class Resolver(
-  cacheSize: Int = 500,
-  repos: RepositoryRefs,
-  cacheTtl: Option[Int] = None
+case class Resolver[F[_]: Sync](
+  cache: Option[SchemaCache[F]],
+  repos: List[RepositoryRef],
 ) {
   import Resolver._
 
   private[client] val allRepos = Bootstrap.Repo :: repos
-
-  // TODO: ideally replace unsafeRunSync() with referentially transparent API
-  object cache {
-
-    private val lru: Option[SchemaLruMap] =
-      if (cacheSize > 0)
-        Some(LruMap.create[IO, SchemaKey, SchemaLookupStamped](cacheSize).unsafeRunSync())
-      else None
-
-    /**
-     * Looks up the given schema key in the cache.
-     *
-     * @param schemaKey The SchemaKey uniquely identifying
-     *        the schema in Iglu
-     * @return the schema if found as Some Json or None
-     *         if not found, or cache is not enabled.
-     */
-    def get(schemaKey: SchemaKey): Option[SchemaLookup] =
-      for {
-        l      <- lru
-        (t, k) <- l.get(schemaKey).unsafeRunSync()
-        if isViable(t)
-      } yield k
-
-    /**
-     * Caches and returns the given schema. Does
-     * nothing if we don't have an LRU cache
-     * available.
-     *
-     * @param schema The provided schema
-     * @return the same schema
-     */
-    def store(schemaKey: SchemaKey, schema: SchemaLookup): SchemaLookup = {
-      for (l <- lru) {
-        l.put(schemaKey, (currentSeconds, schema)).unsafeRunSync()
-      }
-      schema
-    }
-
-    /**
-     * Check if cached value is still valid based on resolver's `cacheTtl`
-     *
-     * @param storedTstamp timestamp when value was saved
-     * @return true if
-     */
-    private def isViable(storedTstamp: Int): Boolean = {
-      cacheTtl match {
-        case None => true
-        case Some(ttl) =>
-          if (currentSeconds - storedTstamp < ttl) true
-          else false
-      }
-    }
-  }
 
   /**
    * Tries to find the given schema in any of the
@@ -365,17 +266,27 @@ case class Resolver(
    *         Json on Success, or an error String
    *         on Failure
    */
-  def lookupSchema(schemaKey: SchemaKey, attempts: Int = 3): ValidatedNelType[Json] = {
-    val result = cache.get(schemaKey) match {
+  def lookupSchema(
+    schemaKey: SchemaKey,
+    attempts: Int = 3): F[Either[NonEmptyList[ProcessingMessage], Json]] = {
+    val result = cache.flatTraverse(_.get(schemaKey)).flatMap {
       case Some(schema) =>
-        schema.handleErrorWith { serverErrors =>
-          val reposForRetry = getReposForRetry(serverErrors, attempts)
-          traverseRepos(schemaKey, Resolver.prioritizeRepos(schemaKey, reposForRetry), serverErrors)
-        }
+        schema
+          .leftMap { serverErrors =>
+            val reposForRetry = getReposForRetry(serverErrors, attempts)
+            traverseRepos(
+              schemaKey,
+              Resolver.prioritizeRepos(schemaKey, reposForRetry),
+              serverErrors)
+          }
+          .bitraverse(identity, Sync[F].pure(_))
+          .map(_.leftFlatMap(identity))
       case None => traverseRepos(schemaKey, prioritizeRepos(schemaKey, allRepos), Map())
     }
 
-    cache.store(schemaKey, result).leftMap(collectErrors(schemaKey, _))
+    result
+      .flatTap(lookup => cache.traverse(_.store(schemaKey, lookup)))
+      .map(_.leftMap(collectErrors(schemaKey, _)))
   }
 
   /**
@@ -391,26 +302,45 @@ case class Resolver(
    *         Json on Success, or an error String
    *         on Failure
    */
-  def lookupSchema(schemaUri: String): ValidatedNelType[Json] =
+  def lookupSchema(schemaUri: String): F[Either[NonEmptyList[ProcessingMessage], Json]] =
     SchemaKeyUtils
       .parse(schemaUri)
-      .toValidatedNel
-      .andThen(k => lookupSchema(k))
+      .leftMap(NonEmptyList.one)
+      .flatTraverse(key => lookupSchema(key))
 
   /**
-   * Tries to find the given schema in any of the
-   * provided repository refs.
-   *
-   * Unsafe as will throw an exception if the
-   * schema cannot be found.
+   * Tail-recursive function to find our schema in one
+   * of our repositories.
    *
    * @param schemaKey The SchemaKey uniquely identifying
-   *        the schema in Iglu
-   * @return the Json representing this schema
+   *                  this schema in Iglu
+   * @param remaining A List of repositories we have to look in
+   *                  (not-tried yet or with non-404 error)
+   * @param tried A Map of repositories with their accumulated errors
+   *              we have looked in fruitlessly so far
+   * @return either a Success-boxed schema (as a Json),
+   *         or a Failure-boxing of Map of repositories with all their
+   *         accumulated errors
    */
-  def unsafeLookupSchema(schemaKey: SchemaKey): Json =
-    lookupSchema(schemaKey) match {
-      case Valid(schema) => schema
-      case Invalid(err)  => throw new RuntimeException(s"Unsafe schema lookup failed: $err")
+  private def traverseRepos(
+    schemaKey: SchemaKey,
+    remaining: RepositoryRefs,
+    tried: RepoFailuresMap): F[SchemaLookup] = {
+    remaining match {
+      case Nil => Sync[F].pure(tried.asLeft)
+      case repo :: repos =>
+        repo.lookupSchema(schemaKey).flatMap {
+          case Right(Some(schema)) if isValid(schema) => Sync[F].pure(schema.asRight)
+          case Right(Some(schema)) =>
+            val error = RepoError(getErrors(schema).toSet, 1, unrecoverable = true).some
+            traverseRepos(schemaKey, repos, Map(repo -> error) |+| tried)
+          case Right(None) =>
+            val error = none[RepoError]
+            traverseRepos(schemaKey, repos, Map(repo -> error) |+| tried)
+          case Left(e) =>
+            val error = RepoError(Set(e), 1, unrecoverable = false).some
+            traverseRepos(schemaKey, repos, Map(repo -> error) |+| tried)
+        }
     }
+  }
 }
