@@ -16,7 +16,10 @@ package com.snowplowanalytics.iglu.client
 import cats.syntax.either._
 import cats.syntax.option._
 import cats.syntax.validated._
+import cats.syntax.parallel._
 import cats.data.NonEmptyList
+
+import cats.effect.IO
 
 // circe
 import io.circe.Json
@@ -79,16 +82,20 @@ class ResolverSpec extends Specification with DataTables with ValidatedMatchers 
 
   def e1 = {
     val resolver =
-      Resolver(cacheSize = 0, SpecHelpers.IgluCentral, Repos.one, Repos.two, Repos.three)
+      Resolver[IO](cacheSize = 10, SpecHelpers.IgluCentral, Repos.one, Repos.two, Repos.three)
     val schemaKey =
       SchemaKey("de.acompany.snowplow", "mobile_context", "jsonschema", SchemaVer.Full(1, 0, 0))
 
-    Resolver.prioritizeRepos(schemaKey, resolver.allRepos) must_== List(
-      Repos.two,
-      Repos.three,
-      Bootstrap.Repo,
-      Repos.one,
-      SpecHelpers.IgluCentral)
+    resolver
+      .map { resolver =>
+        Resolver.prioritizeRepos(schemaKey, resolver.allRepos) must_== List(
+          Repos.two,
+          Repos.three,
+          Bootstrap.Repo,
+          Repos.one,
+          SpecHelpers.IgluCentral)
+      }
+      .unsafeRunSync()
   }
 
   def e2 = {
@@ -122,9 +129,14 @@ class ResolverSpec extends Specification with DataTables with ValidatedMatchers 
             }
           }"""
 
-    val expected = Resolver(cacheSize = 500, SpecHelpers.IgluCentral, Repos.three)
+    val result = for {
+      parsed <- Resolver.parse[IO](config)
+    } yield
+      parsed must beRight.like {
+        case resolver => resolver.repos must contain(SpecHelpers.IgluCentral, Repos.three)
+      }
 
-    Resolver.parse(config) must beValid(expected)
+    result.unsafeRunSync()
   }
 
   def e3 = {
@@ -137,8 +149,10 @@ class ResolverSpec extends Specification with DataTables with ValidatedMatchers 
       )
     )
 
-    val actual = SpecHelpers.TestResolver.lookupSchema(schemaKey)
-    actual.leftMap(_.map(_.toString)) must beInvalid(expected)
+    SpecHelpers.TestResolver
+      .flatMap(resolver => resolver.lookupSchema(schemaKey))
+      .map(result => result.leftMap(_.map(_.toString)) must beLeft(expected))
+      .unsafeRunSync()
   }
 
   def e4 = {
@@ -158,8 +172,10 @@ class ResolverSpec extends Specification with DataTables with ValidatedMatchers 
         "t").toProcessingMessage.toString
     )
 
-    val actual = SpecHelpers.TestResolver.lookupSchema(schemaKey)
-    actual.leftMap(_.map(_.toString)) must beInvalid(expected)
+    SpecHelpers.TestResolver
+      .flatMap(resolver => resolver.lookupSchema(schemaKey))
+      .map(result => result.leftMap(_.map(_.toString)) must beLeft(expected))
+      .unsafeRunSync()
   }
 
   def e5 = {
@@ -177,8 +193,11 @@ class ResolverSpec extends Specification with DataTables with ValidatedMatchers 
       "array must have at least one element".toProcessingMessage.toString
     )
 
-    val actual = SpecHelpers.TestResolver.lookupSchema(schemaKey)
-    actual.leftMap(_.length) must beInvalid(2)
+    SpecHelpers.TestResolver
+      .flatMap(resolver => resolver.lookupSchema(schemaKey))
+      .map(result => result.leftMap(_.length))
+      .map(_ must beLeft(2))
+      .unsafeRunSync()
   }
 
   def e6 = {
@@ -188,7 +207,7 @@ class ResolverSpec extends Specification with DataTables with ValidatedMatchers 
         "mock_schema",
         "jsonschema",
         SchemaVer.Full(1, 0, 0))
-    val timeoutError = ProcessingMessage("Timeout exception").asLeft[Option[Json]]
+    val timeoutError = IO.pure(ProcessingMessage("Timeout exception").asLeft[Option[Json]])
     val correctSchema =
       json"""{
        	"$$schema": "http://iglucentral.com/schemas/com.snowplowanalytics.self-desc/schema/jsonschema/1-0-0#",
@@ -210,12 +229,19 @@ class ResolverSpec extends Specification with DataTables with ValidatedMatchers 
     httpRep.classPriority returns 1
 
     // Stubbing
-    httpRep.lookupSchema(schemaKey) returns timeoutError thenReturns correctSchema
+    httpRep.lookupSchema[IO](schemaKey) returns timeoutError thenReturns IO.pure(correctSchema)
 
-    val resolver = Resolver(10, List(httpRep))
-    resolver.lookupSchema(schemaKey) must beInvalid and (
-      resolver.lookupSchema(schemaKey) must beEqualTo(correctSchema.map(_.get).toValidatedNel)
-    )
+    val resolver = Resolver[IO](10, httpRep)
+
+    val test1 = resolver
+      .flatMap(resolver => resolver.lookupSchema(schemaKey))
+      .map(_ must beLeft)
+
+    val test2 = resolver
+      .flatMap(_.lookupSchema(schemaKey))
+      .map(_ must beEqualTo(correctSchema.map(_.get)))
+
+    (test1, test2).parMapN(_ and _).unsafeRunSync()
   }
 
   def e7 = {
@@ -226,9 +252,9 @@ class ResolverSpec extends Specification with DataTables with ValidatedMatchers 
         "jsonschema",
         SchemaVer.Full(1, 0, 0))
     val timeout      = ProcessingMessage("Timeout exception")
-    val timeoutError = timeout.asLeft[Option[Json]]
+    val timeoutError = IO.pure(timeout.asLeft[Option[Json]])
     val correctSchema =
-      json"""{
+      IO.pure(json"""{
        	"$$schema": "http://iglucentral.com/schemas/com.snowplowanalytics.self-desc/schema/jsonschema/1-0-0#",
        	"self": {
        		"vendor": "com.snowplowanalytics.iglu-test",
@@ -236,7 +262,7 @@ class ResolverSpec extends Specification with DataTables with ValidatedMatchers 
        		"format": "jsonschema",
        		"version": "1-0-0"
        	}
-       }""".some.asRight
+       }""".some.asRight)
 
     // Mocking repository
     val httpRep = mock[HttpRepositoryRef]
@@ -248,23 +274,28 @@ class ResolverSpec extends Specification with DataTables with ValidatedMatchers 
     httpRep.classPriority returns 1
 
     // Stubbing (return error three times in a row)
-    httpRep.lookupSchema(schemaKey) returns timeoutError thenReturns timeoutError thenReturns timeoutError thenReturns correctSchema
+    httpRep.lookupSchema[IO](schemaKey) returns timeoutError thenReturns timeoutError thenReturns timeoutError thenReturns correctSchema
 
-    val resolver = Resolver(10, List(httpRep))
-    resolver.lookupSchema(schemaKey)
-    resolver.lookupSchema(schemaKey)
-    resolver.lookupSchema(schemaKey)
-    resolver.lookupSchema(schemaKey) // this and subsequent return error
+    val result = for {
+      resolver <- Resolver[IO](10, httpRep)
+      _        <- resolver.lookupSchema(schemaKey)
+      _        <- resolver.lookupSchema(schemaKey)
+      _        <- resolver.lookupSchema(schemaKey)
+      _        <- resolver.lookupSchema(schemaKey) // this and subsequent return error
+      result   <- resolver.lookupSchema(schemaKey)
 
-    resolver.lookupSchema(schemaKey) must beInvalid.like {
-      case error =>
-        error.toList.map(_.toString) must contain(
-          notFoundError(
-            schemaKey.toSchemaUri,
-            List("Iglu Client Embedded [embedded]", "Mock Repo [null]")),
-          timeout.toString
-        )
-    } and (there was 3.times(httpRep).lookupSchema(schemaKey))
+      matcher = result must beLeft.like {
+        case error =>
+          error.toList.map(_.toString) must contain(
+            notFoundError(
+              schemaKey.toSchemaUri,
+              List("Iglu Client Embedded [embedded]", "Mock Repo [null]")),
+            timeout.toString
+          )
+      }
+    } yield matcher and (there was 3.times(httpRep).lookupSchema[IO](schemaKey))
+
+    result.unsafeRunSync()
   }
 
   def e8 = {
@@ -296,26 +327,32 @@ class ResolverSpec extends Specification with DataTables with ValidatedMatchers 
     httpRep2.classPriority returns 1
 
     // Stubbing
-    httpRep1.lookupSchema(schemaKey) returns error1.asLeft[Option[Json]] thenReturns error2
-      .asLeft[Option[Json]]
-    httpRep2.lookupSchema(schemaKey) returns error3.asLeft[Option[Json]] thenReturns error4
-      .asLeft[Option[Json]]
+    httpRep1.lookupSchema[IO](schemaKey) returns IO.pure(error1.asLeft) thenReturns IO.pure(
+      error2.asLeft)
+    httpRep2.lookupSchema[IO](schemaKey) returns IO.pure(error3.asLeft) thenReturns IO.pure(
+      error4.asLeft)
 
-    val resolver = Resolver(10, List(httpRep1, httpRep2))
-    resolver.lookupSchema(schemaKey)
+    val result = for {
+      resolver <- Resolver[IO](10, httpRep1, httpRep2)
+      _        <- resolver.lookupSchema(schemaKey)
+      result   <- resolver.lookupSchema(schemaKey)
 
-    resolver.lookupSchema(schemaKey) must beInvalid.like {
-      case error =>
-        error.toList.map(_.toString) must contain(
-          notFoundError(
-            schemaKey.toSchemaUri,
-            List("Iglu Client Embedded [embedded]", "Mock Repo 2 [null]", "Mock Repo 1 [null]")),
-          error1.toString,
-          error2.toString,
-          error3.toString,
-          error4.toString
-        )
-    } and (there was 2.times(httpRep1).lookupSchema(schemaKey))
+      matcher = result must beLeft.like {
+        case error =>
+          error.toList.map(_.toString) must contain(
+            notFoundError(
+              schemaKey.toSchemaUri,
+              List("Iglu Client Embedded [embedded]", "Mock Repo 2 [null]", "Mock Repo 1 [null]")),
+            error1.toString,
+            error2.toString,
+            error3.toString,
+            error4.toString
+          )
+
+      }
+    } yield matcher and (there was 2.times(httpRep1).lookupSchema[IO](schemaKey))
+
+    result.unsafeRunSync()
   }
 
   def e9 = {
@@ -338,7 +375,7 @@ class ResolverSpec extends Specification with DataTables with ValidatedMatchers 
         }
        }""".some.asRight
 
-    def notFound = Option.empty[Json].asRight // 404
+    def notFound = IO.pure(Option.empty[Json].asRight) // 404
 
     // Mocking repository
     val httpRep = mock[HttpRepositoryRef]
@@ -350,26 +387,23 @@ class ResolverSpec extends Specification with DataTables with ValidatedMatchers 
     httpRep.classPriority returns 1
 
     // Stubbing
-    httpRep.lookupSchema(schemaKey) returns notFound thenReturns correctSchema
+    httpRep.lookupSchema[IO](schemaKey) returns notFound thenReturns IO.pure(correctSchema)
 
-    val resolver = Resolver(cacheSize = 10, repos = List(httpRep), cacheTtl = Some(3))
+    val result = for {
+      resolver          <- SchemaCache[IO](10, Some(3)).map(cache => Resolver(cache, List(httpRep)))
+      fetchResult       <- resolver.lookupSchema(schemaKey) // not found
+      immediateResult   <- resolver.lookupSchema(schemaKey) // not found, but from cache, not from RegistryRef
+      _                 <- IO(Thread.sleep(3500)) // wait until cache expire
+      afterCacheExpired <- resolver.lookupSchema(schemaKey) // invalidate cache, retry and succeed
 
-    // Fetch
-    val fetchResult     = resolver.lookupSchema(schemaKey) // not found
-    val immediateResult = resolver.lookupSchema(schemaKey) // not found, but from cache, not from RegistryRef
-    Thread.sleep(3500) // wait until cache expire
-    val afterCacheExpired = resolver.lookupSchema(schemaKey) // invalidate cache, retry and succeed
+      successCheck                = afterCacheExpired must beEqualTo(correctSchema.map(_.get))
+      immediateCacheNotFoundCheck = immediateResult must beLeft
+      cacheFirstTwoCheck          = there was 2.times(httpRep).lookupSchema[IO](schemaKey)
+      fetchNotFoundCheck          = fetchResult must beLeft
+    } yield
+      successCheck and immediateCacheNotFoundCheck and cacheFirstTwoCheck and fetchNotFoundCheck
 
-    val successCheck                = afterCacheExpired must beEqualTo(correctSchema.map(_.get).toValidatedNel)
-    val immediateCacheNotFoundCheck = immediateResult must beInvalid
-    val cacheFirstTwoCheck          = there was 2.times(httpRep).lookupSchema(schemaKey)
-    val fetchNotFoundCheck          = fetchResult must beInvalid
-
-    cacheFirstTwoCheck
-      .and(successCheck)
-      .and(cacheFirstTwoCheck)
-      .and(immediateCacheNotFoundCheck)
-      .and(fetchNotFoundCheck)
+    result.unsafeRunSync()
   }
 
   def e10 = {
@@ -405,10 +439,13 @@ class ResolverSpec extends Specification with DataTables with ValidatedMatchers 
           }
           }"""
 
-    val expected =
-      Resolver(cacheSize = 500, List(SpecHelpers.IgluCentral, Repos.three), cacheTtl = Some(10))
-
-    Resolver.parse(config) must beValid(expected)
+    Resolver
+      .parse[IO](config)
+      .map(_ must beRight.like {
+        case resolver =>
+          resolver.cache.ttl must beSome(10) and
+            (resolver.repos must contain(SpecHelpers.IgluCentral, Repos.three))
+      })
+      .unsafeRunSync()
   }
-
 }

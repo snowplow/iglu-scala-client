@@ -36,7 +36,8 @@ object BuildSettings {
       "-Ywarn-nullary-override",
       "-Ywarn-nullary-unit",
       "-Ywarn-numeric-widen",
-      "-Ywarn-value-discard"
+      "-Ywarn-value-discard",
+      "-language:higherKinds"
     ),
 
     parallelExecution in Test := false // possible race bugs

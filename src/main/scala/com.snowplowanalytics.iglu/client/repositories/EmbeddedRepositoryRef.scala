@@ -27,6 +27,7 @@ import cats.syntax.either._
 import cats.syntax.option._
 import cats.syntax.validated._
 import cats.syntax.traverse._
+import cats.effect.Sync
 
 // circe
 import io.circe.Json
@@ -113,26 +114,28 @@ case class EmbeddedRepositoryRef(override val config: RepositoryRefConfig, path:
    * @param schemaKey The SchemaKey uniquely identifying the schema in Iglu
    * @return either a schema Json on success, or a ProcessingMessage on Failure
    */
-  def lookupSchema(schemaKey: SchemaKey): Either[ProcessingMessage, Option[Json]] = {
+  def lookupSchema[F[_]: Sync](schemaKey: SchemaKey): F[Either[ProcessingMessage, Option[Json]]] = {
     val schemaPath = SchemaKeyUtils.toPath(path, schemaKey)
     val streamOpt = Option(getClass.getResource(schemaPath))
       .map(_.openStream())
 
-    try {
-      streamOpt
-        .map(stream => Source.fromInputStream(stream).mkString)
-        .traverse(jsonString => parse(jsonString))
-        .leftMap(failure =>
+    Sync[F].delay {
+      try {
+        streamOpt
+          .map(stream => Source.fromInputStream(stream).mkString)
+          .traverse(jsonString => parse(jsonString))
+          .leftMap(failure =>
+            ProcessingMessage(
+              s"Problem parsing $schemaPath as JSON in $descriptor Iglu repository ${config.name}: %s"
+                .format(VE.stripInstanceEtc(failure.message))))
+      } catch {
+        case e: Throwable =>
           ProcessingMessage(
-            s"Problem parsing $schemaPath as JSON in $descriptor Iglu repository ${config.name}: %s"
-              .format(VE.stripInstanceEtc(failure.message))))
-    } catch {
-      case e: Throwable =>
-        ProcessingMessage(
-          s"Unknown problem reading and parsing ${schemaPath} in ${descriptor} Iglu repository ${config.name}: ${VE
-            .getThrowableMessage(e)}").asLeft
-    } finally {
-      streamOpt.foreach(_.close())
+            s"Unknown problem reading and parsing ${schemaPath} in ${descriptor} Iglu repository ${config.name}: ${VE
+              .getThrowableMessage(e)}").asLeft
+      } finally {
+        streamOpt.foreach(_.close())
+      }
     }
   }
 

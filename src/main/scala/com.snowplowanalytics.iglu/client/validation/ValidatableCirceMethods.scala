@@ -17,9 +17,11 @@ package validation
 import scala.collection.JavaConverters._
 
 // Cats
-import cats.instances.option._
+import cats.instances.all._
 import cats.syntax.all._
-import cats.data.NonEmptyList
+import cats.data.{EitherT, NonEmptyList}
+
+import cats.effect.Sync
 
 // circe
 import io.circe.Json
@@ -46,7 +48,9 @@ object ValidatableCirceMethods extends Validatable[Json] {
   private val factory =
     JsonSchemaFactory.builder(JsonSchemaFactory.getInstance).addMetaSchema(metaSchema).build()
 
-  private def validateOnReadySchema(schema: JsonSchema, instance: Json): ValidatedNelType[Json] = {
+  private def validateOnReadySchema(
+    schema: JsonSchema,
+    instance: Json): Either[NonEmptyList[ProcessingMessage], Json] = {
     val messages = schema
       .validate(circeToJackson(instance))
       .asScala
@@ -54,65 +58,60 @@ object ValidatableCirceMethods extends Validatable[Json] {
       .map(message => ProcessingMessage(message.getMessage))
 
     messages match {
-      case x :: xs => NonEmptyList(x, xs).invalid
-      case Nil     => instance.valid
+      case x :: xs => NonEmptyList(x, xs).asLeft
+      case Nil     => instance.asRight
     }
   }
 
-  def validateAgainstSchema(instance: Json, schemaJson: Json): ValidatedNelType[Json] = {
+  def validateAgainstSchema(
+    instance: Json,
+    schemaJson: Json): Either[NonEmptyList[ProcessingMessage], Json] = {
     Either
       .catchNonFatal(factory.getSchema(circeToJackson(schemaJson)))
       .leftMap(error => NonEmptyList.one(ProcessingMessage(error.getMessage)))
-      .toValidated
-      .andThen(schema => validateOnReadySchema(schema, instance))
+      .flatMap(schema => validateOnReadySchema(schema, instance))
   }
 
-  def validate(instance: Json, dataOnly: Boolean = false)(
-    implicit resolver: Resolver): ValidatedNelType[Json] = {
+  def validateAndIdentifySchema[F[_]: Sync](instance: Json, dataOnly: Boolean = false)(
+    implicit resolver: Resolver[F]): F[Either[NonEmptyList[ProcessingMessage], (SchemaKey, Json)]] =
+    validateAsSelfDescribing(instance).productR(validateInstance(instance, dataOnly))
 
-    validateAsSelfDescribing(instance)
-      .andThen(json => splitJson(json).toValidatedNel)
-      .andThen { case (key, data) => resolver.lookupSchema(key).map(schema => (data, schema)) }
-      .andThen {
-        case (data, schema) =>
-          validateAgainstSchema(data, schema).map(_ => if (dataOnly) data else instance)
-      }
-  }
-
-  def validateAndIdentifySchema(instance: Json, dataOnly: Boolean = false)(
-    implicit resolver: Resolver): ValidatedNelType[(SchemaKey, Json)] = {
-
-    validateAsSelfDescribing(instance)
-      .andThen(json => splitJson(json).toValidatedNel)
-      .andThen {
+  private def validateInstance[F[_]: Sync](
+    instance: Json,
+    dataOnly: Boolean)(implicit resolver: Resolver[F]): F[
+    Either[NonEmptyList[ProcessingMessage], (SchemaKey, Json)]] = {
+    splitJson(instance)
+      .leftMap(NonEmptyList.one)
+      .flatTraverse {
         case (key, data) =>
           resolver
             .lookupSchema(key)
-            .andThen(schema => validateAgainstSchema(data, schema))
-            .map(_ => if (dataOnly) (key, data) else (key, instance))
+            .map(_.flatMap(schema => validateAgainstSchema(data, schema)))
+            .map(_.map(_ => if (dataOnly) (key, data) else (key, instance)))
       }
   }
 
-  def verifySchemaAndValidate(
+  def verifySchemaAndValidate[F[_]: Sync](
     instance: Json,
     schemaCriterion: SchemaCriterion,
-    dataOnly: Boolean = false)(implicit resolver: Resolver): ValidatedNelType[Json] = {
+    dataOnly: Boolean = false)(
+    implicit resolver: Resolver[F]): F[Either[NonEmptyList[ProcessingMessage], Json]] = {
+    val result = for {
+      json         <- EitherT(validateAsSelfDescribing(instance))
+      keyDataTuple <- EitherT.fromEither[F](splitJson(json).leftMap(NonEmptyList.one))
+      (key, data) = keyDataTuple
+      _ <- EitherT.fromEither[F](
+        Either.cond(
+          schemaCriterion.matches(key),
+          key,
+          NonEmptyList.one(ProcessingMessage(
+            s"Verifying schema as ${schemaCriterion.asString} failed: found ${key.toSchemaUri}"))
+        ))
+      schema <- EitherT(resolver.lookupSchema(key))
+      _      <- EitherT.fromEither[F](validateAgainstSchema(data, schema))
+    } yield if (dataOnly) data else instance
 
-    validateAsSelfDescribing(instance)
-      .andThen(json => splitJson(json).toValidatedNel)
-      .andThen {
-        case (key, data) =>
-          Either
-            .cond(
-              schemaCriterion.matches(key),
-              key,
-              ProcessingMessage(
-                s"Verifying schema as ${schemaCriterion.asString} failed: found ${key.toSchemaUri}"))
-            .toValidatedNel
-            .andThen(schemaKey => resolver.lookupSchema(key))
-            .andThen(schema => validateAgainstSchema(data, schema))
-            .map(_ => if (dataOnly) data else instance)
-      }
+    result.value
   }
 
   /**
@@ -121,8 +120,9 @@ object ValidatableCirceMethods extends Validatable[Json] {
    * Unsafe lookup is fine here because we know this
    * schema exists in our resources folder
    */
-  private[validation] def getSelfDescribingSchema(implicit resolver: Resolver): Json =
-    resolver.unsafeLookupSchema(
+  private[validation] def getSelfDescribingSchema[F[_]: Sync](
+    implicit resolver: Resolver[F]): F[Either[NonEmptyList[ProcessingMessage], Json]] =
+    resolver.lookupSchema(
       SchemaKey(
         "com.snowplowanalytics.self-desc",
         "instance-iglu-only",
@@ -152,7 +152,8 @@ object ValidatableCirceMethods extends Validatable[Json] {
    *         a NonEmptyList of
    *         ProcessingMessages
    */
-  private[validation] def validateAsSelfDescribing(instance: Json)(
-    implicit resolver: Resolver): ValidatedNelType[Json] =
-    validateAgainstSchema(instance, getSelfDescribingSchema)
+  private[validation] def validateAsSelfDescribing[F[_]: Sync](instance: Json)(
+    implicit resolver: Resolver[F]): F[Either[NonEmptyList[ProcessingMessage], Json]] =
+    getSelfDescribingSchema
+      .map(_.flatMap(selfDesc => validateAgainstSchema(instance, selfDesc)))
 }

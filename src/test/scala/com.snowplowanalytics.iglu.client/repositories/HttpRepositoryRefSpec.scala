@@ -15,6 +15,7 @@ package repositories
 
 // Cats
 import cats.syntax.option._
+import cats.effect.IO
 
 // circe
 import io.circe.literal._
@@ -113,13 +114,18 @@ class HttpRepositoryRefSpec extends Specification with DataTables with Validated
             "additionalProperties": false
           }"""
 
-    val actual = SpecHelpers.IgluCentral.lookupSchema(schemaKey)
-    actual.map(_.map(_.toString)) must beRight(expected.toString.some)
+    SpecHelpers.IgluCentral
+      .lookupSchema[IO](schemaKey)
+      .map(_ must beRight(expected.some))
+      .unsafeRunSync()
   }
 
   def e4 = {
     val schemaKey = SchemaKey("de.ersatz.n-a", "null", "jsonschema", SchemaVer.Full(1, 0, 0))
-    SpecHelpers.IgluCentral.lookupSchema(schemaKey) must beRight(None)
+    SpecHelpers.IgluCentral
+      .lookupSchema[IO](schemaKey)
+      .map(_ must beRight(None))
+      .unsafeRunSync()
   }
 
   def e5 = {
