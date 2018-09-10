@@ -20,14 +20,20 @@ import io.circe.syntax._
 // TODO: replace with better format after discussion
 case class ProcessingMessage(
   message: String,
+  jsonPath: Option[String] = None,
+  targets: Option[List[String]] = None,
   schemaKey: Option[String] = None,
-  repositories: Option[Json] = None) {
+  keyword: Option[String] = None,
+  repositories: Option[List[String]] = None) {
 
   def asJson: Json = {
     Json.obj(
-      "level" := "error",
       "message" := message,
-      "schemaKey" := schemaKey
+      "path" := jsonPath,
+      "schemaKey" := schemaKey,
+      "keyword" := keyword,
+      "targets" := targets,
+      "repositories" := repositories
     )
   }
 
