@@ -17,12 +17,12 @@ object Dependencies {
     // Java
     val commonsLang     = "3.1"
     val jacksonDatabind = "2.2.3"
-    val jsonValidator   = "0.1.21"
+    val jsonValidator   = "1.0.2"
     // Scala
     val igluCore        = "0.4.0"
     val circe           = "0.11.1"
     val json4s          = "3.2.11"
-    val lruMap          = "0.1.0"
+    val lruMap          = "0.2.0"
     val scalaj          = "2.4.1"
     // Scala (test only)
     val specs2          = "4.3.3"
