@@ -28,7 +28,6 @@ import io.circe.optics.JsonPath._
 import com.snowplowanalytics.iglu.core.SchemaKey
 
 // This project
-import validation.ProcessingMessageMethods._
 import utils.JacksonCatsUtils._
 import validation.ProcessingMessage
 
@@ -51,17 +50,17 @@ object RepositoryRefConfig {
     (
       root.name.string
         .getOption(config)
-        .toValidNel(s"Could not retrieve field 'name'".toProcessingMessage),
+        .toValidNel(ProcessingMessage(s"Could not retrieve field 'name'")),
       root.priority.int
         .getOption(config)
-        .toValidNel(s"Could not retrieve field 'priority'".toProcessingMessage),
+        .toValidNel(ProcessingMessage(s"Could not retrieve field 'priority'")),
       root.vendorPrefixes.each.string
         .getAll(config)
         .validNel
         .andThen(
           list =>
             if (list.isEmpty)
-              s"Could not retrieve field 'vendorPrefixes'".toProcessingMessage.invalidNel
+              ProcessingMessage(s"Could not retrieve field 'vendorPrefixes'").invalidNel
             else list.validNel)
     ).mapN(RepositoryRefConfig(_, _, _))
 }
