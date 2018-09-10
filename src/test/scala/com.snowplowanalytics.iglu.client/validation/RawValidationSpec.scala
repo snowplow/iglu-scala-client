@@ -44,7 +44,6 @@ class RawValidationSpec extends Specification with DataTables {
         .mkString).leftMap(_ => ProcessingMessage("foo"))
 
   import ValidatableCirceMethods._
-  implicit val resolver = Bootstrap.resolver[IO].unsafeRunSync()
 
   def e1 = {
     val json = json"""{"country": "JP", "beers": ["Asahi", "Orion", "..."]}"""
