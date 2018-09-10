@@ -42,7 +42,6 @@ import validation.SchemaValidation.{getErrors, isValid}
 import validation.ValidatableCirceMethods
 import utils.JacksonCatsUtils._
 import validation.ProcessingMessage
-import validation.ProcessingMessageMethods._
 
 /**
  * Companion object. Lets us create a Resolver from
@@ -161,7 +160,7 @@ object Resolver {
     } else if (HttpRepositoryRef.isHttp(rc)) {
       HttpRepositoryRef.parse(rc)
     } else {
-      s"Configuration unrecognizable as either embedded or HTTP repository".invalid.toProcessingMessageNel
+      ProcessingMessage(s"Configuration unrecognizable as either embedded or HTTP repository").invalidNel
     }
   }
 

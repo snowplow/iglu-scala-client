@@ -46,8 +46,6 @@ import scalaj.http._
 import com.snowplowanalytics.iglu.core.SchemaKey
 
 // This project
-import validation.ProcessingMessageMethods
-import ProcessingMessageMethods._
 import utils.{ValidationExceptions => VE}
 import utils.SchemaKeyUtils
 import validation.ProcessingMessage
@@ -131,7 +129,7 @@ object HttpRepositoryRef {
     root.connection.http.json
       .getOption(config)
       .flatMap(_.as[HttpConnection].toOption)
-      .toValid(s"Could not extract connection.http from ${config.spaces2}".toProcessingMessage)
+      .toValid(ProcessingMessage(s"Could not extract connection.http from ${config.spaces2}"))
 
   /**
    * A wrapper around Java's URI.
