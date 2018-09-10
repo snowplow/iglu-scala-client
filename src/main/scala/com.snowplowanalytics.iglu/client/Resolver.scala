@@ -212,8 +212,9 @@ object Resolver {
         .map(repo => s"${repo.config.name} [${repo.descriptor}]")
 
     val notFound = ProcessingMessage(
-      message = s"Could not find schema with key ${schemaKey.toSchemaUri} in any repository, tried:",
-      repositories = Some(repos.asJson)
+      message =
+        s"Could not find schema with key ${schemaKey.toSchemaUri} in any repository, tried: $repos",
+      repositories = Some(repos)
     )
 
     NonEmptyList(notFound, failures)
