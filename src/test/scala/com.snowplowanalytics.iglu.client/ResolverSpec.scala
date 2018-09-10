@@ -16,7 +16,7 @@ package com.snowplowanalytics.iglu.client
 import cats.syntax.either._
 import cats.syntax.option._
 import cats.syntax.validated._
-import cats.syntax.parallel._
+import cats.syntax.apply._
 import cats.data.NonEmptyList
 
 import cats.effect.IO
@@ -56,8 +56,8 @@ object ResolverSpec {
 
   def notFoundError(schemaKey: String, repos: List[String]): String =
     ProcessingMessage(
-      s"Could not find schema with key ${schemaKey} in any repository, tried:",
-      repositories = Some(repos.asJson)).toString
+      s"Could not find schema with key ${schemaKey} in any repository, tried: $repos",
+      repositories = Some(repos)).toString
 }
 
 class ResolverSpec extends Specification with DataTables with ValidatedMatchers with Mockito {
@@ -240,7 +240,7 @@ class ResolverSpec extends Specification with DataTables with ValidatedMatchers 
       .flatMap(_.lookupSchema(schemaKey))
       .map(_ must beEqualTo(correctSchema.map(_.get)))
 
-    (test1, test2).parMapN(_ and _).unsafeRunSync()
+    (test1, test2).mapN(_ and _).unsafeRunSync()
   }
 
   def e7 = {
