@@ -67,9 +67,11 @@ trait Validatable[JsonAST] { self =>
    *         or a Failure boxing a NonEmptyList
    *         of ProcessingMessages
    */
-  def validate[F[_]: Sync](instance: JsonAST, dataOnly: Boolean = false)(
-    implicit resolver: Resolver[F]): F[Either[NonEmptyList[ProcessingMessage], JsonAST]] =
-    validateAndIdentifySchema(instance, dataOnly).map(_.map(_._2))
+  def validate[F[_]: Sync](
+    resolver: Resolver[F],
+    instance: JsonAST,
+    dataOnly: Boolean = false): F[Either[NonEmptyList[ProcessingMessage], JsonAST]] =
+    validateAndIdentifySchema(resolver, instance, dataOnly).map(_.map(_._2))
 
   /**
    * The same as validate(), but on Success returns
@@ -90,9 +92,10 @@ trait Validatable[JsonAST] { self =>
    *         or a Failure boxing a NonEmptyList
    *         of ProcessingMessages
    */
-  def validateAndIdentifySchema[F[_]: Sync](instance: JsonAST, dataOnly: Boolean = false)(
-    implicit resolver: Resolver[F]): F[
-    Either[NonEmptyList[ProcessingMessage], (SchemaKey, JsonAST)]]
+  def validateAndIdentifySchema[F[_]: Sync](
+    resolver: Resolver[F],
+    instance: JsonAST,
+    dataOnly: Boolean = false): F[Either[NonEmptyList[ProcessingMessage], (SchemaKey, JsonAST)]]
 
   /**
    * Verify that this JSON is of the expected schema,
@@ -114,10 +117,10 @@ trait Validatable[JsonAST] { self =>
    *         of ProcessingMessages
    */
   def verifySchemaAndValidate[F[_]: Sync](
+    resolver: Resolver[F],
     instance: JsonAST,
     schemaCriterion: SchemaCriterion,
-    dataOnly: Boolean = false)(
-    implicit resolver: Resolver[F]): F[Either[NonEmptyList[ProcessingMessage], JsonAST]]
+    dataOnly: Boolean = false): F[Either[NonEmptyList[ProcessingMessage], JsonAST]]
 
   /**
    * Operations available as postfix-ops
@@ -147,9 +150,10 @@ trait Validatable[JsonAST] { self =>
      * @return either Success boxing the Json or a Failure boxing a NonEmptyList
      *         of ProcessingMessages
      */
-    def validate[F[_]: Sync](dataOnly: Boolean)(
-      implicit resolver: Resolver[F]): F[Either[NonEmptyList[ProcessingMessage], JsonAST]] =
-      self.validate(instance, dataOnly)
+    def validate[F[_]: Sync](
+      resolver: Resolver[F],
+      dataOnly: Boolean): F[Either[NonEmptyList[ProcessingMessage], JsonAST]] =
+      self.validate(resolver, instance, dataOnly)
 
     /**
      * The same as validate(), but on Success returns a tuple containing the SchemaKey as well as
@@ -160,9 +164,10 @@ trait Validatable[JsonAST] { self =>
      * @return either Success boxing a Tuple2 of the JSON's SchemaKey plus its Json,
      *         or a Failure boxing a NonEmptyList of ProcessingMessages
      */
-    def validateAndIdentifySchema[F[_]: Sync](dataOnly: Boolean)(implicit resolver: Resolver[F]): F[
-      Either[NonEmptyList[ProcessingMessage], (SchemaKey, JsonAST)]] =
-      self.validateAndIdentifySchema(instance, dataOnly)
+    def validateAndIdentifySchema[F[_]: Sync](
+      resolver: Resolver[F],
+      dataOnly: Boolean): F[Either[NonEmptyList[ProcessingMessage], (SchemaKey, JsonAST)]] =
+      self.validateAndIdentifySchema(resolver, instance, dataOnly)
 
     /**
      * Verify that this JSON is of the expected schema, then validate it against the schema.
@@ -173,8 +178,10 @@ trait Validatable[JsonAST] { self =>
      * @return either Success boxing the Json or a Failure boxing a NonEmptyList
      *         of ProcessingMessages
      */
-    def verifySchemaAndValidate[F[_]: Sync](schemaCriterion: SchemaCriterion, dataOnly: Boolean)(
-      implicit resolver: Resolver[F]): F[Either[NonEmptyList[ProcessingMessage], JsonAST]] =
-      self.verifySchemaAndValidate(instance, schemaCriterion, dataOnly)
+    def verifySchemaAndValidate[F[_]: Sync](
+      resolver: Resolver[F],
+      schemaCriterion: SchemaCriterion,
+      dataOnly: Boolean): F[Either[NonEmptyList[ProcessingMessage], JsonAST]] =
+      self.verifySchemaAndValidate(resolver, instance, schemaCriterion, dataOnly)
   }
 }
