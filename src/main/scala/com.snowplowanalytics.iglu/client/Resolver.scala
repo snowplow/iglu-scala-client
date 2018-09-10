@@ -112,14 +112,14 @@ object Resolver {
     import ValidatableCirceMethods._
 
     val result = for {
-      resolver <- EitherT.liftF(Bootstrap.resolver[F])
+      resolver <- EitherT.right(Bootstrap.resolver[F])
       json <- EitherT(
         config.verifySchemaAndValidate(resolver, ConfigurationSchema, dataOnly = true))
       config <- EitherT
-        .fromEither(resolverConfigDecoder(json.hcursor).toEither)
+        .fromEither[F](resolverConfigDecoder(json.hcursor).toEither)
         .leftMap(nel => nel.map(failure => ProcessingMessage(failure.getMessage)))
       cache <- EitherT.liftF(SchemaCache(config.cacheSize, config.cacheTtl))
-      refs  <- EitherT.fromEither(getRepositoryRefs(config.repositoryRefs).toEither)
+      refs  <- EitherT.fromEither[F](getRepositoryRefs(config.repositoryRefs).toEither)
     } yield Resolver(cache, refs)
 
     result.value
@@ -238,7 +238,7 @@ object Resolver {
  */
 case class Resolver[F[_]: Sync](
   cache: SchemaCache[F],
-  repos: List[RepositoryRef],
+  repos: List[RepositoryRef]
 ) {
   import Resolver._
 

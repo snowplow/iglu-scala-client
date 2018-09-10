@@ -17,6 +17,7 @@ package validation
 import scala.language.implicitConversions
 
 // Cats
+import cats.syntax.either._
 import cats.syntax.functor._
 import cats.data.NonEmptyList
 import cats.effect.Sync
