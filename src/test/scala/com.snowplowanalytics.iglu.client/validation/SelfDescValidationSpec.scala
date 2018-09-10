@@ -27,7 +27,6 @@ import com.snowplowanalytics.iglu.core.{SchemaCriterion, SchemaKey, SchemaVer}
 
 // This project
 import ValidatableCirceMethods._
-import validation.ProcessingMessageMethods._
 
 // Specs2
 import org.specs2.Specification
@@ -168,8 +167,8 @@ class SelfDescValidationSpec extends Specification with ValidatedMatchers {
   val incorrectKey =
     SchemaCriterion("com.snowplowanalytics.iglu-test", "stock-item", "jsonschema", 2, 0, 0)
   val verifyExpected =
-    "Verifying schema as iglu:com.snowplowanalytics.iglu-test/stock-item/jsonschema/2-0-0 failed: found iglu:com.snowplowanalytics.iglu-test/stock-item/jsonschema/1-0-0".toProcessingMessageNel
-      .map(_.toString)
+    NonEmptyList.one(ProcessingMessage(
+      "Verifying schema as iglu:com.snowplowanalytics.iglu-test/stock-item/jsonschema/2-0-0 failed: found iglu:com.snowplowanalytics.iglu-test/stock-item/jsonschema/1-0-0").toString)
 
   def e9 = {
     val action = for {

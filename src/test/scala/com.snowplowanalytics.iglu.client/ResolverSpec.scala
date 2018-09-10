@@ -32,7 +32,6 @@ import com.snowplowanalytics.iglu.core.{SchemaKey, SchemaVer}
 
 // This project
 import repositories.{EmbeddedRepositoryRef, HttpRepositoryRef, RepositoryRefConfig}
-import validation.ProcessingMessageMethods._
 import com.snowplowanalytics.iglu.client.validation.ProcessingMessage
 
 // Specs2
@@ -168,8 +167,8 @@ class ResolverSpec extends Specification with DataTables with ValidatedMatchers 
         "iglu:com.snowplowanalytics.iglu-test/corrupted_schema/jsonschema/1-0-0",
         List("Iglu Client Embedded [embedded]", "Iglu Test Embedded [embedded]")
       ),
-      ("Problem parsing /iglu-test-embedded/schemas/com.snowplowanalytics.iglu-test/corrupted_schema/jsonschema/1-0-0 as JSON in embedded Iglu repository Iglu Test Embedded: exhausted inpu" +
-        "t").toProcessingMessage.toString
+      ProcessingMessage(
+        "Problem parsing /iglu-test-embedded/schemas/com.snowplowanalytics.iglu-test/corrupted_schema/jsonschema/1-0-0 as JSON in embedded Iglu repository Iglu Test Embedded: exhausted input").toString
     )
 
     SpecHelpers.TestResolver
@@ -190,7 +189,7 @@ class ResolverSpec extends Specification with DataTables with ValidatedMatchers 
         "iglu:com.snowplowanalytics.iglu-test/invalid_schema/jsonschema/1-0-0",
         List("Iglu Client Embedded [embedded]", "Iglu Test Embedded [embedded]")
       ),
-      "array must have at least one element".toProcessingMessage.toString
+      ProcessingMessage("array must have at least one element").toString
     )
 
     SpecHelpers.TestResolver
