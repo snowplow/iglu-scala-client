@@ -72,14 +72,17 @@ object ValidatableCirceMethods extends Validatable[Json] {
       .flatMap(schema => validateOnReadySchema(schema, instance))
   }
 
-  def validateAndIdentifySchema[F[_]: Sync](instance: Json, dataOnly: Boolean = false)(
-    implicit resolver: Resolver[F]): F[Either[NonEmptyList[ProcessingMessage], (SchemaKey, Json)]] =
-    validateAsSelfDescribing(instance).productR(validateInstance(instance, dataOnly))
+  def validateAndIdentifySchema[F[_]: Sync](
+    resolver: Resolver[F],
+    instance: Json,
+    dataOnly: Boolean = false): F[Either[NonEmptyList[ProcessingMessage], (SchemaKey, Json)]] =
+    validateAsSelfDescribing(resolver, instance).productR(
+      validateInstance(resolver, instance, dataOnly))
 
   private def validateInstance[F[_]: Sync](
+    resolver: Resolver[F],
     instance: Json,
-    dataOnly: Boolean)(implicit resolver: Resolver[F]): F[
-    Either[NonEmptyList[ProcessingMessage], (SchemaKey, Json)]] = {
+    dataOnly: Boolean): F[Either[NonEmptyList[ProcessingMessage], (SchemaKey, Json)]] = {
     splitJson(instance)
       .leftMap(NonEmptyList.one)
       .flatTraverse {
@@ -92,14 +95,15 @@ object ValidatableCirceMethods extends Validatable[Json] {
   }
 
   def verifySchemaAndValidate[F[_]: Sync](
+    resolver: Resolver[F],
     instance: Json,
     schemaCriterion: SchemaCriterion,
-    dataOnly: Boolean = false)(
-    implicit resolver: Resolver[F]): F[Either[NonEmptyList[ProcessingMessage], Json]] = {
+    dataOnly: Boolean = false): F[Either[NonEmptyList[ProcessingMessage], Json]] = {
     val result = for {
-      json         <- EitherT(validateAsSelfDescribing(instance))
+      json         <- EitherT(validateAsSelfDescribing(resolver, instance))
       keyDataTuple <- EitherT.fromEither[F](splitJson(json).leftMap(NonEmptyList.one))
       (key, data) = keyDataTuple
+
       _ <- EitherT.fromEither[F](
         Either.cond(
           schemaCriterion.matches(key),
@@ -121,7 +125,7 @@ object ValidatableCirceMethods extends Validatable[Json] {
    * schema exists in our resources folder
    */
   private[validation] def getSelfDescribingSchema[F[_]: Sync](
-    implicit resolver: Resolver[F]): F[Either[NonEmptyList[ProcessingMessage], Json]] =
+    resolver: Resolver[F]): F[Either[NonEmptyList[ProcessingMessage], Json]] =
     resolver.lookupSchema(
       SchemaKey(
         "com.snowplowanalytics.self-desc",
@@ -152,8 +156,9 @@ object ValidatableCirceMethods extends Validatable[Json] {
    *         a NonEmptyList of
    *         ProcessingMessages
    */
-  private[validation] def validateAsSelfDescribing[F[_]: Sync](instance: Json)(
-    implicit resolver: Resolver[F]): F[Either[NonEmptyList[ProcessingMessage], Json]] =
-    getSelfDescribingSchema
+  private[validation] def validateAsSelfDescribing[F[_]: Sync](
+    resolver: Resolver[F],
+    instance: Json): F[Either[NonEmptyList[ProcessingMessage], Json]] =
+    getSelfDescribingSchema(resolver)
       .map(_.flatMap(selfDesc => validateAgainstSchema(instance, selfDesc)))
 }
