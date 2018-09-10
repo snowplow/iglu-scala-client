@@ -42,7 +42,11 @@ object SchemaValidation {
    */
   def getErrors(schema: Json): List[ProcessingMessage] = {
     val jacksonJson = new ObjectMapper().readTree(schema.noSpaces)
-    v4Schema.validate(jacksonJson).asScala.toList.map(m => ProcessingMessage(m.getMessage))
+    v4Schema
+      .validate(jacksonJson)
+      .asScala
+      .toList
+      .map(m => ProcessingMessage(m.getMessage, jsonPath = Some(m.getPath)))
   }
 
   /**
