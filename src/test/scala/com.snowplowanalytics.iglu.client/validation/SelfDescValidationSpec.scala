@@ -50,21 +50,29 @@ class SelfDescValidationSpec extends Specification with ValidatedMatchers {
   verifying an incorrect self-desc JSON vs the incorrect schema should return an error message in a Failure  $e10
   """
 
-  implicit val resolver = SpecHelpers.TestResolver.unsafeRunSync()
-
   val validJson =
     json"""{"schema": "iglu:com.snowplowanalytics.iglu-test/stock-item/jsonschema/1-0-0", "data": { "id": "123-12", "name": "t-shirt", "price": 29.99 } }"""
 
   val validJsonExpectedData = validJson.hcursor
     .get[Json]("data")
 
-  def e1 = validJson.validate[IO](dataOnly = false).map(_ must beRight(validJson)).unsafeRunSync()
+  def e1 = {
+    val action = for {
+      resolver <- SpecHelpers.TestResolver
+      result   <- validJson.validate[IO](resolver, dataOnly = false)
+    } yield result must beRight(validJson)
 
-  def e2 =
-    validJson
-      .validate[IO](dataOnly = true)
-      .map(_ must beEqualTo(validJsonExpectedData))
-      .unsafeRunSync()
+    action.unsafeRunSync()
+  }
+
+  def e2 = {
+    val action = for {
+      resolver <- SpecHelpers.TestResolver
+      result   <- validJson.validate[IO](resolver, dataOnly = true)
+    } yield result must beEqualTo(validJsonExpectedData)
+
+    action.unsafeRunSync()
+  }
 
   val invalidJson =
     json"""{"schema": "iglu:com.snowplowanalytics.iglu-test/stock-item/jsonschema/1-0-0", "data": { "id": "123-12", "newName": "t-shirt", "price": "tbc" } }"""
@@ -93,12 +101,14 @@ class SelfDescValidationSpec extends Specification with ValidatedMatchers {
     )
     .map(_.toString)
 
-  def e3 =
-    invalidJson
-      .validate[IO](dataOnly = false)
-      .map(_.leftMap(_.map(_.toString)))
-      .map(_ must beLeft) // TODO: check expected messages
-      .unsafeRunSync()
+  def e3 = {
+    val action = for {
+      resolver <- SpecHelpers.TestResolver
+      result   <- invalidJson.validate[IO](resolver, dataOnly = false)
+    } yield result must beLeft
+
+    action.unsafeRunSync()
+  }
 
   val expectedKey =
     SchemaKey(
@@ -110,36 +120,50 @@ class SelfDescValidationSpec extends Specification with ValidatedMatchers {
   val expectedCriterion =
     SchemaCriterion("com.snowplowanalytics.iglu-test", "stock-item", "jsonschema", 1, 0, 0)
 
-  def e4 =
-    validJson
-      .validateAndIdentifySchema[IO](dataOnly = false)
-      .map(_ must beRight((expectedKey, validJson)))
-      .unsafeRunSync()
+  def e4 = {
+    val action = for {
+      resolver <- SpecHelpers.TestResolver
+      result   <- validJson.validateAndIdentifySchema[IO](resolver, dataOnly = false)
+    } yield result must beRight((expectedKey, validJson))
 
-  def e5 =
-    validJson
-      .validateAndIdentifySchema[IO](dataOnly = true)
-      .map(_ must beEqualTo(validJsonExpectedData.map(data => (expectedKey, data))))
-      .unsafeRunSync()
+    action.unsafeRunSync()
+  }
 
-  def e6 =
-    invalidJson
-      .validateAndIdentifySchema[IO](dataOnly = false)
-      .map(_.leftMap(_.map(_.toString)))
-      .map(_ must beLeft) // TODO: Check expected messages
-      .unsafeRunSync()
+  def e5 = {
+    val action = for {
+      resolver <- SpecHelpers.TestResolver
+      result   <- validJson.validateAndIdentifySchema[IO](resolver, dataOnly = true)
+    } yield result must beEqualTo(validJsonExpectedData.map(data => (expectedKey, data)))
 
-  def e7 =
-    validJson
-      .verifySchemaAndValidate[IO](expectedCriterion, dataOnly = false)
-      .map(_ must beRight(validJson))
-      .unsafeRunSync()
+    action.unsafeRunSync()
+  }
 
-  def e8 =
-    validJson
-      .verifySchemaAndValidate[IO](expectedCriterion, dataOnly = true)
-      .map(_ must beEqualTo(validJsonExpectedData))
-      .unsafeRunSync()
+  def e6 = {
+    val action = for {
+      resolver <- SpecHelpers.TestResolver
+      result   <- invalidJson.validateAndIdentifySchema[IO](resolver, dataOnly = false)
+    } yield result must beLeft
+
+    action.unsafeRunSync()
+  }
+
+  def e7 = {
+    val action = for {
+      resolver <- SpecHelpers.TestResolver
+      result   <- validJson.verifySchemaAndValidate[IO](resolver, expectedCriterion, dataOnly = false)
+    } yield result must beRight(validJson)
+
+    action.unsafeRunSync()
+  }
+
+  def e8 = {
+    val action = for {
+      resolver <- SpecHelpers.TestResolver
+      result   <- validJson.verifySchemaAndValidate[IO](resolver, expectedCriterion, dataOnly = true)
+    } yield result must beEqualTo(validJsonExpectedData)
+
+    action.unsafeRunSync()
+  }
 
   val incorrectKey =
     SchemaCriterion("com.snowplowanalytics.iglu-test", "stock-item", "jsonschema", 2, 0, 0)
@@ -147,17 +171,22 @@ class SelfDescValidationSpec extends Specification with ValidatedMatchers {
     "Verifying schema as iglu:com.snowplowanalytics.iglu-test/stock-item/jsonschema/2-0-0 failed: found iglu:com.snowplowanalytics.iglu-test/stock-item/jsonschema/1-0-0".toProcessingMessageNel
       .map(_.toString)
 
-  def e9 =
-    validJson
-      .verifySchemaAndValidate[IO](incorrectKey, dataOnly = false)
-      .map(_.leftMap(_.map(_.toString)))
-      .map(_ must beLeft(verifyExpected))
-      .unsafeRunSync()
+  def e9 = {
+    val action = for {
+      resolver <- SpecHelpers.TestResolver
+      result   <- validJson.verifySchemaAndValidate[IO](resolver, incorrectKey, dataOnly = false)
+    } yield result must beLeft
 
-  def e10 =
-    invalidJson
-      .verifySchemaAndValidate[IO](incorrectKey, dataOnly = false)
-      .map(_.leftMap(_.map(_.toString)))
-      .map(_ must beLeft(verifyExpected))
-      .unsafeRunSync()
+    action.unsafeRunSync()
+  }
+
+  def e10 = {
+    val action = for {
+      resolver <- SpecHelpers.TestResolver
+      result   <- invalidJson.verifySchemaAndValidate[IO](resolver, incorrectKey, dataOnly = false)
+      resultStr = result.leftMap(_.map(_.toString))
+    } yield resultStr must beLeft(verifyExpected)
+
+    action.unsafeRunSync()
+  }
 }

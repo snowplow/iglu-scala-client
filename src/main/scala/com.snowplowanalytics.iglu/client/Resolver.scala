@@ -13,12 +13,8 @@
 package com.snowplowanalytics.iglu.client
 
 // Scala
-import com.snowplowanalytics.iglu.client.utils.ValidationExceptions
 import io.circe.Decoder.Result
-import io.circe.{AccumulatingDecoder, DecodingFailure, HCursor}
-
-import scala.annotation.tailrec
-import scala.concurrent.ExecutionContext.Implicits.global
+import io.circe.{AccumulatingDecoder, HCursor}
 
 // Cats
 import cats.Semigroup
@@ -26,15 +22,10 @@ import cats.implicits._
 import cats.data.{EitherT, NonEmptyList}
 import cats.data.Validated._
 import cats.effect.Sync
-import cats.effect.{IO, LiftIO}
 
 // circe
 import io.circe.{Decoder, Json}
 import io.circe.syntax._
-import io.circe.optics.JsonPath._
-
-// LruMap
-import com.snowplowanalytics.lrumap.LruMap
 
 // Iglu Core
 import com.snowplowanalytics.iglu.core.{SchemaCriterion, SchemaKey}
@@ -44,7 +35,6 @@ import utils.SchemaKeyUtils
 import repositories.{EmbeddedRepositoryRef, HttpRepositoryRef, RepositoryRef}
 import validation.SchemaValidation.{getErrors, isValid}
 import validation.ValidatableCirceMethods
-import utils.JacksonCatsUtils._
 import validation.ProcessingMessage
 import validation.ProcessingMessageMethods._
 
@@ -115,24 +105,19 @@ object Resolver {
    */
   def parse[F[_]: Sync](config: Json): F[Either[NonEmptyList[ProcessingMessage], Resolver[F]]] = {
     import ValidatableCirceMethods._
-    import ValidationExceptions._
 
-    // We can use the bootstrap Resolver for working
-    // with JSON Schemas here.
-    val resolver = Bootstrap.resolver[F]
+    val result = for {
+      resolver <- EitherT.liftF(Bootstrap.resolver[F])
+      json <- EitherT(
+        config.verifySchemaAndValidate(resolver, ConfigurationSchema, dataOnly = true))
+      config <- EitherT
+        .fromEither(resolverConfigDecoder(json.hcursor).toEither)
+        .leftMap(nel => nel.map(failure => ProcessingMessage(failure.getMessage)))
+      cacheOpt <- EitherT.liftF(SchemaCache(config.cacheSize, config.cacheTtl))
+      refs     <- EitherT.fromEither(getRepositoryRefs(config.repositoryRefs).toEither)
+    } yield Resolver(cacheOpt, refs)
 
-    resolver.flatMap { implicit resolver =>
-      val result = for {
-        json <- EitherT(config.verifySchemaAndValidate(ConfigurationSchema, dataOnly = true))
-        config <- EitherT
-          .fromEither(resolverConfigDecoder(json.hcursor).toEither)
-          .leftMap(nel => nel.map(failure => ProcessingMessage(failure.getMessage)))
-        cacheOpt <- EitherT.liftF(SchemaCache(config.cacheSize, config.cacheTtl))
-        refs     <- EitherT.fromEither(getRepositoryRefs(config.repositoryRefs).toEither)
-      } yield Resolver(cacheOpt, refs)
-
-      result.value
-    }
+    result.value
   }
 
   /**
