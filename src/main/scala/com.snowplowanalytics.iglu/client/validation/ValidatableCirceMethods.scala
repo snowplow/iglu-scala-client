@@ -55,7 +55,13 @@ object ValidatableCirceMethods extends Validatable[Json] {
       .validate(circeToJackson(instance))
       .asScala
       .toList
-      .map(message => ProcessingMessage(message.getMessage))
+      .map(
+        m =>
+          ProcessingMessage(
+            message = m.getMessage,
+            jsonPath = m.getPath.some,
+            keyword = m.getType.some,
+            targets = m.getArguments.toList.some))
 
     messages match {
       case x :: xs => NonEmptyList(x, xs).asLeft
