@@ -15,14 +15,13 @@ import sbt._
 object Dependencies {
   object V {
     // Java
-    val commonsLang     = "3.1"
-    val jacksonDatabind = "2.2.3"
-    val jsonValidator   = "1.0.2"
+    val jsonValidator   = "1.0.16"
+    val slf4j           = "1.7.26"
     // Scala
     val igluCore        = "0.5.1"
+    val cats            = "1.6.1"
     val circe           = "0.11.1"
-    val json4s          = "3.2.11"
-    val lruMap          = "0.2.0"
+    val lruMap          = "0.3.0-M1"
     val scalaj          = "2.4.1"
     // Scala (test only)
     val specs2          = "4.3.3"
@@ -30,19 +29,20 @@ object Dependencies {
 
   object Libraries {
     // Java
-    val commonsLang      = "org.apache.commons"         %  "commons-lang3"           % V.commonsLang
-    val jacksonDatabind  = "com.fasterxml.jackson.core" %  "jackson-databind"        % V.jacksonDatabind
     val jsonValidator    = "com.networknt"              %  "json-schema-validator"   % V.jsonValidator
     // Scala
     val igluCore         = "com.snowplowanalytics"      %% "iglu-core"               % V.igluCore
+    val igluCoreCirce    = "com.snowplowanalytics"      %% "iglu-core-circe"         % V.igluCore
+    val cats             = "org.typelevel"              %% "cats-core"               % V.cats
     val circeParser      = "io.circe"                   %% "circe-parser"            % V.circe
-    val circeOptics      = "io.circe"                   %% "circe-optics"            % V.circe
+    val circeJackson     = "io.circe"                   %% "circe-jackson29"         % V.circe
     val lruMap           = "com.snowplowanalytics"      %% "scala-lru-map"           % V.lruMap
     val scalaj           = "org.scalaj"                 %% "scalaj-http"             % V.scalaj
     // Scala (test only)
-    val circeLiteral     = "io.circe"                   %% "circe-literal"           % V.circe           % "test"
-    val specs2           = "org.specs2"                 %% "specs2-core"             % V.specs2          % "test"
-    val specs2Cats       = "org.specs2"                 %% "specs2-cats"             % V.specs2          % "test"
-    val specs2Mock       = "org.specs2"                 %% "specs2-mock"             % V.specs2          % "test"
+    val circeLiteral     = "io.circe"                   %% "circe-literal"           % V.circe           % Test
+    val specs2           = "org.specs2"                 %% "specs2-core"             % V.specs2          % Test
+    val specs2Cats       = "org.specs2"                 %% "specs2-cats"             % V.specs2          % Test
+    // Java (exists to suppress NOP log message, must not be included in compile-time)
+    val slf4jNop         = "org.slf4j"                  % "slf4j-nop"                % V.slf4j           % Test
   }
 }

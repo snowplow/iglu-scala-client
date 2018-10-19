@@ -40,6 +40,8 @@ object BuildSettings {
       "-language:higherKinds"
     ),
 
+    addCompilerPlugin("org.spire-math" %% "kind-projector" % "0.9.8"),
+
     parallelExecution in Test := false // possible race bugs
   )
 
