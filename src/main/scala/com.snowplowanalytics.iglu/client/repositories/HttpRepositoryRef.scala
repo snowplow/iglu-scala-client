@@ -188,8 +188,9 @@ case class HttpRepositoryRef(
    *         on Failure
    */
   def lookupSchema[F[_]: Sync](schemaKey: SchemaKey): F[Either[ProcessingMessage, Option[Json]]] = {
+    val uriNorm =  if (uri.endsWith("/")) uri.dropRight(1) else uri
     HttpRepositoryRef
-      .stringToUri(SchemaKeyUtils.toPath(uri, schemaKey))
+      .stringToUri(SchemaKeyUtils.toPath(uriNorm, schemaKey))
       .traverse(uri => HttpRepositoryRef.getFromUri(uri, apikey))
       .map { jsonEither =>
         val result = for {
