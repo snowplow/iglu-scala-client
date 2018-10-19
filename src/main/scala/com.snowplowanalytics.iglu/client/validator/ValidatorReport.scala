@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018-2019 Snowplow Analytics Ltd. All rights reserved.
+ * Copyright (c) 2014-2018 Snowplow Analytics Ltd. All rights reserved.
  *
  * This program is licensed to you under the Apache License Version 2.0,
  * and you may not use this file except in compliance with the Apache License Version 2.0.
@@ -10,18 +10,27 @@
  * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the Apache License Version 2.0 for the specific language governing permissions and limitations there under.
  */
-package com.snowplowanalytics.iglu.client.utils
+package com.snowplowanalytics.iglu.client
+package validator
 
-// Jackson
-import com.fasterxml.jackson.databind.{JsonNode, ObjectMapper}
+// Circe
+import io.circe._
+import io.circe.syntax._
 
-// circe
-import io.circe.Json
+case class ValidatorReport(
+  message: String,
+  path: Option[String],
+  targets: List[String],
+  keyword: Option[String])
 
-object JacksonCatsUtils {
-
-  // TODO: make it a real conversion
-  def circeToJackson(circeJson: Json): JsonNode =
-    new ObjectMapper().readTree(circeJson.noSpaces)
-
+object ValidatorReport {
+  implicit val validatorReportCirceEncoder: Encoder[ValidatorReport] =
+    Encoder.instance { report =>
+      Json.obj(
+        "message" := report.message,
+        "path" := report.path,
+        "keyword" := report.keyword,
+        "targets" := report.targets
+      )
+    }
 }

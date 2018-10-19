@@ -24,7 +24,7 @@ Note the double percent (`%%`) between the group and artifactId. That'll ensure 
 
 ## Usage
 
-Primary entity for working with Iglu Scala Client is `com.snowplowanalytics.iglu.client.Resolver`.
+Primary entity for working with Iglu Scala Client is `com.snowplowanalytics.iglu.client.resolver.Resolver`.
 Resolver companion object has `parse` method which allows you to create Resolver instance from **[resolver configuration][resolver-config]**.
 Second working method is `lookupSchema`, receiving Schema key as String or directly `com.snowplowanalytics.iglu.SchemaKey` object,
 this method traverse all configured repositories trying to find Schema by its key.

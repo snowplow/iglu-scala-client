@@ -11,51 +11,41 @@
  * See the Apache License Version 2.0 for the specific language governing permissions and limitations there under.
  */
 package com.snowplowanalytics.iglu.client
-package validation
+package validator
 
-// Scala
-import scala.collection.JavaConverters._
-
-// Jackson
-import com.fasterxml.jackson.databind.ObjectMapper
+// cats
+import cats.data.NonEmptyList
+import cats.syntax.either._
 
 // circe
 import io.circe.Json
 
-// JsonSchema
-import com.networknt.schema._
+// This project
+import ClientError.ValidatorError
 
-object SchemaValidation {
+trait Validator[A] {
 
-  private lazy val v4MetaSchema =
-    new ObjectMapper().readTree(getClass.getResourceAsStream("/v4metaschema.json"))
+  /** Main method, validating _non-self-describing_ instance */
+  protected[iglu] def validate(data: A, schema: Json): Either[ValidatorError, Unit]
 
-  private lazy val v4Schema = JsonSchemaFactory.getInstance.getSchema(v4MetaSchema)
-
-  /**
-   * Get validation errors for Schema
+  /** Get validation errors for Schema
    * Errors like empty `required` property or `minimum` property containing string
    * will be catched
    *
    * @param schema JSON Schema
    * @return list of Processing Messages with log level above warning
    */
-  def getErrors(schema: Json): List[ProcessingMessage] = {
-    val jacksonJson = new ObjectMapper().readTree(schema.noSpaces)
-    v4Schema
-      .validate(jacksonJson)
-      .asScala
-      .toList
-      .map(m => ProcessingMessage(m.getMessage, jsonPath = Some(m.getPath)))
-  }
+  def checkSchema(schema: Json): List[ValidatorError.SchemaIssue]
 
-  /**
-   * Validate JSON Schema against it's own Schema
+  def validateSchema(schema: Json): Either[ValidatorError, Unit] =
+    checkSchema(schema) match {
+      case Nil    => ().asRight
+      case h :: t => ValidatorError.InvalidSchema(NonEmptyList(h, t)).asLeft
+    }
+
+  /** Validate JSON Schema against it's own Schema
    * Errors like empty `required` property or `minimum` property containing string
    * will be catched
-   *
-   * @param schema JSON Schema
-   * @return true if Schema is valid
    */
-  def isValid(schema: Json): Boolean = getErrors(schema).isEmpty
+  def isValidSchema(schema: Json): Boolean = checkSchema(schema).isEmpty
 }
