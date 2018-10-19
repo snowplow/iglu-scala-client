@@ -36,5 +36,4 @@ case class ProcessingMessage(
       "repositories" := repositories
     )
   }
-
 }

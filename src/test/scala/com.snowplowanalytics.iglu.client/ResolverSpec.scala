@@ -149,7 +149,7 @@ class ResolverSpec extends Specification with DataTables with ValidatedMatchers 
     )
 
     SpecHelpers.TestResolver
-      .flatMap(resolver => resolver.lookupSchema(schemaKey))
+      .flatMap(resolver => resolver.lookupSchema(schemaKey, 3))
       .map(result => result.leftMap(_.map(_.toString)) must beLeft(expected))
       .unsafeRunSync()
   }
@@ -172,7 +172,7 @@ class ResolverSpec extends Specification with DataTables with ValidatedMatchers 
     )
 
     SpecHelpers.TestResolver
-      .flatMap(resolver => resolver.lookupSchema(schemaKey))
+      .flatMap(resolver => resolver.lookupSchema(schemaKey, 3))
       .map(result => result.leftMap(_.map(_.toString)) must beLeft(expected))
       .unsafeRunSync()
   }
@@ -193,7 +193,7 @@ class ResolverSpec extends Specification with DataTables with ValidatedMatchers 
     )
 
     SpecHelpers.TestResolver
-      .flatMap(resolver => resolver.lookupSchema(schemaKey))
+      .flatMap(resolver => resolver.lookupSchema(schemaKey, 3))
       .map(result => result.leftMap(_.length))
       .map(_ must beLeft(2))
       .unsafeRunSync()
@@ -233,11 +233,11 @@ class ResolverSpec extends Specification with DataTables with ValidatedMatchers 
     val resolver = Resolver[IO](10, httpRep)
 
     val test1 = resolver
-      .flatMap(resolver => resolver.lookupSchema(schemaKey))
+      .flatMap(resolver => resolver.lookupSchema(schemaKey, 3))
       .map(_ must beLeft)
 
     val test2 = resolver
-      .flatMap(_.lookupSchema(schemaKey))
+      .flatMap(_.lookupSchema(schemaKey, 3))
       .map(_ must beEqualTo(correctSchema.map(_.get)))
 
     (test1, test2).mapN(_ and _).unsafeRunSync()
@@ -277,11 +277,11 @@ class ResolverSpec extends Specification with DataTables with ValidatedMatchers 
 
     val result = for {
       resolver <- Resolver[IO](10, httpRep)
-      _        <- resolver.lookupSchema(schemaKey)
-      _        <- resolver.lookupSchema(schemaKey)
-      _        <- resolver.lookupSchema(schemaKey)
-      _        <- resolver.lookupSchema(schemaKey) // this and subsequent return error
-      result   <- resolver.lookupSchema(schemaKey)
+      _        <- resolver.lookupSchema(schemaKey, 3)
+      _        <- resolver.lookupSchema(schemaKey, 3)
+      _        <- resolver.lookupSchema(schemaKey, 3)
+      _        <- resolver.lookupSchema(schemaKey, 3) // this and subsequent return error
+      result   <- resolver.lookupSchema(schemaKey, 3)
 
       matcher = result must beLeft.like {
         case error =>
@@ -333,8 +333,8 @@ class ResolverSpec extends Specification with DataTables with ValidatedMatchers 
 
     val result = for {
       resolver <- Resolver[IO](10, httpRep1, httpRep2)
-      _        <- resolver.lookupSchema(schemaKey)
-      result   <- resolver.lookupSchema(schemaKey)
+      _        <- resolver.lookupSchema(schemaKey, 3)
+      result   <- resolver.lookupSchema(schemaKey, 3)
 
       matcher = result must beLeft.like {
         case error =>
@@ -390,10 +390,10 @@ class ResolverSpec extends Specification with DataTables with ValidatedMatchers 
 
     val result = for {
       resolver          <- SchemaCache[IO](10, Some(3)).map(cache => Resolver(cache, List(httpRep)))
-      fetchResult       <- resolver.lookupSchema(schemaKey) // not found
-      immediateResult   <- resolver.lookupSchema(schemaKey) // not found, but from cache, not from RegistryRef
+      fetchResult       <- resolver.lookupSchema(schemaKey, 3) // not found
+      immediateResult   <- resolver.lookupSchema(schemaKey, 3) // not found, but from cache, not from RegistryRef
       _                 <- IO(Thread.sleep(3500)) // wait until cache expire
-      afterCacheExpired <- resolver.lookupSchema(schemaKey) // invalidate cache, retry and succeed
+      afterCacheExpired <- resolver.lookupSchema(schemaKey, 3) // invalidate cache, retry and succeed
 
       successCheck                = afterCacheExpired must beEqualTo(correctSchema.map(_.get))
       immediateCacheNotFoundCheck = immediateResult must beLeft

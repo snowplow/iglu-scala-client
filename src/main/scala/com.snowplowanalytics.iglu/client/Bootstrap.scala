@@ -16,7 +16,6 @@ package com.snowplowanalytics.iglu.client
 import cats.effect.Sync
 
 // This project
-import com.snowplowanalytics.iglu.client.{Resolver => UrResolver}
 import repositories.{EmbeddedRepositoryRef, RepositoryRefConfig}
 
 /**

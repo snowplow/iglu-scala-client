@@ -27,7 +27,6 @@ import com.snowplowanalytics.iglu.core.SchemaKey
 
 // This project
 import client.repositories.RepositoryRef
-import client.Resolver.RepoError
 import client.validation.ProcessingMessage
 
 /**

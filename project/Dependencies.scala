@@ -15,8 +15,6 @@ import sbt._
 object Dependencies {
   object V {
     // Java
-    val commonsLang     = "3.1"
-    val jacksonDatabind = "2.2.3"
     val jsonValidator   = "0.1.21"
     // Scala
     val igluCore        = "0.3.0"
@@ -29,8 +27,6 @@ object Dependencies {
 
   object Libraries {
     // Java
-    val commonsLang      = "org.apache.commons"         %  "commons-lang3"           % V.commonsLang
-    val jacksonDatabind  = "com.fasterxml.jackson.core" %  "jackson-databind"        % V.jacksonDatabind
     val jsonValidator    = "com.networknt"              %  "json-schema-validator"   % V.jsonValidator
     // Scala
     val igluCore         = "com.snowplowanalytics"      %% "iglu-core"               % V.igluCore

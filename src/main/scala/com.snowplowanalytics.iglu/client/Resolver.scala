@@ -17,9 +17,8 @@ import io.circe.Decoder.Result
 import io.circe.{AccumulatingDecoder, HCursor}
 
 // Cats
-import cats.Semigroup
 import cats.implicits._
-import cats.data.{EitherT, NonEmptyList}
+import cats.data.{EitherNel, EitherT, NonEmptyList}
 import cats.data.Validated._
 import cats.effect.Sync
 
@@ -31,7 +30,6 @@ import io.circe.syntax._
 import com.snowplowanalytics.iglu.core.{SchemaCriterion, SchemaKey}
 
 // This project
-import utils.SchemaKeyUtils
 import repositories.{EmbeddedRepositoryRef, HttpRepositoryRef, RepositoryRef}
 import validation.SchemaValidation.{getErrors, isValid}
 import validation.ValidatableCirceMethods
@@ -47,30 +45,6 @@ object Resolver {
     SchemaCriterion("com.snowplowanalytics.iglu", "resolver-config", "jsonschema", 1, 0)
 
   /**
-   * Helper class responsible for aggregating repository lookup errors
-   * Using to aggregate all errors for single schema for single repo during all retries
-   *
-   * @param errors set of all errors happened during all attempts
-   * @param attempts amount of undertaken attempts
-   * @param unrecoverable indicates whether among failures were unrecoverable ones (like invalid schema)
-   */
-  private[client] case class RepoError(
-    errors: Set[ProcessingMessage],
-    attempts: Int,
-    unrecoverable: Boolean)
-
-  /**
-   * Semigroup instance helping to aggregate repository errors
-   */
-  private[client] implicit object RepoErrorSemigroup extends Semigroup[RepoError] {
-    override def combine(a: RepoError, b: RepoError): RepoError =
-      RepoError(
-        a.errors |+| b.errors,
-        a.attempts.max(b.attempts) + 1,
-        a.unrecoverable || b.unrecoverable)
-  }
-
-  /**
    * Constructs a Resolver instance from an arg array
    * of RepositoryRefs.
    *
@@ -80,7 +54,7 @@ object Resolver {
    * @return a configured Resolver instance
    */
   def apply[F[_]: Sync](cacheSize: Int, refs: RepositoryRef*): F[Resolver[F]] =
-    SchemaCache[F](cacheSize).map(cacheOpt => new Resolver(cacheOpt, List(refs: _*)))
+    SchemaCache[F](cacheSize, None).map(cacheOpt => new Resolver(cacheOpt, List(refs: _*)))
 
   final case class ResolverConfig(cacheSize: Int, cacheTtl: Option[Int], repositoryRefs: List[Json])
 
@@ -102,7 +76,7 @@ object Resolver {
    *        for this resolver
    * @return a configured Resolver instance
    */
-  def parse[F[_]: Sync](config: Json): F[Either[NonEmptyList[ProcessingMessage], Resolver[F]]] = {
+  def parse[F[_]: Sync](config: Json): F[EitherNel[ProcessingMessage, Resolver[F]]] = {
     import ValidatableCirceMethods._
 
     val result = for {
@@ -230,30 +204,22 @@ object Resolver {
  * specified by the exact same version (i.e.
  * MODEL-REVISION-ADDITION).
  */
-case class Resolver[F[_]: Sync](
-  cache: Option[SchemaCache[F]],
-  repos: List[RepositoryRef],
-) {
+case class Resolver[F[_]: Sync](cache: Option[SchemaCache[F]], repos: List[RepositoryRef]) {
   import Resolver._
 
   private[client] val allRepos = Bootstrap.Repo :: repos
 
   /**
-   * Tries to find the given schema in any of the
-   * provided repository refs.
-   * If any of repositories gives non-non-found error,
-   * lookup will retried 3 times
+   * Tries to find the given schema in any of the provided repository refs
+   * If any of repositories gives non-non-found error, lookup will retried
    *
-   * @param schemaKey The SchemaKey uniquely identifying
-   *        the schema in Iglu
+   * @param schemaKey The SchemaKey uniquely identifying the schema in Iglu
    * @param attempts number of attempts to retry after non-404 errors
    * @return a Validation boxing either the Schema's
    *         Json on Success, or an error String
    *         on Failure
    */
-  def lookupSchema(
-    schemaKey: SchemaKey,
-    attempts: Int = 3): F[Either[NonEmptyList[ProcessingMessage], Json]] = {
+  def lookupSchema(schemaKey: SchemaKey, attempts: Int): F[EitherNel[ProcessingMessage, Json]] = {
     val result = cache.flatTraverse(_.get(schemaKey)).flatMap {
       case Some(schema) =>
         schema
@@ -275,25 +241,6 @@ case class Resolver[F[_]: Sync](
   }
 
   /**
-   * Tries to find the given schema in any of the
-   * provided repository refs.
-   *
-   * Convenience function which converts an
-   * Iglu-format schema URI to a SchemaKey to
-   * perform the lookup.
-   *
-   * @param schemaUri The Iglu-format schema URI
-   * @return a Validation boxing either the Schema's
-   *         Json on Success, or an error String
-   *         on Failure
-   */
-  def lookupSchema(schemaUri: String): F[Either[NonEmptyList[ProcessingMessage], Json]] =
-    SchemaKeyUtils
-      .parse(schemaUri)
-      .leftMap(NonEmptyList.one)
-      .flatTraverse(key => lookupSchema(key))
-
-  /**
    * Tail-recursive function to find our schema in one
    * of our repositories.
    *
@@ -313,18 +260,18 @@ case class Resolver[F[_]: Sync](
     tried: RepoFailuresMap): F[SchemaLookup] = {
     remaining match {
       case Nil => Sync[F].pure(tried.asLeft)
-      case repo :: repos =>
+      case repo :: tail =>
         repo.lookupSchema(schemaKey).flatMap {
           case Right(Some(schema)) if isValid(schema) => Sync[F].pure(schema.asRight)
           case Right(Some(schema)) =>
             val error = RepoError(getErrors(schema).toSet, 1, unrecoverable = true).some
-            traverseRepos(schemaKey, repos, Map(repo -> error) |+| tried)
+            traverseRepos(schemaKey, tail, Map(repo -> error) |+| tried)
           case Right(None) =>
             val error = none[RepoError]
-            traverseRepos(schemaKey, repos, Map(repo -> error) |+| tried)
+            traverseRepos(schemaKey, tail, Map(repo -> error) |+| tried)
           case Left(e) =>
             val error = RepoError(Set(e), 1, unrecoverable = false).some
-            traverseRepos(schemaKey, repos, Map(repo -> error) |+| tried)
+            traverseRepos(schemaKey, tail, Map(repo -> error) |+| tried)
         }
     }
   }

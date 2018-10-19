@@ -23,8 +23,6 @@ lazy val root = (project in file("."))
   .settings(
     libraryDependencies ++= Seq(
       // Java
-      Dependencies.Libraries.commonsLang,
-      Dependencies.Libraries.jacksonDatabind,
       Dependencies.Libraries.jsonValidator,
       // Scala
       Dependencies.Libraries.igluCore,

@@ -82,13 +82,11 @@ case class SchemaCache[F[_]: Sync] private (
 }
 
 object SchemaCache {
-
-  def apply[F[_]: Sync](size: Int, ttl: Option[Int] = None): F[Option[SchemaCache[F]]] = {
+  def apply[F[_]: Sync](size: Int, ttl: Option[Int]): F[Option[SchemaCache[F]]] = {
     Option(())
       .filter(_ => size > 0)
       .filter(_ => !ttl.exists(_ <= 0))
       .traverse(_ => LruMap.create[F, SchemaKey, SchemaLookupStamped](size))
       .map(_.map(lru => new SchemaCache[F](lru, ttl)))
   }
-
 }

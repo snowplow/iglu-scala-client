@@ -17,10 +17,9 @@ package validation
 import scala.collection.JavaConverters._
 
 // Cats
+import cats.data.{EitherNel, EitherT, NonEmptyList}
 import cats.instances.all._
 import cats.syntax.all._
-import cats.data.{EitherT, NonEmptyList}
-
 import cats.effect.Sync
 
 // circe
@@ -50,7 +49,7 @@ object ValidatableCirceMethods extends Validatable[Json] {
 
   private def validateOnReadySchema(
     schema: JsonSchema,
-    instance: Json): Either[NonEmptyList[ProcessingMessage], Json] = {
+    instance: Json): EitherNel[ProcessingMessage, Json] = {
     val messages = schema
       .validate(circeToJackson(instance))
       .asScala
@@ -71,7 +70,7 @@ object ValidatableCirceMethods extends Validatable[Json] {
 
   def validateAgainstSchema(
     instance: Json,
-    schemaJson: Json): Either[NonEmptyList[ProcessingMessage], Json] = {
+    schemaJson: Json): EitherNel[ProcessingMessage, Json] = {
     Either
       .catchNonFatal(factory.getSchema(circeToJackson(schemaJson)))
       .leftMap(error => NonEmptyList.one(ProcessingMessage(error.getMessage)))
@@ -81,20 +80,20 @@ object ValidatableCirceMethods extends Validatable[Json] {
   def validateAndIdentifySchema[F[_]: Sync](
     resolver: Resolver[F],
     instance: Json,
-    dataOnly: Boolean = false): F[Either[NonEmptyList[ProcessingMessage], (SchemaKey, Json)]] =
+    dataOnly: Boolean = false): F[EitherNel[ProcessingMessage, (SchemaKey, Json)]] =
     validateAsSelfDescribing(resolver, instance).productR(
       validateInstance(resolver, instance, dataOnly))
 
   private def validateInstance[F[_]: Sync](
     resolver: Resolver[F],
     instance: Json,
-    dataOnly: Boolean): F[Either[NonEmptyList[ProcessingMessage], (SchemaKey, Json)]] = {
+    dataOnly: Boolean): F[EitherNel[ProcessingMessage, (SchemaKey, Json)]] = {
     splitJson(instance)
       .leftMap(NonEmptyList.one)
       .flatTraverse {
         case (key, data) =>
           resolver
-            .lookupSchema(key)
+            .lookupSchema(key, 3)
             .map(_.flatMap(schema => validateAgainstSchema(data, schema)))
             .map(_.map(_ => if (dataOnly) (key, data) else (key, instance)))
       }
@@ -104,7 +103,7 @@ object ValidatableCirceMethods extends Validatable[Json] {
     resolver: Resolver[F],
     instance: Json,
     schemaCriterion: SchemaCriterion,
-    dataOnly: Boolean = false): F[Either[NonEmptyList[ProcessingMessage], Json]] = {
+    dataOnly: Boolean = false): F[EitherNel[ProcessingMessage, Json]] = {
     val result = for {
       json         <- EitherT(validateAsSelfDescribing(resolver, instance))
       keyDataTuple <- EitherT.fromEither[F](splitJson(json).leftMap(NonEmptyList.one))
@@ -117,7 +116,7 @@ object ValidatableCirceMethods extends Validatable[Json] {
           NonEmptyList.one(ProcessingMessage(
             s"Verifying schema as ${schemaCriterion.asString} failed: found ${key.toSchemaUri}"))
         ))
-      schema <- EitherT(resolver.lookupSchema(key))
+      schema <- EitherT(resolver.lookupSchema(key, 3))
       _      <- EitherT.fromEither[F](validateAgainstSchema(data, schema))
     } yield if (dataOnly) data else instance
 
@@ -131,13 +130,14 @@ object ValidatableCirceMethods extends Validatable[Json] {
    * schema exists in our resources folder
    */
   private[validation] def getSelfDescribingSchema[F[_]: Sync](
-    resolver: Resolver[F]): F[Either[NonEmptyList[ProcessingMessage], Json]] =
+    resolver: Resolver[F]): F[EitherNel[ProcessingMessage, Json]] =
     resolver.lookupSchema(
       SchemaKey(
         "com.snowplowanalytics.self-desc",
         "instance-iglu-only",
         "jsonschema",
-        SchemaVer.Full(1, 0, 0))
+        SchemaVer.Full(1, 0, 0)),
+      3
     )
 
   private def splitJson(json: Json): Either[ProcessingMessage, (SchemaKey, Json)] = {
@@ -153,18 +153,15 @@ object ValidatableCirceMethods extends Validatable[Json] {
   }
 
   /**
-   * Validates that this JSON is a self-
-   * describing JSON.
+   * Validates that this JSON is a self- describing JSON.
    *
    * @param instance The JSON to check
-   * @return either Success boxing the
-   *         Json, or a Failure boxing
-   *         a NonEmptyList of
-   *         ProcessingMessages
+   * @return either Success boxing the Json, or a Failure boxing
+   *         a NonEmptyList of ProcessingMessages
    */
   private[validation] def validateAsSelfDescribing[F[_]: Sync](
     resolver: Resolver[F],
-    instance: Json): F[Either[NonEmptyList[ProcessingMessage], Json]] =
+    instance: Json): F[EitherNel[ProcessingMessage, Json]] =
     getSelfDescribingSchema(resolver)
       .map(_.flatMap(selfDesc => validateAgainstSchema(instance, selfDesc)))
 }
