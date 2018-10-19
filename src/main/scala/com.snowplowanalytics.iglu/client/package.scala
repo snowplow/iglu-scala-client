@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018-2019 Snowplow Analytics Ltd. All rights reserved.
+ * Copyright (c) 2014-2019 Snowplow Analytics Ltd. All rights reserved.
  *
  * This program is licensed to you under the Apache License Version 2.0,
  * and you may not use this file except in compliance with the Apache License Version 2.0.
@@ -10,21 +10,12 @@
  * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the Apache License Version 2.0 for the specific language governing permissions and limitations there under.
  */
-package com.snowplowanalytics.iglu.client
-package utils
+package com.snowplowanalytics.iglu
 
-import com.snowplowanalytics.iglu.core.SchemaKey
+package object client {
+  type Resolver[F[_]] = resolver.Resolver[F]
+  type Validator[A]   = validator.Validator[A]
 
-import validation.ProcessingMessage
-
-private[client] object SchemaKeyUtils {
-
-  def toPath(prefix: String, key: SchemaKey): String =
-    s"$prefix/schemas/${key.vendor}/${key.name}/${key.format}/${key.version.asString}"
-
-  def parse(uri: String): Either[ProcessingMessage, SchemaKey] =
-    SchemaKey
-      .fromUri(uri)
-      .toRight(ProcessingMessage(s"$uri is not a valid Iglu-format schema URI"))
-
+  val Resolver       = resolver.Resolver
+  val CirceValidator = validator.CirceValidator
 }

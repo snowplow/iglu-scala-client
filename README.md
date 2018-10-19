@@ -12,7 +12,7 @@ Iglu Scala Client is used extensively in **[Snowplow][snowplow-repo]** to valida
 
 ## Installation
 
-The latest version of Iglu Scala Client is 0.5.0, which currently works with Scala 2.11.x
+The latest version of Iglu Scala Client is 0.6.0, which currently works with Scala 2.11 and 2.12.
 
 If you're using SBT, add the following lines to your build file:
 
@@ -22,30 +22,80 @@ val igluClient = "com.snowplowanalytics" %% "iglu-scala-client" % "0.5.0"
 
 Note the double percent (`%%`) between the group and artifactId. That'll ensure you get the right package for your Scala version.
 
-## Usage
+## API
 
-Primary entity for working with Iglu Scala Client is `com.snowplowanalytics.iglu.client.Resolver`.
-Resolver companion object has `parse` method which allows you to create Resolver instance from **[resolver configuration][resolver-config]**.
+Iglu Scala Client has "tagless final"-friendly API, allowing end-users to abstract over effects they use:
+
+* `cats.effect.IO`, ZIO or similar lazy referentially-transparent implementation for most production use cases
+* `cats.data.State` for testing purposes
+* `Id` when you need an eager implementation
+
+Generally, we highly recommend to use a referentially-transparent implementation,
+but in some environments like Apache Spark or Apache Beam it is not possible to use lazy implementation.
+In Spark and similar environments we recommend to use `Id`, but everything needs to be tested in real environment.
+
+Primary entity for working with Iglu Scala Client is `com.snowplowanalytics.iglu.client.Client`.
+It consists of two objects: `Resolver` and `Validator`. First one responsible for registry traversal, schema resolution, fetching and caching.
+While second one just checks the datum against resolved schema and returns a report.
+
+`Client` has only one method:
+
+```
+def check[F[_]: Monad: Clock: RegistryLookup](instance: SelfDescribingData[Json]): EitherT[F, ClientError, Unit]
+```
+
+This method performs resolution and validation steps altogether. Also you can use `Resolver` and `Validator` separately.
+
+* `F[_]` is an effect type, usually representing a side-effect
+* `Monad` is an implicit evidence that `F` has an instance of `cats.Monad` type class
+* `Clock` is an implicit evidence that `F` has an instance of `cats.effect.Clock` capability and thus has an access to wallclock
+* `RegistryLookup` is an implicit evidence that `F` can perform lookups. Its a tagless-final capability, defined for Iglu Client.
+* `ClientError` is an error ADT, representing a failure happened either due resolution or validation step
+
+`Client` companion object also has `parseDefault` method which allows you to instantiate `Client` instance from **[resolver configuration][resolver-config]**. It will also instantiate a mutable cache instance (thus, result is wrapped in `F[_]`).
+
+## Example
+
 Second working method is `lookupSchema`, receiving Schema key as String or directly `com.snowplowanalytics.iglu.SchemaKey` object,
 this method traverse all configured repositories trying to find Schema by its key.
 
 ```scala
-import cats.data.ValidatedNel
-import com.fasterxml.jackson.databind.JsonNode
-import com.snowplowanalytics.iglu.client.{ Resolver, SchemaKey }
-import com.snowplowanalytics.iglu.client.validation.ProcessingMessage
+import io.circe.Json
+import io.circe.literal._   // circe-literal is not bundled with Iglu Client
 
-val resolverConfig: JsonNode = ???
-val schema: ValidatedNel[ProcessingMessage, JsonNode] = for {
-  schemaKey <- SchemaKey.parseNel("iglu:com.snowplowanalytics.snowplow/mobile_context/jsonschema/1-0-0")
-  resolver <- Resolver.parse(resolverConfig)
-  schema <- resolver.lookupSchema(schemaKey)
-} yield schema
+import cats.effect.IO
+import cats.syntax.show._
+
+import com.snowplowanalytics.iglu.client.Client
+import com.snowplowanalytics.iglu.core.{SchemaKey, SchemaVer, SelfDescribingData}
+
+implicit val clockIoInstance: Clock[IO] = Clock.create[IO] // Usually provided by IOApp
+
+val resolverConfig: Json = json"""{
+  "schema": "iglu:com.snowplowanalytics.iglu/resolver-config/jsonschema/1-0-1",
+  "data": {
+    "cacheSize": 5,
+    "repositories": [{
+      "name": "Iglu Central",
+      "priority": 0,
+      "vendorPrefixes": [ "com.snowplowanalytics" ],
+      "connection": { "http": { "uri": "http://iglucentral.com" } }
+    }]
+  }
+}"""
+
+val instance = SelfDescribingData(
+  SchemaKey("com.snowplowanalytics.snowplow", "geolocation_context", "jsonschema", SchemaVer.Full(1,1,0)),
+  json"""{"latitude": 3, "longitude": 0}""")
+
+val result = for {
+  client <- Client.parseDefault[IO](resolverConfig).leftMap(_.show) // It can be a DecodingError
+  _ <- client.check(instance).leftMap(_.show) // ClientError has an instance of Show type class
+} yield ()
 ```
 
-Above snippet returns mobile context JSON Schema if you provide correct `resolverConfig`.
-If not you will get all errors (like invalid format, network failure, etc) accumulated in `cats.data.NonEmptyList`,
-which itself is left side of `ValidatedNel`, structure isomorphic to native Scala `Either`.
+Above snippet will return a lazy side-effect that can be either a ClientError in case data is invalid against its schema
+or there some kind of resolution problems, or simply nothing (`Unit`) in case of success
 
 ## Find out more
 

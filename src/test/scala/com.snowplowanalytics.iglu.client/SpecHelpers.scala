@@ -12,36 +12,47 @@
  */
 package com.snowplowanalytics.iglu.client
 
+import java.net.URI
+import java.util.concurrent.TimeUnit
+
 // Cats
+import cats.Id
+import cats.effect.Clock
 import cats.effect.IO
 
 // This project
-import repositories.{EmbeddedRepositoryRef, HttpRepositoryRef, RepositoryRefConfig}
-import com.snowplowanalytics.iglu.client.validation.ProcessingMessage
+import resolver.registries.Registry
 
 object SpecHelpers {
 
-  val IgluCentral =
-    HttpRepositoryRef(
-      RepositoryRefConfig("Iglu Central", 0, List("com.snowplowanalytics")),
-      "http://iglucentral.com")
+  val IgluCentral: Registry =
+    Registry.Http(
+      Registry.Config("Iglu Central", 0, List("com.snowplowanalytics")),
+      Registry.HttpConnection(URI.create("http://iglucentral.com"), None))
 
-  val EmbeddedTest =
-    EmbeddedRepositoryRef(
-      RepositoryRefConfig("Iglu Test Embedded", 0, List("com.snowplowanalytics")),
+  val EmbeddedTest: Registry =
+    Registry.Embedded(
+      Registry.Config("Iglu Test Embedded", 0, List("com.snowplowanalytics")),
       path = "/iglu-test-embedded")
 
-  val TestResolver = Resolver[IO](cacheSize = 10, EmbeddedTest)
+  implicit val idClock: Clock[Id] = new Clock[Id] {
+    final def realTime(unit: TimeUnit): Id[Long] =
+      unit.convert(System.currentTimeMillis(), TimeUnit.MILLISECONDS)
 
-  // TODO: improve this after ProcessingMessage format is discussed
-  def asProcessingMessage(
-    message: String,
-    schema: String,
-    instance: String,
-    keyword: String,
-    foundExpected: Option[(String, String)],
-    requiredMissing: Option[(String, String)],
-    unwanted: Option[String]): ProcessingMessage =
-    ProcessingMessage(message = message)
+    final def monotonic(unit: TimeUnit): Id[Long] =
+      unit.convert(System.nanoTime(), TimeUnit.NANOSECONDS)
+  }
+
+  // TODO: is it a very bad idea?
+  implicit val ioClock: Clock[IO] = new Clock[IO] {
+    final def realTime(unit: TimeUnit): IO[Long] =
+      IO.delay(unit.convert(System.currentTimeMillis(), TimeUnit.MILLISECONDS))
+
+    final def monotonic(unit: TimeUnit): IO[Long] =
+      IO.delay(unit.convert(System.nanoTime(), TimeUnit.NANOSECONDS))
+  }
+
+  val TestResolver = Resolver.init[IO](cacheSize = 10, EmbeddedTest)
+  val TestClient   = for { resolver <- TestResolver } yield Client(resolver, CirceValidator)
 
 }

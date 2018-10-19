@@ -23,20 +23,20 @@ lazy val root = (project in file("."))
   .settings(
     libraryDependencies ++= Seq(
       // Java
-      Dependencies.Libraries.commonsLang,
-      Dependencies.Libraries.jacksonDatabind,
       Dependencies.Libraries.jsonValidator,
       // Scala
       Dependencies.Libraries.igluCore,
+      Dependencies.Libraries.igluCoreCirce,
+      Dependencies.Libraries.cats,
       Dependencies.Libraries.circeParser,
-      Dependencies.Libraries.circeOptics,
       Dependencies.Libraries.lruMap,
       Dependencies.Libraries.scalaj,
       // Scala (test only)
       Dependencies.Libraries.circeLiteral,
       Dependencies.Libraries.specs2,
       Dependencies.Libraries.specs2Cats,
-      Dependencies.Libraries.specs2Mock
+      // Java (test only)
+      Dependencies.Libraries.slf4jNop
     ),
     scalafmtOnCompile := true
   )

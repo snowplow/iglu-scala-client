@@ -10,11 +10,12 @@
  * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the Apache License Version 2.0 for the specific language governing permissions and limitations there under.
  */
-package com.snowplowanalytics.iglu.client
-package repositories
+package com.snowplowanalytics.iglu.client.resolver.registries
+
+// Java
+import java.net.URI
 
 // Cats
-import cats.syntax.option._
 import cats.effect.IO
 
 // circe
@@ -23,16 +24,21 @@ import io.circe.literal._
 // Iglu Core
 import com.snowplowanalytics.iglu.core.{SchemaKey, SchemaVer}
 
+// This project
+import com.snowplowanalytics.iglu.client.resolver.registries.RegistryLookup._
+
 // Specs2
 import org.specs2.Specification
 import org.specs2.matcher.{DataTables, ValidatedMatchers}
 
-class HttpRepositoryRefSpec extends Specification with DataTables with ValidatedMatchers {
+import com.snowplowanalytics.iglu.client.SpecHelpers
+
+class HttpSpec extends Specification with DataTables with ValidatedMatchers {
   def is = s2"""
 
   This is a specification to test an HTTP-based RepositoryRef
 
-  a JSON configuration for an HTTP-based RepositoryRef should be recognized as such  $e1
+  toPath strips unnecessary trailing slash $e1
   a JSON configuration can be used to construct an HTTP-based RepositoryRef  $e2
   retrieving an existent JSON Schema from an HTTP-based RepositoryRef should work  $e3
   requesting a non-existent JSON Schema from an HTTP-based RepositoryRef should return None  $e4
@@ -64,14 +70,24 @@ class HttpRepositoryRefSpec extends Specification with DataTables with Validated
           }
           }"""
 
-  def e1 = HttpRepositoryRef.isHttp(AcmeConfig) must beTrue
+  def e1 = {
+    val resultWithSlash = RegistryLookup.toPath(
+      "http://iglucentral.com/api/",
+      SchemaKey("com.snowplow", "event", "jsonschema", SchemaVer.Full(1, 0, 0)))
+    val resultWithoutSlash = RegistryLookup.toPath(
+      "http://iglucentral.com/api",
+      SchemaKey("com.snowplow", "event", "jsonschema", SchemaVer.Full(1, 0, 0)))
+
+    val expected = "http://iglucentral.com/api/schemas/com.snowplow/event/jsonschema/1-0-0"
+    (resultWithSlash must beEqualTo(expected)) and (resultWithoutSlash must beEqualTo(expected))
+  }
 
   def e2 = {
-    val expected = HttpRepositoryRef(
-      config = RepositoryRefConfig("Acme Iglu Repo", 5, List("com.acme")),
-      uri = "http://iglu.acme.com"
+    val expected = Registry.Http(
+      Registry.Config("Acme Iglu Repo", 5, List("com.acme")),
+      Registry.HttpConnection(URI.create("http://iglu.acme.com"), None)
     )
-    HttpRepositoryRef.parse(AcmeConfig) must beValid(expected)
+    Registry.parse(AcmeConfig) must beRight(expected)
   }
 
   def e3 = {
@@ -116,24 +132,23 @@ class HttpRepositoryRefSpec extends Specification with DataTables with Validated
 
     SpecHelpers.IgluCentral
       .lookupSchema[IO](schemaKey)
-      .map(_ must beRight(expected.some))
-      .unsafeRunSync()
+      .unsafeRunSync() must beRight(expected)
   }
 
   def e4 = {
     val schemaKey = SchemaKey("de.ersatz.n-a", "null", "jsonschema", SchemaVer.Full(1, 0, 0))
     SpecHelpers.IgluCentral
       .lookupSchema[IO](schemaKey)
-      .map(_ must beRight(None))
-      .unsafeRunSync()
+      .unsafeRunSync() must beLeft(RegistryError.NotFound)
   }
 
   def e5 = {
-    val expected = HttpRepositoryRef(
-      config = RepositoryRefConfig("Acme Secret Iglu Repo", 3, List("com.acme")),
-      uri = "http://iglu.acme.com",
-      Some("de305d54-75b4-431b-adb2-eb6b9e546014")
+    val expected = Registry.Http(
+      Registry.Config("Acme Secret Iglu Repo", 3, List("com.acme")),
+      Registry.HttpConnection(
+        URI.create("http://iglu.acme.com"),
+        Some("de305d54-75b4-431b-adb2-eb6b9e546014"))
     )
-    HttpRepositoryRef.parse(AcmeConfigWithAuth) must beValid(expected)
+    Registry.parse(AcmeConfigWithAuth) must beRight(expected)
   }
 }
