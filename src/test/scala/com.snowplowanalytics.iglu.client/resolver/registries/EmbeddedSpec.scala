@@ -10,8 +10,7 @@
  * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the Apache License Version 2.0 for the specific language governing permissions and limitations there under.
  */
-package com.snowplowanalytics.iglu.client
-package repositories
+package com.snowplowanalytics.iglu.client.resolver.registries
 
 // Cats
 import cats.syntax.either._
@@ -23,16 +22,20 @@ import io.circe.literal._
 // Iglu Core
 import com.snowplowanalytics.iglu.core.{SchemaKey, SchemaVer}
 
+// This project
+import com.snowplowanalytics.iglu.client.resolver.registries.RegistryLookup._
+
 // Specs2
 import org.specs2.Specification
 import org.specs2.matcher.{DataTables, ValidatedMatchers}
 
-class EmbeddedRepositoryRefSpec extends Specification with DataTables with ValidatedMatchers {
+import com.snowplowanalytics.iglu.client.SpecHelpers
+
+class EmbeddedSpec extends Specification with DataTables with ValidatedMatchers {
   def is = s2"""
 
   This is a specification to test an embedded RepositoryRef
 
-  a JSON configuration for an embedded RepositoryRef should be recognized as such  $e1
   a JSON configuration can be used to construct an embedded RepositoryRef  $e2
   retrieving an existent JSON Schema from an embedded RepositoryRef should work  $e3
   requesting a non-existent JSON Schema from an embedded RepositoryRef should return None  $e4
@@ -51,14 +54,12 @@ class EmbeddedRepositoryRefSpec extends Specification with DataTables with Valid
           }
         }"""
 
-  def e1 = EmbeddedRepositoryRef.isEmbedded(AcmeConfig) must beTrue
-
   def e2 = {
-    val expected = EmbeddedRepositoryRef(
-      config = RepositoryRefConfig("Acme Embedded", 100, List("uk.co.acme", "de.acme")),
+    val expected = Registry.Embedded(
+      config = Registry.Config("Acme Embedded", 100, List("uk.co.acme", "de.acme")),
       path = "/acme-embedded-new"
     )
-    EmbeddedRepositoryRef.parse(AcmeConfig) must beValid(expected)
+    Registry.parse(AcmeConfig) must beRight(expected)
   }
 
   def e3 = {
@@ -96,16 +97,14 @@ class EmbeddedRepositoryRefSpec extends Specification with DataTables with Valid
 
     SpecHelpers.EmbeddedTest
       .lookupSchema[IO](schemaKey)
-      .map(_ must beRight(Some(expected)))
-      .unsafeRunSync()
+      .unsafeRunSync() must beRight(expected)
   }
 
   def e4 = {
     val schemaKey = SchemaKey("com.acme.n-a", "null", "jsonschema", SchemaVer.Full(1, 0, 0))
     SpecHelpers.EmbeddedTest
       .lookupSchema[IO](schemaKey)
-      .map(_ must beRight(None))
-      .unsafeRunSync()
+      .unsafeRunSync() must beLeft(RegistryError.NotFound)
   }
 
   def e5 = {
@@ -117,8 +116,7 @@ class EmbeddedRepositoryRefSpec extends Specification with DataTables with Valid
         SchemaVer.Full(1, 0, 0))
     SpecHelpers.EmbeddedTest
       .lookupSchema[IO](schemaKey)
-      .map(_ must beLeft)
-      .unsafeRunSync
+      .unsafeRunSync must beLeft
   }
 
 }
