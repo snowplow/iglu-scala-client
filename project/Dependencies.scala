@@ -15,14 +15,13 @@ import sbt._
 object Dependencies {
   object V {
     // Java
-    val commonsLang     = "3.1"
-    val jacksonDatabind = "2.2.3"
     val jsonValidator   = "1.0.2"
     // Scala
     val igluCore        = "0.4.0"
+    val cats            = "1.5.0"
     val circe           = "0.11.1"
     val json4s          = "3.2.11"
-    val lruMap          = "0.2.0"
+    val lruMap          = "0.3.0-M1"
     val scalaj          = "2.4.1"
     // Scala (test only)
     val specs2          = "4.3.3"
@@ -30,13 +29,12 @@ object Dependencies {
 
   object Libraries {
     // Java
-    val commonsLang      = "org.apache.commons"         %  "commons-lang3"           % V.commonsLang
-    val jacksonDatabind  = "com.fasterxml.jackson.core" %  "jackson-databind"        % V.jacksonDatabind
     val jsonValidator    = "com.networknt"              %  "json-schema-validator"   % V.jsonValidator
     // Scala
     val igluCore         = "com.snowplowanalytics"      %% "iglu-core"               % V.igluCore
+    val igluCoreCirce    = "com.snowplowanalytics"      %% "iglu-core-circe"         % V.igluCore
+    val cats             = "org.typelevel"              %% "cats-core"               % V.cats
     val circeParser      = "io.circe"                   %% "circe-parser"            % V.circe
-    val circeOptics      = "io.circe"                   %% "circe-optics"            % V.circe
     val lruMap           = "com.snowplowanalytics"      %% "scala-lru-map"           % V.lruMap
     val scalaj           = "org.scalaj"                 %% "scalaj-http"             % V.scalaj
     // Scala (test only)

@@ -10,21 +10,25 @@
  * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the Apache License Version 2.0 for the specific language governing permissions and limitations there under.
  */
-package com.snowplowanalytics.iglu.client
-package utils
+package com.snowplowanalytics.iglu.client.resolver.registries
 
-import com.snowplowanalytics.iglu.core.SchemaKey
+sealed trait RegistryError {
+  def message: String
+}
 
-import validation.ProcessingMessage
+object RegistryError {
 
-private[client] object SchemaKeyUtils {
+  /** Schema certainly does not exist on this registry */
+  final case object NotFound extends RegistryError {
+    override def message: String = "Not found"
+  }
 
-  def toPath(prefix: String, key: SchemaKey): String =
-    s"$prefix/schemas/${key.vendor}/${key.name}/${key.format}/${key.version.asString}"
+  /** Schema was there, but cannot be parsed */
+  final case class InvalidSchema(message: String) extends RegistryError
 
-  def parse(uri: String): Either[ProcessingMessage, SchemaKey] =
-    SchemaKey
-      .fromUri(uri)
-      .toRight(ProcessingMessage(s"$uri is not a valid Iglu-format schema URI"))
+  /** Other error, e.g. 500 HTTP status */
+  final case class RepoFailure(message: String) extends RegistryError
 
+  /** Internal error, usually due configuration error, can be considered fatal */
+  final case class ClientFailure(message: String) extends RegistryError
 }
