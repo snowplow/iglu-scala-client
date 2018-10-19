@@ -10,20 +10,18 @@
  * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the Apache License Version 2.0 for the specific language governing permissions and limitations there under.
  */
-package com.snowplowanalytics.iglu.client
-package validation
-
-// Cats
-import cats.effect.IO
+package com.snowplowanalytics.iglu.client.validator
 
 // circe
 import io.circe.literal._
 
-// This project
-import ValidatableCirceMethods._
-
 // Specs2
 import org.specs2.Specification
+
+import com.snowplowanalytics.iglu.core.{SchemaKey, SchemaVer, SelfDescribingData}
+
+import com.snowplowanalytics.iglu.client.SpecHelpers
+import com.snowplowanalytics.iglu.client.SpecHelpers._
 
 class SchemaValidationSpec extends Specification {
   def is = s2"""
@@ -35,29 +33,42 @@ class SchemaValidationSpec extends Specification {
   """
 
   val validJson =
-    json"""{"schema": "iglu:com.snowplowanalytics.iglu-test/stock-item/jsonschema/1-0-0", "data": { "id": "123-12", "name": "t-shirt", "price": 29.99 } }"""
+    SelfDescribingData(
+      SchemaKey(
+        "com.snowplowanalytics.iglu-test",
+        "stock-item",
+        "jsonschema",
+        SchemaVer.Full(1, 0, 0)),
+      json"""{"id": "123-12", "name": "t-shirt", "price": 29.99 }"""
+    )
 
   val validJsonWithInvalidSchema =
-    json"""{"schema": "iglu:com.snowplowanalytics.iglu-test/invalid-protocol/jsonschema/1-0-0", "data": { "id": 0 } }"""
+    SelfDescribingData(
+      SchemaKey(
+        "com.snowplowanalytics.iglu-test",
+        "invalid-protocol",
+        "jsonschema",
+        SchemaVer.Full(1, 0, 0)),
+      json"""{"schema": "iglu://jsonschema/1-0-0", "data": { "id": 0 } }"""
+    )
 
   val testResolver = SpecHelpers.TestResolver
 
   def e1 = {
     val action = for {
-      resolver <- SpecHelpers.TestResolver
-      result   <- validJson.validate[IO](resolver, dataOnly = false)
-    } yield result must beRight(validJson)
+      client <- SpecHelpers.TestClient
+      result <- client.check(validJson).value
+    } yield result must beRight
 
     action.unsafeRunSync()
   }
 
   def e2 = {
     val action = for {
-      resolver <- SpecHelpers.TestResolver
-      result   <- validJsonWithInvalidSchema.validate[IO](resolver, dataOnly = false)
+      client <- SpecHelpers.TestClient
+      result <- client.check(validJsonWithInvalidSchema).value
     } yield result must beLeft
 
     action.unsafeRunSync()
   }
-
 }

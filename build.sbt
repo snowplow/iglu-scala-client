@@ -23,13 +23,12 @@ lazy val root = (project in file("."))
   .settings(
     libraryDependencies ++= Seq(
       // Java
-      Dependencies.Libraries.commonsLang,
-      Dependencies.Libraries.jacksonDatabind,
       Dependencies.Libraries.jsonValidator,
       // Scala
       Dependencies.Libraries.igluCore,
+      Dependencies.Libraries.igluCoreCirce,
+      Dependencies.Libraries.cats,
       Dependencies.Libraries.circeParser,
-      Dependencies.Libraries.circeOptics,
       Dependencies.Libraries.lruMap,
       Dependencies.Libraries.scalaj,
       // Scala (test only)

@@ -11,30 +11,24 @@
  * See the Apache License Version 2.0 for the specific language governing permissions and limitations there under.
  */
 package com.snowplowanalytics.iglu.client
-package validation
+package validator
 
-// Circe
-import io.circe._
-import io.circe.syntax._
+import cats.data.NonEmptyList
 
-// TODO: replace with better format after discussion
-case class ProcessingMessage(
-  message: String,
-  jsonPath: Option[String] = None,
-  targets: Option[List[String]] = None,
-  schemaKey: Option[String] = None,
-  keyword: Option[String] = None,
-  repositories: Option[List[String]] = None) {
+sealed trait ValidatorError {
+  def toClientError: ClientError = ClientError.ValidationError(this)
+}
 
-  def asJson: Json = {
-    Json.obj(
-      "message" := message,
-      "path" := jsonPath,
-      "schemaKey" := schemaKey,
-      "keyword" := keyword,
-      "targets" := targets,
-      "repositories" := repositories
-    )
-  }
+object ValidatorError {
 
+  final case class SchemaIssue(path: String, message: String)
+
+  /** Primary error */
+  final case class InvalidData(messages: NonEmptyList[ValidatorReport]) extends ValidatorError
+
+  /** Unlike ResolverError.InvalidSchema, this one is more strict */
+  final case class InvalidSchema(issues: NonEmptyList[SchemaIssue]) extends ValidatorError
+
+  private[client] def schemaIssue(issue: Throwable): ValidatorError =
+    InvalidSchema(NonEmptyList.of(SchemaIssue("$", issue.getMessage)))
 }

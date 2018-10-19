@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018-2019 Snowplow Analytics Ltd. All rights reserved.
+ * Copyright (c) 2014-2018 Snowplow Analytics Ltd. All rights reserved.
  *
  * This program is licensed to you under the Apache License Version 2.0,
  * and you may not use this file except in compliance with the Apache License Version 2.0.
@@ -11,20 +11,22 @@
  * See the Apache License Version 2.0 for the specific language governing permissions and limitations there under.
  */
 package com.snowplowanalytics.iglu.client
-package utils
 
-import com.snowplowanalytics.iglu.core.SchemaKey
+// cats
+import validator.ValidatorError
+import resolver.LookupHistory
+import resolver.registries.RegistryError
 
-import validation.ProcessingMessage
+sealed trait ClientError
 
-private[client] object SchemaKeyUtils {
+object ClientError {
 
-  def toPath(prefix: String, key: SchemaKey): String =
-    s"$prefix/schemas/${key.vendor}/${key.name}/${key.format}/${key.version.asString}"
+  /** Error happened during schema resolution step */
+  final case class ResolutionError(value: Map[String, LookupHistory]) extends ClientError {
+    def isNotFound: Boolean =
+      value.values.flatMap(_.errors).forall(_ == RegistryError.NotFound)
+  }
 
-  def parse(uri: String): Either[ProcessingMessage, SchemaKey] =
-    SchemaKey
-      .fromUri(uri)
-      .toRight(ProcessingMessage(s"$uri is not a valid Iglu-format schema URI"))
-
+  /** Error happened during schema/instance validation step */
+  final case class ValidationError(error: ValidatorError) extends ClientError
 }
