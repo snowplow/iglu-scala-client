@@ -13,7 +13,7 @@
 package com.snowplowanalytics.iglu.client.resolver
 
 // cats
-import cats.{Applicative, Monad}
+import cats.{Applicative, Monad, Id}
 import cats.data._
 import cats.effect.Clock
 import cats.implicits._
@@ -137,6 +137,10 @@ object Resolver {
    */
   def init[F[_]: Applicative: InitCache](cacheSize: Int, refs: Registry*): F[Resolver[F]] =
     SchemaCache.init[F](cacheSize, None).map(cacheOpt => new Resolver(List(refs: _*), cacheOpt))
+
+  /** Construct a pure resolver, working only with in-memory registries, no cache, no clock */
+  def initPure(refs: Registry.InMemory*): Resolver[Id] =
+    new Resolver[Id](List(refs: _*), None)
 
   // Keep this up-to-date
   private[client] val EmbeddedSchemaCount = 4
