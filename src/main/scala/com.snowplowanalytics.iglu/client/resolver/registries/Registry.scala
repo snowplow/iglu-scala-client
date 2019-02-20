@@ -22,7 +22,7 @@ import io.circe.{Decoder, HCursor, Json}
 import cats.syntax.either._
 
 // Iglu Core
-import com.snowplowanalytics.iglu.core.SchemaKey
+import com.snowplowanalytics.iglu.core.{SchemaKey, SelfDescribingSchema}
 
 /** ADT supporting all native (from resolver-config) registries */
 sealed trait Registry extends Product with Serializable {
@@ -43,12 +43,17 @@ object Registry {
    * e.g. inside the jar's resources folder
    */
   case class Embedded(config: Config, path: String) extends Registry {
-    val classPriority = 1
+    val classPriority = 2
   }
 
   /** HTTP repository, such as Iglu Server or Iglu Central */
   case class Http(config: Config, http: HttpConnection) extends Registry {
     val classPriority = 100
+  }
+
+  /** Repository where all schemas provided on initialization time */
+  case class InMemory(config: Config, schemas: List[SelfDescribingSchema[Json]]) extends Registry {
+    val classPriority = 1
   }
 
   /** Common config for RepositoryRef classes */

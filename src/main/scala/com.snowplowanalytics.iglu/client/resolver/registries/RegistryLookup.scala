@@ -30,7 +30,8 @@ import io.circe.Json
 import io.circe.parser.parse
 
 // Iglu Core
-import com.snowplowanalytics.iglu.core.SchemaKey
+import com.snowplowanalytics.iglu.core.{SchemaKey, SelfDescribingSchema}
+import com.snowplowanalytics.iglu.core.circe.implicits._
 
 /** A capability of `F` to perform a schema lookup action, using `RepositoryRef` ADT
  *
@@ -62,8 +63,9 @@ object RegistryLookup {
     new RegistryLookup[F] {
       def lookup(repositoryRef: Registry, schemaKey: SchemaKey): F[Either[RegistryError, Json]] =
         repositoryRef match {
-          case Registry.Http(_, connection) => httpLookup(connection, schemaKey)
-          case Registry.Embedded(_, path)   => embeddedLookup[F](path, schemaKey)
+          case Registry.Http(_, connection)  => httpLookup(connection, schemaKey)
+          case Registry.Embedded(_, path)    => embeddedLookup[F](path, schemaKey)
+          case Registry.InMemory(_, schemas) => F.pure(inMemoryLookup(schemas, schemaKey))
         }
     }
 
@@ -83,8 +85,15 @@ object RegistryLookup {
             .value
             .unsafeRunSync()
             .flatten
+        case Registry.InMemory(_, schemas) =>
+          inMemoryLookup(schemas, schemaKey)
       }
   }
+
+  def inMemoryLookup(
+    schemas: List[SelfDescribingSchema[Json]],
+    key: SchemaKey): Either[RegistryError, Json] =
+    schemas.find(s => s.self.schemaKey == key).toRight(RegistryError.NotFound).map(_.normalize)
 
   /** Common method to get an endpoint of `SchemaKey` */
   private def toPath(prefix: String, key: SchemaKey): String =
