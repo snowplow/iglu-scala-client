@@ -15,10 +15,11 @@ import sbt._
 object Dependencies {
   object V {
     // Java
-    val jsonValidator   = "1.0.2"
+    val jsonValidator   = "1.0.5"
+    val slf4j           = "1.7.26"
     // Scala
     val igluCore        = "0.4.0"
-    val cats            = "1.5.0"
+    val cats            = "1.6.0"
     val circe           = "0.11.1"
     val lruMap          = "0.3.0-M1"
     val scalaj          = "2.4.1"
@@ -37,9 +38,10 @@ object Dependencies {
     val lruMap           = "com.snowplowanalytics"      %% "scala-lru-map"           % V.lruMap
     val scalaj           = "org.scalaj"                 %% "scalaj-http"             % V.scalaj
     // Scala (test only)
-    val circeLiteral     = "io.circe"                   %% "circe-literal"           % V.circe           % "test"
-    val specs2           = "org.specs2"                 %% "specs2-core"             % V.specs2          % "test"
-    val specs2Cats       = "org.specs2"                 %% "specs2-cats"             % V.specs2          % "test"
-    val specs2Mock       = "org.specs2"                 %% "specs2-mock"             % V.specs2          % "test"
+    val circeLiteral     = "io.circe"                   %% "circe-literal"           % V.circe           % Test
+    val specs2           = "org.specs2"                 %% "specs2-core"             % V.specs2          % Test
+    val specs2Cats       = "org.specs2"                 %% "specs2-cats"             % V.specs2          % Test
+    // Java (exists to suppress NOP log message, must not be included in compile-time)
+    val slf4jNop         = "org.slf4j"                  % "slf4j-nop"                % V.slf4j           % Test
   }
 }

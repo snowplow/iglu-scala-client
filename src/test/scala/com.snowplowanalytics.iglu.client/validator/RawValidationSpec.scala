@@ -17,6 +17,7 @@ package validator
 import cats.data.NonEmptyList
 
 // circe
+import io.circe.Json
 import io.circe.literal._
 import io.circe.parser.parse
 
@@ -37,11 +38,12 @@ class RawValidationSpec extends Specification with DataTables {
   ipv4 format invalidates plain string $e6
   """
 
-  val simpleSchemaResult =
+  val simpleSchemaResult: Json =
     parse(
       scala.io.Source
         .fromInputStream(getClass.getResourceAsStream("/raw-jsonschema/beer-schema.json"))
-        .mkString).toOption.getOrElse(throw new RuntimeException("Cannot parse beer-schema.json"))
+        .mkString)
+      .fold(e => throw new RuntimeException(s"Cannot parse beer-schema.json, $e"), identity)
 
   def e1 =
     foreach(

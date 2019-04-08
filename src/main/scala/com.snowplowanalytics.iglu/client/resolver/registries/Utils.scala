@@ -79,7 +79,7 @@ private[registries] object Utils {
     Decoder.instance { cursor =>
       for {
         string <- cursor.as[String]
-        uri    <- stringToUri(string).leftMap(e => DecodingFailure(e.message, cursor.history))
+        uri    <- stringToUri(string).leftMap(e => DecodingFailure(e.show, cursor.history))
       } yield uri
     }
 

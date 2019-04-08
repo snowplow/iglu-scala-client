@@ -2,11 +2,9 @@ package com.snowplowanalytics.iglu.client
 package resolver
 
 // Cats
-import cats.{Id, Monad}
 import cats.syntax.either._
 import cats.data.State
 import cats.effect.Clock
-import cats.effect.IO
 
 import scala.concurrent.duration.TimeUnit
 
@@ -17,6 +15,7 @@ import io.circe.Json
 import com.snowplowanalytics.lrumap.{CreateLruMap, LruMap}
 
 import com.snowplowanalytics.iglu.core.SchemaKey
+import com.snowplowanalytics.iglu.core.circe.implicits._
 
 // This project
 import resolver.registries.Registry
@@ -63,8 +62,8 @@ object ResolverSpecHelpers {
     }
   val staticClock: Clock[StaticLookup] =
     new Clock[StaticLookup] {
-      def realTime(unit: TimeUnit): StaticLookup[Long]  = State.get.map(_.time)
-      def monotonic(unit: TimeUnit): StaticLookup[Long] = State.get.map(_.time)
+      def realTime(unit: TimeUnit): StaticLookup[Long]  = State.get.map(_.time.toLong)
+      def monotonic(unit: TimeUnit): StaticLookup[Long] = State.get.map(_.time.toLong)
     }
 
   /** Return specified responses for HTTP repo */
@@ -77,6 +76,10 @@ object ResolverSpecHelpers {
           repositoryRef match {
             case Registry.Embedded(_, _) => (x.tick, RegistryError.NotFound.asLeft)
             case Registry.Http(conf, _)  => (x.request(conf.name).tick, r(x.req))
+            case Registry.InMemory(_, m) =>
+              (
+                x.tick,
+                m.map(_.normalize).lift(x.req).toRight(RegistryError.NotFound: RegistryError))
           }
         }
     }

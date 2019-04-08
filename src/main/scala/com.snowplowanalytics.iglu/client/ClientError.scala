@@ -12,12 +12,19 @@
  */
 package com.snowplowanalytics.iglu.client
 
-// cats
+import cats.syntax.either._
+
+import io.circe.{Decoder, DecodingFailure, Encoder, Json}
+import io.circe.syntax._
+
 import validator.ValidatorError
 import resolver.LookupHistory
 import resolver.registries.RegistryError
 
-sealed trait ClientError
+sealed trait ClientError extends Product with Serializable {
+  def getMessage: String =
+    ClientError.igluClientResolutionErrorCirceEncoder(this).noSpaces
+}
 
 object ClientError {
 
@@ -29,4 +36,69 @@ object ClientError {
 
   /** Error happened during schema/instance validation step */
   final case class ValidationError(error: ValidatorError) extends ClientError
+
+  implicit val igluClientResolutionErrorCirceEncoder: Encoder[ClientError] =
+    Encoder.instance {
+      case ResolutionError(lookupHistory) =>
+        Json.obj(
+          "error" := Json.fromString("ResolutionError"),
+          "lookupHistory" := lookupHistory.toList
+            .map {
+              case (repo, lookups) =>
+                lookups.asJson.deepMerge(Json.obj("repository" := repo.asJson))
+            }
+        )
+      case ValidationError(error) =>
+        error.asJson.deepMerge(Json.obj("error" := Json.fromString("ValidationError")))
+    }
+
+  implicit val igluClientResolutionErrorCirceDecoder: Decoder[ClientError] =
+    Decoder.instance { cursor =>
+      for {
+        error <- cursor.downField("error").as[String]
+        result <- error match {
+          case "ResolutionError" =>
+            cursor
+              .downField("lookupHistory")
+              .as[List[RepoLookupHistory]]
+              .map { history =>
+                ResolutionError(history.map(_.toField).toMap)
+              }
+          case "ValidationError" =>
+            cursor
+              .as[ValidatorError]
+              .map { error =>
+                ValidationError(error)
+              }
+          case _ =>
+            DecodingFailure(
+              s"Error type $error cannot be recognized as Iglu Client Error",
+              cursor.history).asLeft
+        }
+
+      } yield result
+
+    }
+
+  // Auxiliary entity, helping to decode Map[String, LookupHistory]
+  private case class RepoLookupHistory(
+    repository: String,
+    errors: Set[RegistryError],
+    attempts: Int,
+    fatal: Boolean) {
+    def toField: (String, LookupHistory) =
+      (repository, LookupHistory(errors, attempts, fatal))
+  }
+
+  private object RepoLookupHistory {
+    implicit val repoLookupHistoryDecoder: Decoder[RepoLookupHistory] =
+      Decoder.instance { cursor =>
+        for {
+          repository <- cursor.downField("repository").as[String]
+          errors     <- cursor.downField("errors").as[Set[RegistryError]]
+          attempts   <- cursor.downField("attempts").as[Int]
+          fatal      <- cursor.downField("fatal").as[Boolean]
+        } yield RepoLookupHistory(repository, errors, attempts, fatal)
+      }
+  }
 }

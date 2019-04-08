@@ -33,7 +33,6 @@ import com.snowplowanalytics.iglu.client.resolver.registries.RegistryLookup._
 // Specs2
 import org.specs2.Specification
 import org.specs2.matcher.{DataTables, ValidatedMatchers}
-import org.specs2.mock.Mockito
 
 import com.snowplowanalytics.iglu.client.SpecHelpers._
 
@@ -50,7 +49,7 @@ object ResolverSpec {
   }
 }
 
-class ResolverSpec extends Specification with DataTables with ValidatedMatchers with Mockito {
+class ResolverSpec extends Specification with DataTables with ValidatedMatchers {
   def is = s2"""
 
   This is a specification to test the Resolver functionality

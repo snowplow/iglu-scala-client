@@ -13,9 +13,10 @@
 package com.snowplowanalytics.iglu.client
 package validator
 
-// Circe
 import io.circe._
 import io.circe.syntax._
+
+import cats.syntax.either._
 
 case class ValidatorReport(
   message: String,
@@ -32,5 +33,15 @@ object ValidatorReport {
         "keyword" := report.keyword,
         "targets" := report.targets
       )
+    }
+
+  implicit val validatorReportCirceDecoder: Decoder[ValidatorReport] =
+    Decoder.instance { cursor =>
+      for {
+        message <- cursor.downField("message").as[String]
+        path    <- cursor.downField("path").as[Option[String]]
+        targets <- cursor.downField("targets").as[Option[List[String]]].map(_.getOrElse(List.empty))
+        keyword <- cursor.downField("keyword").as[Option[String]]
+      } yield ValidatorReport(message, path, targets, keyword)
     }
 }

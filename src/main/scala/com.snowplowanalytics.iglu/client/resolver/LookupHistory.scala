@@ -15,6 +15,10 @@ package com.snowplowanalytics.iglu.client.resolver
 import cats.Semigroup
 import cats.instances.set._
 import cats.syntax.semigroup._
+import cats.syntax.either._
+
+import io.circe.{Decoder, Encoder, Json}
+import io.circe.syntax._
 
 import registries.RegistryError
 
@@ -30,10 +34,31 @@ case class LookupHistory(errors: Set[RegistryError], attempts: Int, fatal: Boole
 
 object LookupHistory {
 
+  val MaxErrors = 32
+
   /** Semigroup instance helping to aggregate repository errors */
   implicit val lookupHistorySemigroup: Semigroup[LookupHistory] =
     new Semigroup[LookupHistory] {
       override def combine(a: LookupHistory, b: LookupHistory): LookupHistory =
-        LookupHistory(a.errors |+| b.errors, a.attempts.max(b.attempts) + 1, a.fatal || b.fatal)
+        LookupHistory(
+          (a.errors |+| b.errors).take(MaxErrors),
+          a.attempts.max(b.attempts) + 1,
+          a.fatal || b.fatal)
     }
+
+  implicit val lookupHistoryEncoder: Encoder[LookupHistory] = Encoder.instance { history =>
+    Json.obj(
+      "errors" := history.errors.asJson,
+      "attempts" := history.attempts.asJson,
+      "fatal" := history.fatal.asJson
+    )
+  }
+
+  implicit val lookupHistoryDecoder: Decoder[LookupHistory] = Decoder.instance { cursor =>
+    for {
+      errors   <- cursor.downField("errors").as[Set[RegistryError]]
+      attempts <- cursor.downField("attempts").as[Int]
+      fatal    <- cursor.downField("fatal").as[Boolean]
+    } yield LookupHistory(errors, attempts, fatal)
+  }
 }

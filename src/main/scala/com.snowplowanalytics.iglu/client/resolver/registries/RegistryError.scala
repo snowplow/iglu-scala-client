@@ -12,20 +12,59 @@
  */
 package com.snowplowanalytics.iglu.client.resolver.registries
 
-sealed trait RegistryError {
-  def message: String
-}
+import cats.Show
+import cats.syntax.either._
+
+import io.circe.{Decoder, DecodingFailure, Encoder, Json}
+import io.circe.syntax._
+
+sealed trait RegistryError extends Product with Serializable
 
 object RegistryError {
 
   /** Schema certainly does not exist on this registry */
-  final case object NotFound extends RegistryError {
-    def message: String = "Not found"
-  }
+  final case object NotFound extends RegistryError
 
   /** Other error, e.g. 500 HTTP status or invalid schema. Usually, non fatal */
   final case class RepoFailure(message: String) extends RegistryError
 
   /** Internal error, usually due configuration error. Can be considered fatal */
   final case class ClientFailure(message: String) extends RegistryError
+
+  final implicit val registryErrorCirceJsonEncoder: Encoder[RegistryError] =
+    Encoder.instance {
+      case NotFound =>
+        Json.obj("error" := Json.fromString("NotFound"))
+      case RepoFailure(message) =>
+        Json.obj(
+          "error" := Json.fromString("RepoFailure"),
+          "message" := Json.fromString(message)
+        )
+      case ClientFailure(message) =>
+        Json.obj(
+          "error" := Json.fromString("ClientFailure"),
+          "message" := Json.fromString(message)
+        )
+    }
+
+  final implicit val registryErrorCirceJsonDecoder: Decoder[RegistryError] =
+    Decoder.instance { cursor =>
+      for {
+        error <- cursor.downField("error").as[Option[String]]
+        message = cursor.downField("message").as[String]
+        registryError <- error match {
+          case Some("RepoFailure")   => message.map(m => RepoFailure(m))
+          case Some("ClientFailure") => message.map(m => ClientFailure(m))
+          case Some("NotFound")      => NotFound.asRight
+          case _                     => DecodingFailure("RegistryError is not recognized", cursor.history).asLeft
+        }
+      } yield registryError
+    }
+
+  implicit val registryErrorShow: Show[RegistryError] =
+    Show.show {
+      case NotFound               => "NotFound"
+      case RepoFailure(message)   => s"Iglu Repository Failure. $message"
+      case ClientFailure(message) => s"Iglu Client Failure. $message"
+    }
 }
