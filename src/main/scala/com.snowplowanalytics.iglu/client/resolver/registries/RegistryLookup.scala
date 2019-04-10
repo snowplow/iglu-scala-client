@@ -19,7 +19,7 @@ import java.net.UnknownHostException
 import scala.util.control.NonFatal
 
 // cats
-import cats.Id
+import cats.{Eval, Id}
 import cats.data.{EitherT, OptionT}
 import cats.effect.{IO, Sync}
 import cats.implicits._
@@ -67,6 +67,14 @@ object RegistryLookup {
           case Registry.Embedded(_, path)    => embeddedLookup[F](path, schemaKey)
           case Registry.InMemory(_, schemas) => F.pure(inMemoryLookup(schemas, schemaKey))
         }
+    }
+
+  // Non-RT instances. Use with caution
+
+  implicit def evalLookupInstance: RegistryLookup[Eval] =
+    new RegistryLookup[Eval] {
+      def lookup(repositoryRef: Registry, schemaKey: SchemaKey): Eval[Either[RegistryError, Json]] =
+        Eval.always(idLookupInstance.lookup(repositoryRef, schemaKey))
     }
 
   // Id instance also swallows all exceptions into `RegistryError`
