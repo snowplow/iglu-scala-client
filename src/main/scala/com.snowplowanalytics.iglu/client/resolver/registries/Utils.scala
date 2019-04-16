@@ -16,11 +16,13 @@ package resolver.registries
 // Java
 import java.io.InputStream
 import java.net.URI
+import java.util.UUID
 
 // Scala
 import scala.io.Source
 
 // Cats
+import cats.data.OptionT
 import cats.syntax.either._
 import cats.syntax.option._
 import cats.syntax.functor._
@@ -28,7 +30,8 @@ import cats.syntax.show._
 import cats.effect.Sync
 
 // circe
-import io.circe.{Decoder, DecodingFailure, ParsingFailure}
+import io.circe.{Decoder, DecodingFailure, Json, ParsingFailure}
+import io.circe.parser.parse
 
 // Apache Commons
 import org.apache.commons.lang3.exception.ExceptionUtils
@@ -75,7 +78,7 @@ private[registries] object Utils {
         RegistryError.ClientFailure(s"Provided URI string violates RFC 2396: [$error]").asLeft
     }
 
-  implicit val uriDecoder: Decoder[URI] =
+  implicit val uriCirceJsonDecoder: Decoder[URI] =
     Decoder.instance { cursor =>
       for {
         string <- cursor.as[String]

@@ -18,7 +18,7 @@ object Dependencies {
     val jsonValidator   = "1.0.5"
     val slf4j           = "1.7.26"
     // Scala
-    val igluCore        = "0.4.0"
+    val igluCore        = "0.5.0-M1"
     val cats            = "1.6.0"
     val circe           = "0.11.1"
     val lruMap          = "0.3.0-M1"

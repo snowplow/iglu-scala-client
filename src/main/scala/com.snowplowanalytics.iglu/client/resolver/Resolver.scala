@@ -12,20 +12,24 @@
  */
 package com.snowplowanalytics.iglu.client.resolver
 
-// cats
 import cats.{Applicative, Monad}
 import cats.data._
 import cats.effect.Clock
 import cats.implicits._
 
-// circe
 import io.circe.{Decoder, DecodingFailure, HCursor, Json}
 
-// Iglu Core
-import com.snowplowanalytics.iglu.core.{SchemaCriterion, SchemaKey, SchemaVer, SelfDescribingData}
+import com.snowplowanalytics.lrumap.CreateLruMap
+
+import com.snowplowanalytics.iglu.core.{
+  SchemaCriterion,
+  SchemaKey,
+  SchemaList,
+  SchemaVer,
+  SelfDescribingData
+}
 import com.snowplowanalytics.iglu.core.circe.CirceIgluCodecs._
 
-// This project
 import com.snowplowanalytics.iglu.client.ClientError.ResolutionError
 import com.snowplowanalytics.iglu.client.resolver.registries.{
   Registry,
@@ -34,7 +38,7 @@ import com.snowplowanalytics.iglu.client.resolver.registries.{
 }
 
 /** Resolves schemas from one or more Iglu schema registries */
-final case class Resolver[F[_]](repos: List[Registry], cache: Option[SchemaCache[F]]) {
+final case class Resolver[F[_]](repos: List[Registry], cache: Option[ResolverCache[F]]) {
   import Resolver._
 
   private[client] val allRepos: NonEmptyList[Registry] =
@@ -73,15 +77,23 @@ final case class Resolver[F[_]](repos: List[Registry], cache: Option[SchemaCache
     } yield postProcess(result)
   }
 
+  /** Fetch list of schemas for particular vendor name pair */
+  def listSchemas(vendor: String, name: String)(
+    implicit F: Monad[F],
+    L: RegistryLookup[F]): F[Option[SchemaList]] =
+    prioritizeRepos(SchemaKey(vendor, name, "jsonschema", SchemaVer.Full(1, 0, 0)), repos)
+      .traverse(repo => L.list(repo, vendor, name))
+      .map(_.find(_.isDefined).flatten)
+
   private def addToCache(schemaKey: SchemaKey, result: SchemaLookup)(
     implicit F: Monad[F],
     C: Clock[F]) =
-    cache.traverse(c => c.store(schemaKey, result))
+    cache.traverse(c => c.putSchema(schemaKey, result))
 
   private def getFromCache(
     schemaKey: SchemaKey)(implicit F: Monad[F], C: Clock[F]): F[Option[SchemaLookup]] =
     cache match {
-      case Some(c) => c.get(schemaKey)
+      case Some(c) => c.getSchema(schemaKey)
       case None    => Monad[F].pure(None)
     }
 }
@@ -135,14 +147,16 @@ object Resolver {
    * @param refs Any RepositoryRef to add to this resolver
    * @return a configured Resolver instance
    */
-  def init[F[_]: Applicative: InitCache](cacheSize: Int, refs: Registry*): F[Resolver[F]] =
-    SchemaCache.init[F](cacheSize, None).map(cacheOpt => new Resolver(List(refs: _*), cacheOpt))
+  def init[F[_]: Monad: InitSchemaCache: InitListCache](
+    cacheSize: Int,
+    refs: Registry*): F[Resolver[F]] =
+    ResolverCache.init[F](cacheSize, None).map(cacheOpt => new Resolver(List(refs: _*), cacheOpt))
 
   // Keep this up-to-date
   private[client] val EmbeddedSchemaCount = 4
 
   /** A Resolver which only looks at our embedded repo */
-  def bootstrap[F[_]: Applicative: InitCache]: F[Resolver[F]] =
+  def bootstrap[F[_]: Monad: InitSchemaCache: InitListCache]: F[Resolver[F]] =
     Resolver.init[F](EmbeddedSchemaCount, Registry.EmbeddedRegistry)
 
   private final case class ResolverConfig(
@@ -169,12 +183,13 @@ object Resolver {
    *        for this resolver
    * @return a configured Resolver instance
    */
-  def parse[F[_]: Monad: InitCache](config: Json): F[Either[DecodingFailure, Resolver[F]]] = {
+  def parse[F[_]: Monad: InitSchemaCache: InitListCache](
+    config: Json): F[Either[DecodingFailure, Resolver[F]]] = {
     val result: EitherT[F, DecodingFailure, Resolver[F]] = for {
       datum    <- EitherT.fromEither[F](config.as[SelfDescribingData[Json]])
       _        <- matchConfig[F](datum)
       config   <- EitherT.fromEither[F](resolverConfigCirceDecoder(datum.data.hcursor))
-      cacheOpt <- EitherT.liftF(SchemaCache.init[F](config.cacheSize, config.cacheTtl))
+      cacheOpt <- EitherT.liftF(ResolverCache.init[F](config.cacheSize, config.cacheTtl))
       refsE    <- EitherT.fromEither[F](config.repositoryRefs.traverse(Registry.parse))
       _        <- EitherT.fromEither[F](validateRefs(refsE))
     } yield Resolver(refsE, cacheOpt)

@@ -19,7 +19,7 @@ import io.circe.Json
 import com.snowplowanalytics.lrumap.CreateLruMap
 
 // Iglu Core
-import com.snowplowanalytics.iglu.core.SchemaKey
+import com.snowplowanalytics.iglu.core.{SchemaKey, SchemaList}
 
 // This project
 import resolver.registries.Registry
@@ -44,6 +44,6 @@ package object resolver {
   type SchemaLookupStamped = (Int, SchemaLookup)
 
   /** Ability to initialize the cache */
-  type InitCache[F[_]] = CreateLruMap[F, SchemaKey, SchemaLookupStamped]
-
+  type InitSchemaCache[F[_]] = CreateLruMap[F, SchemaKey, SchemaLookupStamped]
+  type InitListCache[F[_]]   = CreateLruMap[F, (String, String), SchemaList]
 }
