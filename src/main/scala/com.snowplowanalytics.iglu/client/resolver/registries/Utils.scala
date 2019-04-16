@@ -19,6 +19,7 @@ import java.net.URI
 
 // Scala
 import scala.io.Source
+import scala.util.control.NonFatal
 
 // Cats
 import cats.syntax.either._
@@ -28,7 +29,8 @@ import cats.syntax.show._
 import cats.effect.Sync
 
 // circe
-import io.circe.{Decoder, DecodingFailure, ParsingFailure}
+import io.circe.{Decoder, DecodingFailure, Json, ParsingFailure}
+import io.circe.parser.parse
 
 // Apache Commons
 import org.apache.commons.lang3.exception.ExceptionUtils
@@ -36,7 +38,14 @@ import org.apache.commons.lang3.exception.ExceptionUtils
 // scalaj
 import scalaj.http._
 
+import com.snowplowanalytics.iglu.core.SchemaList
+import com.snowplowanalytics.iglu.core.circe.CirceIgluCodecs._
+
 private[registries] object Utils {
+
+  val ConnectionTimeoutMs = 1000
+
+  val ReadTimeoutMs = 4000
 
   /**
    * Read a Json from an URI using optional apikey
@@ -44,19 +53,50 @@ private[registries] object Utils {
    *
    * @param uri the URL to fetch the JSON document from
    * @param apikey optional apikey UUID to authenticate in Iglu Server
-   * @return The document at that URL
+   * @return The document at that URL if code is 2xx
    */
-  def getFromUri[F[_]: Sync](uri: URI, apikey: Option[String]): F[Option[String]] = {
-    val request = apikey
-      .map(key => Http(uri.toString).header("apikey", key))
-      .getOrElse(Http(uri.toString))
-
+  def getFromUri[F[_]: Sync](uri: URI, apikey: Option[String]): F[Option[String]] =
     Sync[F]
-      .delay(request.asString)
+      .delay(buildLookupRequest(uri, apikey).asString)
       .map { response =>
         if (response.is2xx) response.body.some else None
       }
-  }
+
+  /** Non-RT analog of [[getFromUri]] */
+  def unsafeGetFromUri(uri: URI, apikey: Option[String]): Either[RegistryError, Json] =
+    try {
+      val response = buildLookupRequest(uri, apikey).asString
+      val data     = if (response.is2xx) response.body.some else none
+      data
+        .map(parse)
+        .map(_.leftMap(e => RegistryError.RepoFailure(e.show)))
+        .getOrElse(RegistryError.NotFound.asLeft)
+    } catch {
+      case NonFatal(e) =>
+        repoFailure(e).asLeft
+    }
+
+  /** Not-RT analog of [[RegistryLookup.embeddedLookup]] */
+  def unsafeEmbeddedLookup(path: String): Either[RegistryError, Json] =
+    try {
+      val is     = Utils.unsafeReadResource(path)
+      val schema = is.map(unsafeFromStream)
+      val result = schema
+        .toRight(RegistryError.NotFound: RegistryError)
+        .flatMap(x => parse(x).leftMap(invalidSchema))
+      is.fold(())(unsafeCloseStream)
+      result
+    } catch {
+      case NonFatal(e) =>
+        repoFailure(e).asLeft
+    }
+
+  /** Non-RT analog of [[RegistryLookup.httpList]] */
+  def unsafeHttpList(uri: URI, apikey: Option[String]): Either[RegistryError, SchemaList] =
+    for {
+      json <- unsafeGetFromUri(uri, apikey)
+      list <- json.as[SchemaList].leftMap(e => RegistryError.RepoFailure(e.show))
+    } yield list
 
   /**
    * A wrapper around Java's URI.
@@ -75,7 +115,7 @@ private[registries] object Utils {
         RegistryError.ClientFailure(s"Provided URI string violates RFC 2396: [$error]").asLeft
     }
 
-  implicit val uriDecoder: Decoder[URI] =
+  implicit val uriCirceJsonDecoder: Decoder[URI] =
     Decoder.instance { cursor =>
       for {
         string <- cursor.as[String]
@@ -83,14 +123,26 @@ private[registries] object Utils {
       } yield uri
     }
 
+  private def buildLookupRequest(uri: URI, apikey: Option[String]): HttpRequest =
+    apikey
+      .map(key => Http(uri.toString).header("apikey", key))
+      .getOrElse(Http(uri.toString))
+      .timeout(ConnectionTimeoutMs, ReadTimeoutMs)
+
   private[resolver] def readResource[F[_]: Sync](path: String): F[Option[InputStream]] =
-    Sync[F].delay(Option(getClass.getResource(path)).map(_.openStream()))
+    Sync[F].delay(unsafeReadResource(path))
+  private[resolver] def unsafeReadResource(path: String): Option[InputStream] =
+    Option(getClass.getResource(path)).map(_.openStream())
 
   private[resolver] def fromStream[F[_]: Sync](is: InputStream): F[String] =
-    Sync[F].delay(Source.fromInputStream(is).mkString)
+    Sync[F].delay(unsafeFromStream(is))
+  private[resolver] def unsafeFromStream(is: InputStream): String =
+    Source.fromInputStream(is).mkString
 
   private[resolver] def closeStream[F[_]: Sync](is: InputStream): F[Unit] =
-    Sync[F].delay(is.close())
+    Sync[F].delay(unsafeCloseStream(is))
+  private[resolver] def unsafeCloseStream(is: InputStream): Unit =
+    is.close()
 
   private[resolver] def invalidSchema(failure: ParsingFailure): RegistryError =
     RegistryError.RepoFailure(failure.show)

@@ -21,7 +21,7 @@ import io.circe.Json
 
 import com.snowplowanalytics.iglu.core.SelfDescribingData
 
-import resolver.InitCache
+import resolver.{InitListCache, InitSchemaCache}
 import resolver.registries.{Registry, RegistryLookup}
 
 /**
@@ -53,7 +53,7 @@ object Client {
   val IgluCentral: Client[IO, Json] =
     Client[IO, Json](Resolver(List(Registry.IgluCentral), None), CirceValidator)
 
-  def parseDefault[F[_]: Monad: InitCache](json: Json) =
+  def parseDefault[F[_]: Monad: InitSchemaCache: InitListCache](json: Json) =
     EitherT(Resolver.parse(json)).map { resolver =>
       Client(resolver, CirceValidator)
     }
