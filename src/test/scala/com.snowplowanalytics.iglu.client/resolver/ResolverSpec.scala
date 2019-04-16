@@ -15,7 +15,6 @@ package com.snowplowanalytics.iglu.client.resolver
 // Cats
 import cats.effect.IO
 import cats.implicits._
-import com.snowplowanalytics.iglu.client.resolver.ResolverSpecHelpers.StaticLookup
 
 // circe
 import io.circe.Json
@@ -29,6 +28,7 @@ import com.snowplowanalytics.iglu.client.SpecHelpers
 import com.snowplowanalytics.iglu.client.ClientError._
 import com.snowplowanalytics.iglu.client.resolver.registries.{Registry, RegistryError}
 import com.snowplowanalytics.iglu.client.resolver.registries.RegistryLookup._
+import com.snowplowanalytics.iglu.client.resolver.ResolverSpecHelpers.StaticLookup
 
 // Specs2
 import org.specs2.Specification
@@ -78,7 +78,7 @@ class ResolverSpec extends Specification with DataTables with ValidatedMatchers 
 
     resolver
       .map { resolver =>
-        Resolver.prioritizeRepos(schemaKey, resolver.allRepos.toList) must_== expected
+        Resolver.prioritizeRepos(schemaKey.vendor, resolver.allRepos.toList) must_== expected
       }
       .unsafeRunSync()
   }
@@ -196,9 +196,10 @@ class ResolverSpec extends Specification with DataTables with ValidatedMatchers 
 
     val responses = List(timeoutError, correctSchema)
 
-    implicit val registryLookup = ResolverSpecHelpers.getLookup(responses)
     implicit val cache          = ResolverSpecHelpers.staticCache
+    implicit val cacheList      = ResolverSpecHelpers.staticCacheForList
     implicit val clock          = ResolverSpecHelpers.staticClock
+    implicit val registryLookup = ResolverSpecHelpers.getLookup(responses, Nil)
 
     val result = for {
       resolver  <- Resolver.init[StaticLookup](10, httpRep)
@@ -238,9 +239,10 @@ class ResolverSpec extends Specification with DataTables with ValidatedMatchers 
       correctSchema.asRight // Should never be reached
     )
 
-    implicit val registryLookup = ResolverSpecHelpers.getLookup(responses)
     implicit val cache          = ResolverSpecHelpers.staticCache
+    implicit val cacheList      = ResolverSpecHelpers.staticCacheForList
     implicit val clock          = ResolverSpecHelpers.staticClock
+    implicit val registryLookup = ResolverSpecHelpers.getLookup(responses, Nil)
 
     val result = for {
       resolver <- Resolver.init[StaticLookup](10, httpRep)
@@ -288,13 +290,15 @@ class ResolverSpec extends Specification with DataTables with ValidatedMatchers 
       Registry.Config("Mock Repo 2", 1, List("com.snowplowanalytics.iglu-test")),
       null)
 
-    implicit val cache = ResolverSpecHelpers.staticCache
-    implicit val clock = ResolverSpecHelpers.staticClock
+    implicit val cache     = ResolverSpecHelpers.staticCache
+    implicit val cacheList = ResolverSpecHelpers.staticCacheForList
+    implicit val clock     = ResolverSpecHelpers.staticClock
     implicit val registryLookup = ResolverSpecHelpers.getLookupByRepo(
       Map(
         "Mock Repo 1" -> List(error1.asLeft, error2.asLeft),
         "Mock Repo 2" -> List(error3.asLeft, error4.asLeft)
-      ))
+      ),
+      Nil)
 
     val expected = ResolutionError(
       Map(
@@ -331,21 +335,23 @@ class ResolverSpec extends Specification with DataTables with ValidatedMatchers 
         }
        }""".asRight
 
-    implicit val cache = ResolverSpecHelpers.staticCache
-    implicit val clock = ResolverSpecHelpers.staticClock
+    implicit val cache     = ResolverSpecHelpers.staticCache
+    implicit val cacheList = ResolverSpecHelpers.staticCacheForList
+    implicit val clock     = ResolverSpecHelpers.staticClock
     implicit val registryLookup = ResolverSpecHelpers.getLookupByRepo(
       Map(
         "Mock Repo" -> List(
           RegistryError.NotFound.asLeft[Json],
           correctSchema
-        )))
+        )),
+      Nil)
 
     // Mocking repository
     val httpRep =
       Registry.Http(Registry.Config("Mock Repo", 1, List("com.snowplowanalytics.iglu-test")), null)
 
     val result = for {
-      resolver <- SchemaCache
+      resolver <- ResolverCache
         .init[StaticLookup](10, Some(3))
         .map(cache => Resolver(List(httpRep), cache))
       firstResult       <- resolver.lookupSchema(schemaKey, 3) // not found

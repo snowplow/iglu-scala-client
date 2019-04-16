@@ -12,20 +12,24 @@
  */
 package com.snowplowanalytics.iglu.client.resolver
 
-// cats
 import cats.{Applicative, Monad}
 import cats.data._
 import cats.effect.Clock
 import cats.implicits._
 
-// circe
 import io.circe.{Decoder, DecodingFailure, HCursor, Json}
 
-// Iglu Core
-import com.snowplowanalytics.iglu.core.{SchemaCriterion, SchemaKey, SchemaVer, SelfDescribingData}
+import com.snowplowanalytics.iglu.core.{
+  SchemaCriterion,
+  SchemaKey,
+  SchemaList,
+  SchemaMap,
+  SchemaVer,
+  SelfDescribingData,
+  SelfDescribingSchema
+}
 import com.snowplowanalytics.iglu.core.circe.CirceIgluCodecs._
 
-// This project
 import com.snowplowanalytics.iglu.client.ClientError.ResolutionError
 import com.snowplowanalytics.iglu.client.resolver.registries.{
   Registry,
@@ -34,7 +38,7 @@ import com.snowplowanalytics.iglu.client.resolver.registries.{
 }
 
 /** Resolves schemas from one or more Iglu schema registries */
-final case class Resolver[F[_]](repos: List[Registry], cache: Option[SchemaCache[F]]) {
+final case class Resolver[F[_]](repos: List[Registry], cache: Option[ResolverCache[F]]) {
   import Resolver._
 
   private[client] val allRepos: NonEmptyList[Registry] =
@@ -56,32 +60,68 @@ final case class Resolver[F[_]](repos: List[Registry], cache: Option[SchemaCache
     F: Monad[F],
     L: RegistryLookup[F],
     C: Clock[F]): F[Either[ResolutionError, Json]] = {
-    val prioritize = prioritizeRepos(schemaKey, _: List[Registry]).toList
+    val prioritize                                      = prioritizeRepos(schemaKey.vendor, _: List[Registry]).toList
+    val get: Registry => F[Either[RegistryError, Json]] = r => L.lookup(r, schemaKey)
     def retryCached(serverErrors: LookupFailureMap): F[SchemaLookup] = {
       val reposForRetry = getReposForRetry(serverErrors, attempts)
-      traverseRepos[F](schemaKey, prioritize(reposForRetry), serverErrors)
+      traverseRepos[F, Json](get, prioritize(reposForRetry), serverErrors)
     }
 
     val resultAction = getFromCache(schemaKey).flatMap {
       case Some(lookupResult) => lookupResult.fold(retryCached, finish[F, Json])
-      case None               => traverseRepos[F](schemaKey, prioritize(allRepos.toList), Map.empty)
+      case None               => traverseRepos[F, Json](get, prioritize(allRepos.toList), Map.empty)
     }
 
     for {
       result <- resultAction
-      _      <- addToCache(schemaKey, result)
+      _      <- cache.traverse(c => c.putSchema(schemaKey, result))
     } yield postProcess(result)
   }
 
-  private def addToCache(schemaKey: SchemaKey, result: SchemaLookup)(
+  /**
+   * Get list of available schemas for particular vendor and name part
+   * Server supposed to return them in proper order
+   */
+  def listSchemas(vendor: String, name: String, model: Option[Int])(
     implicit F: Monad[F],
+    L: RegistryLookup[F]) = {
+    val prioritize                                            = prioritizeRepos(vendor, _: List[Registry]).toList
+    val get: Registry => F[Either[RegistryError, SchemaList]] = r => L.list(r, vendor, name, model)
+    def retryCached(serverErrors: LookupFailureMap): F[ListLookup] = {
+      val reposForRetry = getReposForRetry(serverErrors, 5)
+      traverseRepos[F, SchemaList](get, prioritize(reposForRetry), serverErrors)
+    }
+
+    val resultAction = cache
+      .fold(F.pure(none[ListLookup]))(_.getSchemaList(vendor, name))
+      .flatMap {
+        case Some(listResult) => listResult.fold(retryCached, finish[F, SchemaList])
+        case None =>
+          traverseRepos[F, SchemaList](get, prioritize(allRepos.toList), Map.empty)
+      }
+
+    for {
+      result <- resultAction
+      _      <- cache.traverse(c => c.putSchemaList(vendor, name, result))
+    } yield postProcess(result)
+  }
+
+  /** Get list of full self-describing schemas available on Iglu Server for particular vendor/name pair */
+  def fetchSchemas(vendor: String, name: String, model: Option[Int])(
+    implicit F: Monad[F],
+    L: RegistryLookup[F],
     C: Clock[F]) =
-    cache.traverse(c => c.store(schemaKey, result))
+    for {
+      list <- EitherT(listSchemas(vendor, name, model))
+      result <- list.schemas.traverse { key =>
+        EitherT(lookupSchema(key, 3)).map(json => SelfDescribingSchema(SchemaMap(key), json))
+      }
+    } yield result
 
   private def getFromCache(
     schemaKey: SchemaKey)(implicit F: Monad[F], C: Clock[F]): F[Option[SchemaLookup]] =
     cache match {
-      case Some(c) => c.get(schemaKey)
+      case Some(c) => c.getSchema(schemaKey)
       case None    => Monad[F].pure(None)
     }
 }
@@ -92,8 +132,7 @@ object Resolver {
   /**
    * Tail-recursive function to find our schema in one of our repositories
    *
-   * @param schemaKey The SchemaKey uniquely identifying
-   *                  this schema in Iglu
+   * @param get a function to get an entity from first registry
    * @param remaining A List of repositories we have to look in
    *                  (not-tried yet or with non-404 error)
    * @param tried A Map of repositories with their accumulated errors
@@ -102,18 +141,18 @@ object Resolver {
    *         or a Failure-boxing of Map of repositories with all their
    *         accumulated errors
    */
-  def traverseRepos[F[_]: Monad: RegistryLookup](
-    schemaKey: SchemaKey,
+  def traverseRepos[F[_]: Monad: RegistryLookup, A](
+    get: Registry => F[Either[RegistryError, A]],
     remaining: List[Registry],
-    tried: LookupFailureMap): F[SchemaLookup] = remaining match {
+    tried: LookupFailureMap): F[Either[LookupFailureMap, A]] = remaining match {
     case Nil => Applicative[F].pure(tried.asLeft)
     case repo :: tail =>
-      RegistryLookup[F].lookup(repo, schemaKey).flatMap {
-        case Right(schema) =>
-          finish[F, Json](schema)
+      get(repo).flatMap {
+        case Right(list) =>
+          finish[F, A](list)
         case Left(e) => // TODO: we can pattern match here
           val error = LookupHistory(Set(e), 1, fatal = false)
-          traverseRepos[F](schemaKey, tail, Map(repo -> error) |+| tried)
+          traverseRepos[F, A](get, tail, Map(repo -> error) |+| tried)
       }
   }
 
@@ -135,14 +174,16 @@ object Resolver {
    * @param refs Any RepositoryRef to add to this resolver
    * @return a configured Resolver instance
    */
-  def init[F[_]: Applicative: InitCache](cacheSize: Int, refs: Registry*): F[Resolver[F]] =
-    SchemaCache.init[F](cacheSize, None).map(cacheOpt => new Resolver(List(refs: _*), cacheOpt))
+  def init[F[_]: Monad: InitSchemaCache: InitListCache](
+    cacheSize: Int,
+    refs: Registry*): F[Resolver[F]] =
+    ResolverCache.init[F](cacheSize, None).map(cacheOpt => new Resolver(List(refs: _*), cacheOpt))
 
   // Keep this up-to-date
   private[client] val EmbeddedSchemaCount = 4
 
   /** A Resolver which only looks at our embedded repo */
-  def bootstrap[F[_]: Applicative: InitCache]: F[Resolver[F]] =
+  def bootstrap[F[_]: Monad: InitSchemaCache: InitListCache]: F[Resolver[F]] =
     Resolver.init[F](EmbeddedSchemaCount, Registry.EmbeddedRegistry)
 
   private final case class ResolverConfig(
@@ -169,12 +210,13 @@ object Resolver {
    *        for this resolver
    * @return a configured Resolver instance
    */
-  def parse[F[_]: Monad: InitCache](config: Json): F[Either[DecodingFailure, Resolver[F]]] = {
+  def parse[F[_]: Monad: InitSchemaCache: InitListCache](
+    config: Json): F[Either[DecodingFailure, Resolver[F]]] = {
     val result: EitherT[F, DecodingFailure, Resolver[F]] = for {
       datum    <- EitherT.fromEither[F](config.as[SelfDescribingData[Json]])
       _        <- matchConfig[F](datum)
       config   <- EitherT.fromEither[F](resolverConfigCirceDecoder(datum.data.hcursor))
-      cacheOpt <- EitherT.liftF(SchemaCache.init[F](config.cacheSize, config.cacheTtl))
+      cacheOpt <- EitherT.liftF(ResolverCache.init[F](config.cacheSize, config.cacheTtl))
       refsE    <- EitherT.fromEither[F](config.repositoryRefs.traverse(Registry.parse))
       _        <- EitherT.fromEither[F](validateRefs(refsE))
     } yield Resolver(refsE, cacheOpt)
@@ -200,14 +242,14 @@ object Resolver {
    * Re-sorts RepositoryRefs into the optimal order for querying
    * (optimal = minimizing unsafe I/O).
    *
-   * @param schemaKey SchemaKey uniquely identifying the schema in Iglu
+   * @param vendor vendor of a schema
    * @param repositoryRefs list of repository refs to be sorted
    * @return the prioritized List of RepositoryRefs.
    *         Pragmatically sorted to minimize lookups.
    */
-  private[client] def prioritizeRepos(schemaKey: SchemaKey, repositoryRefs: List[Registry]) =
+  private[client] def prioritizeRepos(vendor: String, repositoryRefs: List[Registry]) =
     repositoryRefs.sortBy(r =>
-      (!r.config.vendorMatched(schemaKey), r.classPriority, r.config.instancePriority))
+      (!r.config.vendorMatched(vendor), r.classPriority, r.config.instancePriority))
 
   /**
    * Get from Map of repository failures only those repository which
@@ -227,7 +269,7 @@ object Resolver {
     errorsToRetry.keys.toList
   }
 
-  private def postProcess[F[_]](result: SchemaLookup) =
+  private def postProcess[F[_], A](result: Either[LookupFailureMap, A]) =
     result.leftMap { failure =>
       ResolutionError(failure.map { case (key, value) => (key.config.name, value) })
     }

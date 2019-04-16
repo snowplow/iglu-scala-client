@@ -10,7 +10,8 @@
  * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the Apache License Version 2.0 for the specific language governing permissions and limitations there under.
  */
-package com.snowplowanalytics.iglu.client.resolver.registries
+package com.snowplowanalytics.iglu.client.resolver
+package registries
 
 // Java
 import java.net.UnknownHostException
@@ -30,10 +31,11 @@ import io.circe.Json
 import io.circe.parser.parse
 
 // Iglu Core
-import com.snowplowanalytics.iglu.core.{SchemaKey, SelfDescribingSchema}
-import com.snowplowanalytics.iglu.core.circe.implicits._
+import com.snowplowanalytics.iglu.core.{SchemaKey, SchemaList, SelfDescribingSchema}
+import com.snowplowanalytics.iglu.core.circe.instances._
 
-/** A capability of `F` to perform a schema lookup action, using `RepositoryRef` ADT
+/** A capability of `F` to communicate with Iglu registries, using `RepositoryRef` ADT,
+ * in order to lookup for schemas or get schema lists
  *
  * @tparam F effect type
  */
@@ -42,12 +44,26 @@ trait RegistryLookup[F[_]] {
 
   /** Find a schema in the particular `RepositoryRef`
    *
-   * @param repositoryRef one of supported repository types
+   * @param registry one of supported repository types
    * @param schemaKey The SchemaKey uniquely identifying the schema in Iglu
    * @return either schema parsed into `Json` or `RegistryError`, such as absent schema,
    *         or unexpected response
    */
-  def lookup(repositoryRef: Registry, schemaKey: SchemaKey): F[Either[RegistryError, Json]]
+  def lookup(registry: Registry, schemaKey: SchemaKey): F[Either[RegistryError, Json]]
+
+  /** List all schemas (formats and versions) for a given vendor/name pair in their
+   * chronological order. It is up to Registry to build valid list
+   *
+   * @param registry one of supported repository types (only HTTP is supported)
+   * @param vendor precise schema vendor
+   * @param name schema name
+   * @return some parsed `SchemaList` (order is trusted) or none in any unexpected case
+   */
+  def list(
+    registry: Registry,
+    vendor: String,
+    name: String,
+    model: Option[Int]): F[Either[RegistryError, SchemaList]]
 }
 
 object RegistryLookup {
@@ -67,14 +83,30 @@ object RegistryLookup {
           case Registry.Embedded(_, path)    => embeddedLookup[F](path, schemaKey)
           case Registry.InMemory(_, schemas) => F.pure(inMemoryLookup(schemas, schemaKey))
         }
+
+      def list(
+        registry: Registry,
+        vendor: String,
+        name: String,
+        model: Option[Int]): F[Either[RegistryError, SchemaList]] =
+        registry match {
+          case Registry.Http(_, connection) => httpList(connection, vendor, name, model)
+          case _                            => F.pure(RegistryError.NotFound.asLeft)
+        }
     }
 
   // Non-RT instances. Use with caution
 
   implicit def evalLookupInstance: RegistryLookup[Eval] =
     new RegistryLookup[Eval] {
-      def lookup(repositoryRef: Registry, schemaKey: SchemaKey): Eval[Either[RegistryError, Json]] =
-        Eval.always(idLookupInstance.lookup(repositoryRef, schemaKey))
+      def lookup(registry: Registry, schemaKey: SchemaKey): Eval[Either[RegistryError, Json]] =
+        Eval.always(idLookupInstance.lookup(registry, schemaKey))
+      def list(
+        registry: Registry,
+        vendor: String,
+        name: String,
+        model: Option[Int]): Eval[Either[RegistryError, SchemaList]] =
+        Eval.always(idLookupInstance.list(registry, vendor, name, model))
     }
 
   // Id instance also swallows all exceptions into `RegistryError`
@@ -96,6 +128,22 @@ object RegistryLookup {
         case Registry.InMemory(_, schemas) =>
           inMemoryLookup(schemas, schemaKey)
       }
+
+    def list(
+      registry: Registry,
+      vendor: String,
+      name: String,
+      model: Option[Int]): Id[Either[RegistryError, SchemaList]] =
+      registry match {
+        case Registry.Http(_, connection) =>
+          httpList[IO](connection, vendor, name, model).attemptT
+            .leftMap(Utils.repoFailure)
+            .value
+            .unsafeRunSync()
+            .flatten
+        case _ =>
+          RegistryError.NotFound.asLeft
+      }
   }
 
   def inMemoryLookup(
@@ -106,6 +154,12 @@ object RegistryLookup {
   /** Common method to get an endpoint of `SchemaKey` */
   private def toPath(prefix: String, key: SchemaKey): String =
     s"${prefix.stripSuffix("/")}/schemas/${key.toPath}"
+
+  private def toSubpath(prefix: String, vendor: String, name: String, model: Option[Int]): String =
+    model match {
+      case None    => s"${prefix.stripSuffix("/")}/schemas/$vendor/$name/"
+      case Some(m) => s"${prefix.stripSuffix("/")}/schemas/$vendor/$name/jsonschema/$m"
+    }
 
   /** Retrieves an Iglu Schema from the Embedded Iglu Repo as a JSON
    *
@@ -159,6 +213,24 @@ object RegistryLookup {
         case NonFatal(nfe) =>
           val error = s"Unexpected exception fetching: $nfe"
           RegistryError.RepoFailure(error).asLeft
+      }
+  }
+
+  private[registries] def httpList[F[_]: Sync](
+    http: Registry.HttpConnection,
+    vendor: String,
+    name: String,
+    model: Option[Int]): F[Either[RegistryError, SchemaList]] = {
+    Utils
+      .stringToUri(toSubpath(http.uri.toString, vendor, name, model))
+      .traverse(uri => Utils.getFromUri(uri, http.apikey))
+      .map { response =>
+        for {
+          body <- response
+          text <- body.toRight(RegistryError.NotFound)
+          json <- parse(text).leftMap(e => RegistryError.RepoFailure(e.show))
+          list <- json.as[SchemaList].leftMap(e => RegistryError.RepoFailure(e.show))
+        } yield list
       }
   }
 }
