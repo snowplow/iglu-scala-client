@@ -24,10 +24,11 @@ import cats.syntax.option._
 import com.snowplowanalytics.lrumap.{CreateLruMap, LruMap}
 
 // Iglu core
-import com.snowplowanalytics.iglu.core.SchemaKey
+import com.snowplowanalytics.iglu.core.{SchemaKey, SchemaList}
 
-class SchemaCache[F[_]] private (
-  lru: LruMap[F, SchemaKey, SchemaLookupStamped],
+class ResolverCache[F[_]] private (
+  schemas: LruMap[F, SchemaKey, SchemaLookupStamped],
+  schemaLists: LruMap[F, (String, String), ListLookup],
   val ttl: Option[Int]) {
 
   /**
@@ -38,9 +39,9 @@ class SchemaCache[F[_]] private (
    * @return the schema if found as Some Json or None
    *         if not found, or cache is not enabled.
    */
-  def get(key: SchemaKey)(implicit F: Monad[F], C: Clock[F]): F[Option[SchemaLookup]] = {
+  def getSchema(key: SchemaKey)(implicit F: Monad[F], C: Clock[F]): F[Option[SchemaLookup]] = {
     val wrapped = for {
-      (timestamp, lookup) <- OptionT(lru.get(key))
+      (timestamp, lookup) <- OptionT(schemas.get(key))
       seconds             <- OptionT.liftF(currentSeconds)
       if isViable(seconds, timestamp)
     } yield lookup
@@ -49,26 +50,31 @@ class SchemaCache[F[_]] private (
   }
 
   /**
-   * Caches and returns the given schema. Does
-   * nothing if we don't have an LRU cache
-   * available.
+   * Caches and returns the given schema.
+   * Does nothing if we don't have an LRU cache available.
    *
    * @param schema The provided schema
    * @return the same schema
    */
-  def store(schemaKey: SchemaKey, schema: SchemaLookup)(
+  def putSchema(schemaKey: SchemaKey, schema: SchemaLookup)(
     implicit
     C: Clock[F],
     F: Monad[F]): F[SchemaLookup] =
     for {
       seconds <- currentSeconds
-      _       <- lru.put(schemaKey, (seconds, schema))
+      _       <- schemas.put(schemaKey, (seconds, schema))
     } yield schema
 
-  /**
-   * Get Unix epoch timestamp in seconds
-   * TODO: switch to monotonic
-   */
+  /** Lookup a `SchemaList`, no TTL is available */
+  def getSchemaList(vendor: String, name: String)(implicit F: Monad[F]): F[Option[ListLookup]] =
+    schemaLists.get((vendor, name))
+
+  /** Put a `SchemaList` result into a cache */
+  def putSchemaList(vendor: String, name: String, list: ListLookup)(
+    implicit F: Monad[F]): F[ListLookup] =
+    schemaLists.put((vendor, name), list).as(list)
+
+  /** Get Unix epoch timestamp in seconds */
   private def currentSeconds(implicit C: Clock[F], F: Functor[F]): F[Int] =
     C.realTime(java.util.concurrent.TimeUnit.SECONDS).map(_.toInt)
 
@@ -82,15 +88,18 @@ class SchemaCache[F[_]] private (
     ttl.fold(true)(ttlVal => unixSeconds - storedTstamp < ttlVal)
 }
 
-object SchemaCache {
-  def init[F[_]: Applicative: InitCache](size: Int, ttl: Option[Int]): F[Option[SchemaCache[F]]] =
+object ResolverCache {
+  def init[F[_]: Monad](size: Int, ttl: Option[Int])(
+    implicit C: CreateLruMap[F, SchemaKey, SchemaLookupStamped],
+    L: CreateLruMap[F, (String, String), ListLookup]): F[Option[ResolverCache[F]]] =
     Option(())
       .filter(_ => size > 0)
       .filter(_ => !ttl.exists(_ <= 0)) match {
       case Some(_) =>
-        CreateLruMap[F, SchemaKey, SchemaLookupStamped]
-          .create(size)
-          .map(lru => new SchemaCache[F](lru, ttl).some)
+        for {
+          schemas     <- CreateLruMap[F, SchemaKey, SchemaLookupStamped].create(size)
+          schemaLists <- CreateLruMap[F, (String, String), ListLookup].create(size)
+        } yield new ResolverCache[F](schemas, schemaLists, ttl).some
       case None =>
         Applicative[F].pure(none)
     }

@@ -22,7 +22,7 @@ import io.circe.{Decoder, HCursor, Json}
 import cats.syntax.either._
 
 // Iglu Core
-import com.snowplowanalytics.iglu.core.{SchemaKey, SelfDescribingSchema}
+import com.snowplowanalytics.iglu.core.SelfDescribingSchema
 
 /** ADT supporting all native (from resolver-config) registries */
 sealed trait Registry extends Product with Serializable {
@@ -63,13 +63,11 @@ object Registry {
      * vendor prefix match. Returns true if we matched our schema's vendor
      * in the list of vendor prefixes.
      *
-     * @param schemaKey The SchemaKey uniquely identifying the schema in Iglu.
-     *                  We will use the vendor within the SchemaKey to match
-     *                  against our prefixes
+     * @param vendor a schema's vendor to find among specified in resolver
      * @return whether this is a priority lookup or not
      */
-    def vendorMatched(schemaKey: SchemaKey): Boolean =
-      vendorPrefixes.exists(schemaKey.vendor.startsWith)
+    def vendorMatched(vendor: String): Boolean =
+      vendorPrefixes.exists(vendor.startsWith)
   }
 
   /** Primary, public Snowplow-supported Iglu Registry */
