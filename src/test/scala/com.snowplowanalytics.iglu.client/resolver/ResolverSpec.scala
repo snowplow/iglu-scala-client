@@ -12,6 +12,8 @@
  */
 package com.snowplowanalytics.iglu.client.resolver
 
+import java.time.Instant
+
 // Cats
 import cats.effect.IO
 import cats.implicits._
@@ -59,10 +61,9 @@ class ResolverSpec extends Specification with DataTables with ValidatedMatchers 
   a Resolver should report its failed lookups when a JSON Schema can't be resolved $e3
   a Resolver should report issues with a corrupted JSON Schema $e4
   a Resolver should report issues with invalid JSON Schema $e5
-  a Resolver should retry after non-404 errors $e6
-  a Resolver should give up after 3rd retry $e7
+  a Resolver should respect backoff policy $e6
+  a Resolver should keep retrying and never overwrite a sucessful response $e7
   a Resolver should accumulate errors from all repositories $e8
-  a Resolver should respect cacheTtl $e9
   we can construct a Resolver from a valid resolver 1-0-2 configuration JSON $e10
   """
 
@@ -70,7 +71,7 @@ class ResolverSpec extends Specification with DataTables with ValidatedMatchers 
 
   def e1 = {
     val resolver =
-      Resolver.init[IO](cacheSize = 10, SpecHelpers.IgluCentral, Repos.one, Repos.two, Repos.three)
+      Resolver.init[IO](10, None, SpecHelpers.IgluCentral, Repos.one, Repos.two, Repos.three)
     val schemaKey =
       SchemaKey("de.acompany.snowplow", "mobile_context", "jsonschema", SchemaVer.Full(1, 0, 0))
     val expected: List[Registry] =
@@ -78,7 +79,7 @@ class ResolverSpec extends Specification with DataTables with ValidatedMatchers 
 
     resolver
       .map { resolver =>
-        Resolver.prioritizeRepos(schemaKey.vendor, resolver.allRepos.toList) must_== expected
+        Resolver.prioritize(schemaKey.vendor, resolver.allRepos.toList) must_== expected
       }
       .unsafeRunSync()
   }
@@ -129,13 +130,14 @@ class ResolverSpec extends Specification with DataTables with ValidatedMatchers 
     val schemaKey = SchemaKey("com.acme.icarus", "wing", "jsonschema", SchemaVer.Full(1, 0, 0))
     val expected = ResolutionError(
       Map(
-        "Iglu Client Embedded" -> LookupHistory(Set(RegistryError.NotFound), 1, false),
-        "Iglu Test Embedded"   -> LookupHistory(Set(RegistryError.NotFound), 1, false)
+        "Iglu Client Embedded" -> LookupHistory(Set(RegistryError.NotFound), 1, SpecHelpers.now),
+        "Iglu Test Embedded"   -> LookupHistory(Set(RegistryError.NotFound), 1, SpecHelpers.now)
       ))
 
     SpecHelpers.TestResolver
-      .flatMap(resolver => resolver.lookupSchema(schemaKey, 3))
-      .unsafeRunSync() must beLeft(expected)
+      .flatMap(resolver => resolver.lookupSchema(schemaKey))
+      .unsafeRunSync()
+      .leftMap(SpecHelpers.cleanTimestamps) must beLeft(expected)
   }
 
   def e4 = {
@@ -147,16 +149,17 @@ class ResolverSpec extends Specification with DataTables with ValidatedMatchers 
         SchemaVer.Full(1, 0, 0))
     val expected = ResolutionError(
       Map(
-        "Iglu Client Embedded" -> LookupHistory(Set(RegistryError.NotFound), 1, false),
+        "Iglu Client Embedded" -> LookupHistory(Set(RegistryError.NotFound), 1, SpecHelpers.now),
         "Iglu Test Embedded" -> LookupHistory(
           Set(RegistryError.RepoFailure("ParsingFailure: exhausted input")),
           1,
-          false)
+          SpecHelpers.now)
       ))
 
     val result = SpecHelpers.TestResolver
-      .flatMap(resolver => resolver.lookupSchema(schemaKey, 3))
+      .flatMap(resolver => resolver.lookupSchema(schemaKey))
       .unsafeRunSync()
+      .leftMap(SpecHelpers.cleanTimestamps)
 
     result must beLeft(expected)
   }
@@ -170,7 +173,7 @@ class ResolverSpec extends Specification with DataTables with ValidatedMatchers 
         SchemaVer.Full(1, 0, 0))
 
     SpecHelpers.TestResolver
-      .flatMap(resolver => resolver.lookupSchema(schemaKey, 3))
+      .flatMap(resolver => resolver.lookupSchema(schemaKey))
       .unsafeRunSync()
       .leftMap {
         case ResolutionError(errors) =>
@@ -190,11 +193,11 @@ class ResolverSpec extends Specification with DataTables with ValidatedMatchers 
       RegistryError.RepoFailure("shouldn't matter").asLeft[Json]
     val correctSchema =
       Json.Null.asRight[RegistryError]
+    val time      = Instant.ofEpochMilli(2L)
+    val responses = List(timeoutError, correctSchema)
 
     val httpRep =
       Registry.Http(Registry.Config("Mock Repo", 1, List("com.snowplowanalytics.iglu-test")), null)
-
-    val responses = List(timeoutError, correctSchema)
 
     implicit val cache          = ResolverSpecHelpers.staticCache
     implicit val cacheList      = ResolverSpecHelpers.staticCacheForList
@@ -202,22 +205,31 @@ class ResolverSpec extends Specification with DataTables with ValidatedMatchers 
     implicit val registryLookup = ResolverSpecHelpers.getLookup(responses, Nil)
 
     val result = for {
-      resolver  <- Resolver.init[StaticLookup](10, httpRep)
-      response1 <- resolver.lookupSchema(schemaKey, 3)
-      response2 <- resolver.lookupSchema(schemaKey, 3)
-    } yield (response1, response2)
+      resolver  <- Resolver.init[StaticLookup](10, None, httpRep)
+      response1 <- resolver.lookupSchema(schemaKey)
+      response2 <- resolver.lookupSchema(schemaKey)
+      _         <- StaticLookup.addTime(600)
+      response3 <- resolver.lookupSchema(schemaKey)
+    } yield (response1, response2, response3)
 
-    val (state, (response1, response2)) = result.run(ResolverSpecHelpers.RegistryState.init).value
+    val (state, (response1, response2, response3)) =
+      result.run(ResolverSpecHelpers.RegistryState.init).value
 
     val firstFailed = response1 must beLeft.like {
       case ResolutionError(history) =>
         history must haveValue(
-          LookupHistory(Set(RegistryError.RepoFailure("shouldn't matter")), 1, false))
+          LookupHistory(Set(RegistryError.RepoFailure("shouldn't matter")), 1, time))
     }
-    val secondSucceeded = response2 must beEqualTo(correctSchema)
-    val requestsNumber  = state.req must beEqualTo(2)
+    val secondFailed = response2 must beLeft.like {
+      case ResolutionError(history) =>
+        history must haveValue(
+          LookupHistory(Set(RegistryError.RepoFailure("shouldn't matter")), 1, time))
+    }
 
-    firstFailed and secondSucceeded and requestsNumber
+    val thirdSucceeded = response3 must beEqualTo(correctSchema)
+    val requestsNumber = state.req must beEqualTo(2)
+
+    firstFailed and secondFailed and thirdSucceeded and requestsNumber
   }
 
   def e7 = {
@@ -227,17 +239,16 @@ class ResolverSpec extends Specification with DataTables with ValidatedMatchers 
         "future_schema",
         "jsonschema",
         SchemaVer.Full(1, 0, 0))
-    val timeout       = RegistryError.RepoFailure("Timeout exception")
     val correctSchema = Json.Null
+    val responses = List(
+      RegistryError.RepoFailure("Timeout exception 1").asLeft,
+      RegistryError.RepoFailure("Timeout exception 2").asLeft,
+      correctSchema.asRight,
+      RegistryError.RepoFailure("Should never be reached").asLeft,
+    )
+
     val httpRep =
       Registry.Http(Registry.Config("Mock Repo", 1, List("com.snowplowanalytics.iglu-test")), null)
-
-    val responses = List(
-      timeout.asLeft[Json],
-      timeout.asLeft[Json],
-      timeout.asLeft[Json],
-      correctSchema.asRight // Should never be reached
-    )
 
     implicit val cache          = ResolverSpecHelpers.staticCache
     implicit val cacheList      = ResolverSpecHelpers.staticCacheForList
@@ -245,29 +256,26 @@ class ResolverSpec extends Specification with DataTables with ValidatedMatchers 
     implicit val registryLookup = ResolverSpecHelpers.getLookup(responses, Nil)
 
     val result = for {
-      resolver <- Resolver.init[StaticLookup](10, httpRep)
-      _        <- resolver.lookupSchema(schemaKey, 3)
-      _        <- resolver.lookupSchema(schemaKey, 3)
-      _        <- resolver.lookupSchema(schemaKey, 3)
-      _        <- resolver.lookupSchema(schemaKey, 3) // this and subsequent return error
-      result   <- resolver.lookupSchema(schemaKey, 3)
+      resolver <- Resolver
+        .init[StaticLookup](10, Some(1000), httpRep) // FIXME: its confusing to mix millis and sec
+      _      <- resolver.lookupSchema(schemaKey)
+      _      <- StaticLookup.addTime(2000)
+      _      <- resolver.lookupSchema(schemaKey)
+      _      <- StaticLookup.addTime(2000)
+      _      <- resolver.lookupSchema(schemaKey)
+      _      <- StaticLookup.addTime(2000)
+      result <- resolver.lookupSchema(schemaKey) // ... but don't try to overwrite it
     } yield result
 
     val (state, response) = result.run(ResolverSpecHelpers.RegistryState.init).value
 
-    // Only 3 attempts were made to Mock Repo and it is reflected in LookupHistory
-    val lookupHistory = response must beLeft.like {
-      case ResolutionError(history) =>
-        history must havePair("Mock Repo" -> LookupHistory(Set(timeout), 3, false))
-    }
+    // Final response must not overwrite a successful one
+    val finalResult = response must beRight(correctSchema)
 
-    // Only 3 attempts were made to HTTP Repo and it is reflected in State
-    val lookupTries = state.req must beEqualTo(3)
+    // Check that it attempted to get fourth schema (500 response)
+    val lookupTries = state.req must beEqualTo(4)
 
-    // (get+put+embd+http) + 2*(get+put+http) + 2*(get+put)
-    val timePassed = state.time must beEqualTo(14)
-
-    lookupHistory and lookupTries and timePassed
+    finalResult and lookupTries
   }
 
   def e8 = {
@@ -302,71 +310,23 @@ class ResolverSpec extends Specification with DataTables with ValidatedMatchers 
 
     val expected = ResolutionError(
       Map(
-        "Mock Repo 1"          -> LookupHistory(Set(error2, error1), 2, false),
-        "Mock Repo 2"          -> LookupHistory(Set(error4, error3), 2, false),
-        "Iglu Client Embedded" -> LookupHistory(Set(RegistryError.NotFound), 1, false)
+        "Mock Repo 1" -> LookupHistory(Set(error1, error2), 2, Instant.ofEpochMilli(2008L)),
+        "Mock Repo 2" -> LookupHistory(Set(error3, error4), 2, Instant.ofEpochMilli(2009L)),
+        "Iglu Client Embedded" -> LookupHistory(
+          Set(RegistryError.NotFound),
+          1,
+          Instant.ofEpochMilli(4L))
       ))
 
     val result = for {
-      resolver <- Resolver.init[StaticLookup](10, httpRep1, httpRep2)
-      _        <- resolver.lookupSchema(schemaKey, 3)
-      result   <- resolver.lookupSchema(schemaKey, 3)
+      resolver <- Resolver.init[StaticLookup](10, Some(100), httpRep1, httpRep2)
+      _        <- resolver.lookupSchema(schemaKey)
+      _        <- StaticLookup.addTime(2000)
+      result   <- resolver.lookupSchema(schemaKey)
     } yield result
 
     val (state, response) = result.run(ResolverSpecHelpers.RegistryState.init).value
     response must beLeft(expected) and (state.req must beEqualTo(4))
-  }
-
-  def e9 = {
-    val schemaKey =
-      SchemaKey(
-        "com.snowplowanalytics.iglu-test",
-        "future_schema",
-        "jsonschema",
-        SchemaVer.Full(1, 0, 0))
-    val correctSchema =
-      json"""{
-       	"$$schema": "http://iglucentral.com/schemas/com.snowplowanalytics.self-desc/schema/jsonschema/1-0-0#",
-       	"self": {
-       		"vendor": "com.snowplowanalytics.iglu-test",
-       		"name": "future_schema",
-       		"format": "jsonschema",
-       		"version": "1-0-0"
-        }
-       }""".asRight
-
-    implicit val cache     = ResolverSpecHelpers.staticCache
-    implicit val cacheList = ResolverSpecHelpers.staticCacheForList
-    implicit val clock     = ResolverSpecHelpers.staticClock
-    implicit val registryLookup = ResolverSpecHelpers.getLookupByRepo(
-      Map(
-        "Mock Repo" -> List(
-          RegistryError.NotFound.asLeft[Json],
-          correctSchema
-        )),
-      Nil)
-
-    // Mocking repository
-    val httpRep =
-      Registry.Http(Registry.Config("Mock Repo", 1, List("com.snowplowanalytics.iglu-test")), null)
-
-    val result = for {
-      resolver <- ResolverCache
-        .init[StaticLookup](10, Some(3))
-        .map(cache => Resolver(List(httpRep), cache))
-      firstResult       <- resolver.lookupSchema(schemaKey, 3) // not found
-      immediateResult   <- resolver.lookupSchema(schemaKey, 3) // not found, but from cache, not from RegistryRef
-      _                 <- cats.data.State.modify[ResolverSpecHelpers.RegistryState](s => s.tick.tick)
-      afterCacheExpired <- resolver.lookupSchema(schemaKey, 3) // invalidate cache, retry and succeed
-    } yield (firstResult, immediateResult, afterCacheExpired)
-
-    val (state, (firstResult, immediateResult, afterCacheExpired)) =
-      result.run(ResolverSpecHelpers.RegistryState.init).value
-
-    ((firstResult must beLeft)
-      and (immediateResult must beLeft)
-      and (afterCacheExpired must beEqualTo(correctSchema))
-      and (state.req must beEqualTo(2)))
   }
 
   def e10 = {

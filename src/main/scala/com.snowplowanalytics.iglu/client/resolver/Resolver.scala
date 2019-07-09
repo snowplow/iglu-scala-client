@@ -14,6 +14,10 @@ package com.snowplowanalytics.iglu.client.resolver
 
 // cats
 import cats.{Applicative, Monad, Id}
+import java.time.Instant
+
+import scala.concurrent.duration.MILLISECONDS
+
 import cats.data._
 import cats.effect.Clock
 import cats.implicits._
@@ -37,6 +41,7 @@ import com.snowplowanalytics.iglu.client.resolver.registries.{
   RegistryError,
   RegistryLookup
 }
+import com.snowplowanalytics.iglu.client.resolver.registries.Registry.Get
 
 /** Resolves schemas from one or more Iglu schema registries */
 final case class Resolver[F[_]](repos: List[Registry], cache: Option[ResolverCache[F]]) {
@@ -50,33 +55,27 @@ final case class Resolver[F[_]](repos: List[Registry], cache: Option[ResolverCac
    * If any of repositories gives non-non-found error, lookup will retried
    *
    * @param schemaKey The SchemaKey uniquely identifying the schema in Iglu
-   * @param attempts number of attempts to retry after non-404 errors
-   *                 retries will happen in *next* requests
    * @return a Validation boxing either the Schema's
    *         Json on Success, or an error String
    *         on Failure
    */
-  def lookupSchema(schemaKey: SchemaKey, attempts: Int)(
+  def lookupSchema(schemaKey: SchemaKey)(
     implicit
     F: Monad[F],
     L: RegistryLookup[F],
     C: Clock[F]): F[Either[ResolutionError, Json]] = {
-    val prioritize                                      = prioritizeRepos(schemaKey.vendor, _: List[Registry]).toList
     val get: Registry => F[Either[RegistryError, Json]] = r => L.lookup(r, schemaKey)
-    def retryCached(serverErrors: LookupFailureMap): F[SchemaLookup] = {
-      val reposForRetry = getReposForRetry(serverErrors, attempts)
-      traverseRepos[F, Json](get, prioritize(reposForRetry), serverErrors)
-    }
-
     val resultAction = getFromCache(schemaKey).flatMap {
-      case Some(lookupResult) => lookupResult.fold(retryCached, finish[F, Json])
-      case None               => traverseRepos[F, Json](get, prioritize(allRepos.toList), Map.empty)
+      case Some(lookupResult) =>
+        lookupResult.fold(retryCached[F, Json](get, schemaKey.vendor), finish[F, Json])
+      case None =>
+        traverseRepos[F, Json](get, prioritize(schemaKey.vendor, allRepos.toList), Map.empty)
     }
 
     for {
-      result <- resultAction
-      _      <- cache.traverse(c => c.putSchema(schemaKey, result))
-    } yield postProcess(result)
+      result      <- resultAction
+      cacheResult <- cache.traverse(c => c.putSchema(schemaKey, result))
+    } yield postProcess(cacheResult.getOrElse(result))
   }
 
   /**
@@ -85,20 +84,17 @@ final case class Resolver[F[_]](repos: List[Registry], cache: Option[ResolverCac
    */
   def listSchemas(vendor: String, name: String, model: Option[Int])(
     implicit F: Monad[F],
-    L: RegistryLookup[F]) = {
-    val prioritize                                            = prioritizeRepos(vendor, _: List[Registry]).toList
+    L: RegistryLookup[F],
+    C: Clock[F]) = {
     val get: Registry => F[Either[RegistryError, SchemaList]] = r => L.list(r, vendor, name, model)
-    def retryCached(serverErrors: LookupFailureMap): F[ListLookup] = {
-      val reposForRetry = getReposForRetry(serverErrors, 5)
-      traverseRepos[F, SchemaList](get, prioritize(reposForRetry), serverErrors)
-    }
 
     val resultAction = cache
       .fold(F.pure(none[ListLookup]))(_.getSchemaList(vendor, name))
       .flatMap {
-        case Some(listResult) => listResult.fold(retryCached, finish[F, SchemaList])
+        case Some(listResult) =>
+          listResult.fold(retryCached[F, SchemaList](get, vendor), finish[F, SchemaList])
         case None =>
-          traverseRepos[F, SchemaList](get, prioritize(allRepos.toList), Map.empty)
+          traverseRepos[F, SchemaList](get, prioritize(vendor, allRepos.toList), Map.empty)
       }
 
     for {
@@ -115,7 +111,7 @@ final case class Resolver[F[_]](repos: List[Registry], cache: Option[ResolverCac
     for {
       list <- EitherT(listSchemas(vendor, name, model))
       result <- list.schemas.traverse { key =>
-        EitherT(lookupSchema(key, 3)).map(json => SelfDescribingSchema(SchemaMap(key), json))
+        EitherT(lookupSchema(key)).map(json => SelfDescribingSchema(SchemaMap(key), json))
       }
     } yield result
 
@@ -130,6 +126,14 @@ final case class Resolver[F[_]](repos: List[Registry], cache: Option[ResolverCac
 /** Companion object. Lets us create a Resolver from a Json */
 object Resolver {
 
+  def retryCached[F[_]: Clock: Monad: RegistryLookup, A](get: Get[F, A], vendor: String)(
+    cachedErrors: LookupFailureMap): F[Either[LookupFailureMap, A]] =
+    for {
+      now <- Clock[F].realTime(MILLISECONDS).map(Instant.ofEpochMilli)
+      reposForRetry = getReposForRetry(cachedErrors, now)
+      result <- traverseRepos[F, A](get, prioritize(vendor, reposForRetry), cachedErrors)
+    } yield result
+
   /**
    * Tail-recursive function to find our schema in one of our repositories
    *
@@ -142,7 +146,7 @@ object Resolver {
    *         or a Failure-boxing of Map of repositories with all their
    *         accumulated errors
    */
-  def traverseRepos[F[_]: Monad: RegistryLookup, A](
+  def traverseRepos[F[_]: Monad: RegistryLookup: Clock, A](
     get: Registry => F[Either[RegistryError, A]],
     remaining: List[Registry],
     tried: LookupFailureMap): F[Either[LookupFailureMap, A]] = remaining match {
@@ -151,11 +155,21 @@ object Resolver {
       get(repo).flatMap {
         case Right(list) =>
           finish[F, A](list)
-        case Left(e) => // TODO: we can pattern match here
-          val error = LookupHistory(Set(e), 1, fatal = false)
-          traverseRepos[F, A](get, tail, Map(repo -> error) |+| tried)
+        case Left(e) =>
+          for {
+            timestamp <- Clock[F].realTime(MILLISECONDS).map(Instant.ofEpochMilli)
+            combinedMap = Map(repo -> LookupHistory(Set(e), 0, timestamp)) |+| tried
+            failureMap  = updateMap[Registry, LookupHistory](combinedMap, repo, _.incrementAttempt)
+            result <- traverseRepos[F, A](get, tail, failureMap |+| tried)
+          } yield result
       }
   }
+
+  private def updateMap[K, V](map: Map[K, V], k: K, f: V => V): Map[K, V] =
+    map.get(k).map(f) match {
+      case Some(v) => map.updated(k, v)
+      case None    => map
+    }
 
   private val ConfigurationSchema =
     SchemaCriterion("com.snowplowanalytics.iglu", "resolver-config", "jsonschema", 1, 0)
@@ -172,13 +186,17 @@ object Resolver {
    * of RepositoryRefs.
    *
    * @param cacheSize The size of the cache
+   * @param cacheTtl Optional time to live for schemas
    * @param refs Any RepositoryRef to add to this resolver
    * @return a configured Resolver instance
    */
   def init[F[_]: Monad: InitSchemaCache: InitListCache](
     cacheSize: Int,
+    cacheTtl: Option[Int],
     refs: Registry*): F[Resolver[F]] =
-    ResolverCache.init[F](cacheSize, None).map(cacheOpt => new Resolver(List(refs: _*), cacheOpt))
+    ResolverCache
+      .init[F](cacheSize, cacheTtl)
+      .map(cacheOpt => new Resolver(List(refs: _*), cacheOpt))
 
   /** Construct a pure resolver, working only with in-memory registries, no cache, no clock */
   def initPure(refs: Registry.InMemory*): Resolver[Id] =
@@ -189,7 +207,7 @@ object Resolver {
 
   /** A Resolver which only looks at our embedded repo */
   def bootstrap[F[_]: Monad: InitSchemaCache: InitListCache]: F[Resolver[F]] =
-    Resolver.init[F](EmbeddedSchemaCount, Registry.EmbeddedRegistry)
+    Resolver.init[F](EmbeddedSchemaCount, None, Registry.EmbeddedRegistry)
 
   private final case class ResolverConfig(
     cacheSize: Int,
@@ -252,24 +270,25 @@ object Resolver {
    * @return the prioritized List of RepositoryRefs.
    *         Pragmatically sorted to minimize lookups.
    */
-  private[client] def prioritizeRepos(vendor: String, repositoryRefs: List[Registry]) =
+  private[client] def prioritize(vendor: String, repositoryRefs: List[Registry]) =
     repositoryRefs.sortBy(r =>
       (!r.config.vendorMatched(vendor), r.classPriority, r.config.instancePriority))
 
   /**
    * Get from Map of repository failures only those repository which
    * were failed with recoverable errors (like timeout or accidental server segfault)
-   * AND retried less than `requiredAttempts` times
    *
    * @param failuresMap Map of repositories to their aggregated errors
    * @return repository refs which still need to be requested
    */
-  private[client] def getReposForRetry[F[_]](
+  private[client] def getReposForRetry(
     failuresMap: LookupFailureMap,
-    requiredAttempts: Int): List[Registry] = {
+    now: Instant): List[Registry] = {
     val errorsToRetry = failuresMap.filter {
-      case (_, LookupHistory(errors, attempts, unrecoverable)) =>
-        attempts < requiredAttempts && !unrecoverable && !errors.contains(RegistryError.NotFound)
+      case (_: Registry.Embedded | _: Registry.InMemory, _) =>
+        false
+      case (_, LookupHistory(_, attempts, lastAttempt)) =>
+        now.toEpochMilli - lastAttempt.toEpochMilli > backoff(attempts)
     }
     errorsToRetry.keys.toList
   }
@@ -287,4 +306,19 @@ object Resolver {
     val matcher = Either.cond(ConfigurationSchema.matches(datum.schema), (), failure)
     EitherT.fromEither[F](matcher)
   }
+
+  // Minimum backoff period for retry
+  private val MinBackoff = 500 // ms
+
+  // Count how many milliseconds the Resolver needs to wait before retrying
+  private def backoff(retryCount: Int): Long =
+    retryCount match {
+      case c if c > 20 => 1200000L + (retryCount * 100L)
+      case c if c > 12 =>
+        MinBackoff + Math.pow(2, retryCount.toDouble).toLong + 5000L
+      case c if c > 8 =>
+        MinBackoff + Math.pow(3, retryCount.toDouble).toLong
+      case _ =>
+        MinBackoff + Math.pow(4, retryCount.toDouble).toLong
+    }
 }

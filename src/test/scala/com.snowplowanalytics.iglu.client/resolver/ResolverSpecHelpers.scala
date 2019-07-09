@@ -1,3 +1,15 @@
+/*
+ * Copyright (c) 2018-2019 Snowplow Analytics Ltd. All rights reserved.
+ *
+ * This program is licensed to you under the Apache License Version 2.0,
+ * and you may not use this file except in compliance with the Apache License Version 2.0.
+ * You may obtain a copy of the Apache License Version 2.0 at http://www.apache.org/licenses/LICENSE-2.0.
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the Apache License Version 2.0 is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the Apache License Version 2.0 for the specific language governing permissions and limitations there under.
+ */
 package com.snowplowanalytics.iglu.client
 package resolver
 
@@ -18,18 +30,27 @@ import com.snowplowanalytics.iglu.core.{SchemaKey, SchemaList}
 import com.snowplowanalytics.iglu.core.circe.implicits._
 
 // This project
-import resolver.registries.Registry
-import resolver.registries.RegistryError
-import resolver.registries.RegistryLookup
+import resolver.registries.{Registry, RegistryError, RegistryLookup}
 
 object ResolverSpecHelpers {
+
+  /**
+   * State of the "resolver's world" to test every aspect of the resolution in a pure FP way
+   * @param requestsCounter map of "registry name -> counter" pairs
+   * @param time time passed in ms (automatically incremented with every effect)
+   * @param cache
+   * @param cacheSize static cache size, doesn't change
+   * @param schemaLists
+   */
   case class RegistryState(
     requestsCounter: Map[String, Int],
     time: Int,
     cache: List[(SchemaKey, SchemaLookupStamped)],
     cacheSize: Int,
     schemaLists: List[ListLookup]) {
-    def request(name: String) = {
+
+    /** Perform a request and write it to [[requestsCounter]] */
+    def request(name: String): RegistryState = {
       val i = requestsCounter.getOrElse(name, 0) + 1
       RegistryState(requestsCounter.updated(name, i), time, cache, cacheSize, schemaLists)
     }
@@ -54,18 +75,28 @@ object ResolverSpecHelpers {
   type StaticLookup[A] = State[RegistryState, A]
   type RequestsMap     = Map[String, List[Either[RegistryError, Json]]]
 
-  case class TestState[A](unwrap: State[RegistryState, A])
+  object StaticLookup {
+
+    /** Either logical clock unit or milliseconds for some specs */
+    def addTime(delta: Int): StaticLookup[Unit] =
+      State(s => (s.copy(time = s.time + delta), ()))
+
+    def getTime: StaticLookup[Int] =
+      State.get[RegistryState].map(_.time)
+  }
 
   val staticCache: InitSchemaCache[StaticLookup] =
     new CreateLruMap[StaticLookup, SchemaKey, SchemaLookupStamped] {
       def create(size: Int): StaticLookup[LruMap[StaticLookup, SchemaKey, SchemaLookupStamped]] =
         State(s => (s.copy(cacheSize = size), StateCache))
     }
-  val staticCacheForList: CreateLruMap[StaticLookup, (String, String), ListLookup] =
+
+  val staticCacheForList: InitListCache[StaticLookup] =
     new CreateLruMap[StaticLookup, (String, String), ListLookup] {
       def create(size: Int): StaticLookup[LruMap[StaticLookup, (String, String), ListLookup]] =
         State(s => (s.copy(cacheSize = size), StateCacheList))
     }
+
   val staticClock: Clock[StaticLookup] =
     new Clock[StaticLookup] {
       def realTime(unit: TimeUnit): StaticLookup[Long]  = State.get.map(_.time.toLong)

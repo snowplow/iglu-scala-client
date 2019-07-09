@@ -39,7 +39,7 @@ final case class Client[F[_], A](resolver: Resolver[F], validator: Validator[A])
     L: RegistryLookup[F],
     C: Clock[F]): EitherT[F, ClientError, Unit] =
     for {
-      schema <- EitherT(resolver.lookupSchema(instance.schema, 3))
+      schema <- EitherT(resolver.lookupSchema(instance.schema))
       schemaValidation = validator.validateSchema(schema)
       _ <- EitherT.fromEither(schemaValidation).leftMap(_.toClientError)
       validation = validator.validate(instance.data, schema)
