@@ -36,11 +36,11 @@ class ClientErrorSpec extends Specification {
         "First repo" -> LookupHistory(
           Set(RegistryError.NotFound, RegistryError.RepoFailure("Server outage")),
           1,
-          false),
+          SpecHelpers.now),
         "Second repo" -> LookupHistory(
           Set(RegistryError.ClientFailure("Internal exception")),
           1,
-          true)
+          SpecHelpers.now.plusMillis(100))
       ))
 
     val json =
@@ -59,7 +59,7 @@ class ClientErrorSpec extends Specification {
               }
             ],
             "attempts" : 1,
-            "fatal" : false
+            "lastAttempt" : "2019-07-08T15:04:45Z"
           },
           {
             "repository" : "Second repo",
@@ -70,7 +70,7 @@ class ClientErrorSpec extends Specification {
               }
             ],
             "attempts" : 1,
-            "fatal" : true
+            "lastAttempt" : "2019-07-08T15:04:45.100Z"
           }
         ]
       }"""

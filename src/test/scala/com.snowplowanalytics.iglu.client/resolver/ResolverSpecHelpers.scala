@@ -1,3 +1,15 @@
+/*
+ * Copyright (c) 2018-2019 Snowplow Analytics Ltd. All rights reserved.
+ *
+ * This program is licensed to you under the Apache License Version 2.0,
+ * and you may not use this file except in compliance with the Apache License Version 2.0.
+ * You may obtain a copy of the Apache License Version 2.0 at http://www.apache.org/licenses/LICENSE-2.0.
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the Apache License Version 2.0 is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the Apache License Version 2.0 for the specific language governing permissions and limitations there under.
+ */
 package com.snowplowanalytics.iglu.client
 package resolver
 
@@ -18,18 +30,27 @@ import com.snowplowanalytics.iglu.core.{SchemaKey, SchemaList}
 import com.snowplowanalytics.iglu.core.circe.implicits._
 
 // This project
-import resolver.registries.Registry
-import resolver.registries.RegistryError
-import resolver.registries.RegistryLookup
+import resolver.registries.{Registry, RegistryError, RegistryLookup}
 
 object ResolverSpecHelpers {
+
+  /**
+   * State of the "resolver's world" to test every aspect of the resolution in a pure FP way
+   * @param requestsCounter map of "registry name -> counter" pairs
+   * @param time time passed in ms (automatically incremented with every effect)
+   * @param cache
+   * @param cacheSize static cache size, doesn't change
+   * @param schemaLists
+   */
   case class RegistryState(
     requestsCounter: Map[String, Int],
     time: Int,
-    cache: List[(SchemaKey, SchemaLookupStamped)],
+    cache: List[(SchemaKey, (Int, SchemaLookup))],
     cacheSize: Int,
-    schemaLists: List[ListLookup]) {
-    def request(name: String) = {
+    schemaLists: List[(Int, ListLookup)]) {
+
+    /** Perform a request and write it to [[requestsCounter]] */
+    def request(name: String): RegistryState = {
       val i = requestsCounter.getOrElse(name, 0) + 1
       RegistryState(requestsCounter.updated(name, i), time, cache, cacheSize, schemaLists)
     }
@@ -54,18 +75,33 @@ object ResolverSpecHelpers {
   type StaticLookup[A] = State[RegistryState, A]
   type RequestsMap     = Map[String, List[Either[RegistryError, Json]]]
 
-  case class TestState[A](unwrap: State[RegistryState, A])
+  object StaticLookup {
+
+    /** Either logical clock unit or milliseconds for some specs */
+    def addTime(delta: Int): StaticLookup[Unit] =
+      State(s => (s.copy(time = s.time + delta), ()))
+
+    def getTime: StaticLookup[Int] =
+      State.get[RegistryState].map(_.time)
+  }
 
   val staticCache: InitSchemaCache[StaticLookup] =
-    new CreateLruMap[StaticLookup, SchemaKey, SchemaLookupStamped] {
-      def create(size: Int): StaticLookup[LruMap[StaticLookup, SchemaKey, SchemaLookupStamped]] =
+    new CreateLruMap[StaticLookup, SchemaKey, (Int, SchemaLookup)] {
+      def create(size: Int): StaticLookup[LruMap[StaticLookup, SchemaKey, (Int, SchemaLookup)]] =
         State(s => (s.copy(cacheSize = size), StateCache))
     }
-  val staticCacheForList: CreateLruMap[StaticLookup, (String, String), ListLookup] =
-    new CreateLruMap[StaticLookup, (String, String), ListLookup] {
-      def create(size: Int): StaticLookup[LruMap[StaticLookup, (String, String), ListLookup]] =
-        State(s => (s.copy(cacheSize = size), StateCacheList))
+
+  val staticCacheForList: InitListCache[StaticLookup] =
+    new CreateLruMap[StaticLookup, (String, String), (Int, ListLookup)] {
+      def create(
+        size: Int): StaticLookup[LruMap[StaticLookup, (String, String), (Int, ListLookup)]] =
+        State { s =>
+          val q: LruMap[StaticLookup, (String, String), (Int, ListLookup)] = StateCacheList
+          val ss                                                           = s.copy(cacheSize = size)
+          (ss, q)
+        }
     }
+
   val staticClock: Clock[StaticLookup] =
     new Clock[StaticLookup] {
       def realTime(unit: TimeUnit): StaticLookup[Long]  = State.get.map(_.time.toLong)
@@ -139,8 +175,8 @@ object ResolverSpecHelpers {
         }
     }
 
-  private object StateCache extends LruMap[StaticLookup, SchemaKey, SchemaLookupStamped] {
-    def get(key: SchemaKey): StaticLookup[Option[SchemaLookupStamped]] = State { state =>
+  private object StateCache extends LruMap[StaticLookup, SchemaKey, (Int, SchemaLookup)] {
+    def get(key: SchemaKey): StaticLookup[Option[(Int, SchemaLookup)]] = State { state =>
       val result = state.cache.find(_._1 == key).map(_._2)
       (state.tick, result)
     }
@@ -150,18 +186,19 @@ object ResolverSpecHelpers {
     }
   }
 
-  private object StateCacheList extends LruMap[StaticLookup, (String, String), ListLookup] {
-    def get(key: (String, String)): StaticLookup[Option[ListLookup]] = State { state =>
-      val result = state.schemaLists.find {
-        case Right(list) =>
-          val head = list.schemas.head
-          head.vendor == key._1 && head.name == key._2
-        case _ => false
+  private object StateCacheList extends LruMap[StaticLookup, (String, String), (Int, ListLookup)] {
+    def get(key: (String, String)): StaticLookup[Option[(Int, ListLookup)]] =
+      State.apply[RegistryState, Option[(Int, ListLookup)]] { state =>
+        val result = state.schemaLists.find {
+          case (time, Right(list)) =>
+            val head = list.schemas.head
+            head.vendor == key._1 && head.name == key._2
+          case _ => false
+        }
+        (state.tick, result)
       }
-      (state.tick, result)
-    }
 
-    def put(key: (String, String), value: ListLookup): StaticLookup[Unit] = State { state =>
+    def put(key: (String, String), value: (Int, ListLookup)): StaticLookup[Unit] = State { state =>
       (state.copy(schemaLists = value :: state.schemaLists).tick, ())
     }
   }

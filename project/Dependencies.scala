@@ -35,6 +35,7 @@ object Dependencies {
     val igluCoreCirce    = "com.snowplowanalytics"      %% "iglu-core-circe"         % V.igluCore
     val cats             = "org.typelevel"              %% "cats-core"               % V.cats
     val circeParser      = "io.circe"                   %% "circe-parser"            % V.circe
+    val circeTime        = "io.circe"                   %% "circe-java8"             % V.circe
     val circeJackson     = "io.circe"                   %% "circe-jackson29"         % V.circe
     val lruMap           = "com.snowplowanalytics"      %% "scala-lru-map"           % V.lruMap
     val scalaj           = "org.scalaj"                 %% "scalaj-http"             % V.scalaj

@@ -12,17 +12,21 @@
  */
 package com.snowplowanalytics.iglu.client
 
+import java.time.Instant
+
 import cats.Show
 import cats.syntax.show._
 import cats.syntax.either._
 
 import io.circe.{Decoder, DecodingFailure, Encoder, Json}
+import io.circe.java8.time._
 import io.circe.syntax._
 
 import validator.ValidatorError
 import resolver.LookupHistory
 import resolver.registries.RegistryError
 
+/** Common type for Resolver's and Validator's errors */
 sealed trait ClientError extends Product with Serializable {
   def getMessage: String =
     ClientError.igluClientResolutionErrorCirceEncoder(this).noSpaces
@@ -82,28 +86,6 @@ object ClientError {
 
     }
 
-  // Auxiliary entity, helping to decode Map[String, LookupHistory]
-  private case class RepoLookupHistory(
-    repository: String,
-    errors: Set[RegistryError],
-    attempts: Int,
-    fatal: Boolean) {
-    def toField: (String, LookupHistory) =
-      (repository, LookupHistory(errors, attempts, fatal))
-  }
-
-  private object RepoLookupHistory {
-    implicit val repoLookupHistoryDecoder: Decoder[RepoLookupHistory] =
-      Decoder.instance { cursor =>
-        for {
-          repository <- cursor.downField("repository").as[String]
-          errors     <- cursor.downField("errors").as[Set[RegistryError]]
-          attempts   <- cursor.downField("attempts").as[Int]
-          fatal      <- cursor.downField("fatal").as[Boolean]
-        } yield RepoLookupHistory(repository, errors, attempts, fatal)
-      }
-  }
-
   implicit val igluClientShowInstance: Show[ClientError] =
     Show.show {
       case ClientError.ValidationError(ValidatorError.InvalidData(reports)) =>
@@ -128,4 +110,26 @@ object ClientError {
         }
         s"Schema cannot be resolved in following repositories:\n${errors.mkString("\n")}"
     }
+
+  // Auxiliary entity, helping to decode Map[String, LookupHistory]
+  private case class RepoLookupHistory(
+    repository: String,
+    errors: Set[RegistryError],
+    attempts: Int,
+    lastAttempt: Instant) {
+    def toField: (String, LookupHistory) =
+      (repository, LookupHistory(errors, attempts, lastAttempt))
+  }
+
+  private object RepoLookupHistory {
+    implicit val repoLookupHistoryDecoder: Decoder[RepoLookupHistory] =
+      Decoder.instance { cursor =>
+        for {
+          repository <- cursor.downField("repository").as[String]
+          errors     <- cursor.downField("errors").as[Set[RegistryError]]
+          attempts   <- cursor.downField("attempts").as[Int]
+          last       <- cursor.downField("lastAttempt").as[Instant]
+        } yield RepoLookupHistory(repository, errors, attempts, last)
+      }
+  }
 }
