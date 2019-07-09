@@ -42,6 +42,8 @@ object BuildSettings {
 
     addCompilerPlugin("org.spire-math" %% "kind-projector" % "0.9.8"),
 
+    addCompilerPlugin("com.olegpy" %% "better-monadic-for" % "0.3.0"),
+
     parallelExecution in Test := false // possible race bugs
   )
 

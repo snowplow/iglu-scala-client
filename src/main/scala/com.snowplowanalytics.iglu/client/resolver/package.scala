@@ -42,10 +42,7 @@ package object resolver {
 
   type ListLookup = Either[LookupFailureMap, SchemaList]
 
-  /** Schema lookup result associated with timestamp (in seconds) it was stored at */
-  type SchemaLookupStamped = (Int, SchemaLookup)
-
   /** Ability to initialize the cache */
-  type InitSchemaCache[F[_]] = CreateLruMap[F, SchemaKey, SchemaLookupStamped]
-  type InitListCache[F[_]]   = CreateLruMap[F, (String, String), ListLookup]
+  type InitSchemaCache[F[_]] = CreateLruMap[F, SchemaKey, (Int, SchemaLookup)]
+  type InitListCache[F[_]]   = CreateLruMap[F, (String, String), (Int, ListLookup)]
 }

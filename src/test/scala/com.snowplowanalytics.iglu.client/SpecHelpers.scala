@@ -13,6 +13,7 @@
 package com.snowplowanalytics.iglu.client
 
 import java.net.URI
+import java.time.Instant
 import java.util.concurrent.TimeUnit
 
 // Cats
@@ -24,6 +25,14 @@ import cats.effect.IO
 import resolver.registries.Registry
 
 object SpecHelpers {
+
+  val now: Instant = Instant.ofEpochSecond(1562598285)
+
+  def cleanTimestamps(error: ClientError): ClientError = error match {
+    case ClientError.ResolutionError(value) =>
+      ClientError.ResolutionError(value.mapValues(_.copy(lastAttempt = now)))
+    case other => other
+  }
 
   val IgluCentral: Registry =
     Registry.Http(
@@ -44,7 +53,6 @@ object SpecHelpers {
       unit.convert(System.nanoTime(), TimeUnit.NANOSECONDS)
   }
 
-  // TODO: is it a very bad idea?
   implicit val ioClock: Clock[IO] = new Clock[IO] {
     final def realTime(unit: TimeUnit): IO[Long] =
       IO.delay(unit.convert(System.currentTimeMillis(), TimeUnit.MILLISECONDS))
@@ -53,7 +61,6 @@ object SpecHelpers {
       IO.delay(unit.convert(System.nanoTime(), TimeUnit.NANOSECONDS))
   }
 
-  val TestResolver = Resolver.init[IO](cacheSize = 10, EmbeddedTest)
+  val TestResolver = Resolver.init[IO](10, None, EmbeddedTest)
   val TestClient   = for { resolver <- TestResolver } yield Client(resolver, CirceValidator)
-
 }
