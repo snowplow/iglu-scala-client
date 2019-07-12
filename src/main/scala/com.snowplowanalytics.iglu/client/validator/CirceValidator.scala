@@ -187,6 +187,7 @@ object CirceValidator extends Validator[Json] {
     .builder(
       "http://iglucentral.com/schemas/com.snowplowanalytics.self-desc/schema/jsonschema/1-0-0#",
       JsonMetaSchema.getDraftV4)
+    .addKeyword(new NonValidationKeyword("self"))
     .build()
 
   private val IgluMetaschemaFactory =

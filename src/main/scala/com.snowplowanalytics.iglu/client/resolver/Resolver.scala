@@ -13,7 +13,7 @@
 package com.snowplowanalytics.iglu.client.resolver
 
 // cats
-import cats.{Applicative, Monad, Id}
+import cats.{Applicative, Id, Monad}
 import java.time.Instant
 
 import scala.concurrent.duration.MILLISECONDS
