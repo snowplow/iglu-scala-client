@@ -244,7 +244,7 @@ class ResolverSpec extends Specification with DataTables with ValidatedMatchers 
       RegistryError.RepoFailure("Timeout exception 1").asLeft,
       RegistryError.RepoFailure("Timeout exception 2").asLeft,
       correctSchema.asRight,
-      RegistryError.RepoFailure("Should never be reached").asLeft,
+      RegistryError.RepoFailure("Should never be reached").asLeft
     )
 
     val httpRep =

@@ -75,7 +75,7 @@ class ResolverCacheSpec extends Specification {
       Registry.Http(Registry.Config("one", 1, List.empty), null) -> LookupHistory(
         Set(RegistryError.RepoFailure("Doesn't matter")),
         4,
-        Instant.ofEpochMilli(10000)),
+        Instant.ofEpochMilli(10000))
     )
 
     val expectedLookup = Map(

@@ -28,6 +28,7 @@ lazy val root = (project in file("."))
       Dependencies.Libraries.igluCore,
       Dependencies.Libraries.igluCoreCirce,
       Dependencies.Libraries.cats,
+      Dependencies.Libraries.circeTime,
       Dependencies.Libraries.circeParser,
       Dependencies.Libraries.lruMap,
       Dependencies.Libraries.scalaj,
