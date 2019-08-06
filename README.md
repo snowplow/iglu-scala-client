@@ -17,7 +17,7 @@ The latest version of Iglu Scala Client is 0.6.0, which currently works with Sca
 If you're using SBT, add the following lines to your build file:
 
 ```scala
-val igluClient = "com.snowplowanalytics" %% "iglu-scala-client" % "0.5.0"
+val igluClient = "com.snowplowanalytics" %% "iglu-scala-client" % "0.6.0"
 ```
 
 Note the double percent (`%%`) between the group and artifactId. That'll ensure you get the right package for your Scala version.
@@ -139,7 +139,7 @@ limitations under the License.
 [travis-image]: https://travis-ci.org/snowplow/iglu-scala-client.png?branch=master
 
 [releases]: https://github.com/snowplow/iglu-scala-client/releases
-[release-image]: http://img.shields.io/badge/release-0.5.0-blue.svg?style=flat
+[release-image]: http://img.shields.io/badge/release-0.6.0-blue.svg?style=flat
 
 [license]: http://www.apache.org/licenses/LICENSE-2.0
 [license-image]: http://img.shields.io/badge/license-Apache--2-blue.svg?style=flat
