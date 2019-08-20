@@ -17,11 +17,13 @@ lazy val root = (project in file("."))
     version := "0.6.2",
     description := "Scala client and resolver for Iglu schema repositories"
   )
+  .enablePlugins(SiteScaladocPlugin, GhpagesPlugin, PreprocessPlugin)
   .settings(BuildSettings.buildSettings)
   .settings(BuildSettings.publishSettings)
   .settings(BuildSettings.mavenCentralExtras)
   .settings(BuildSettings.mimaSettings)
   .settings(BuildSettings.scoverageSettings)
+  .settings(BuildSettings.ghPagesSettings)
   .settings(
     libraryDependencies ++= Seq(
       // Java
