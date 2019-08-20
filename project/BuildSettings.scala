@@ -23,6 +23,9 @@ import bintray.BintrayKeys._
 import com.typesafe.tools.mima.plugin.MimaKeys._
 import com.typesafe.tools.mima.plugin.MimaPlugin
 
+// Scoverage plugin
+import scoverage.ScoverageKeys._
+
 object BuildSettings {
 
   lazy val buildSettings = Seq[Setting[_]](
@@ -73,6 +76,16 @@ object BuildSettings {
     test in Test := {
       mimaReportBinaryIssues.value
       (test in Test).value
+    }
+  )
+
+  val scoverageSettings = Seq(
+    coverageEnabled := true,
+    coverageMinimum := 50,
+    coverageFailOnMinimum := true,
+    coverageHighlighting := false,
+    (test in Test) := {
+      (coverageReport dependsOn (test in Test)).value
     }
   )
 }

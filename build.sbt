@@ -21,6 +21,7 @@ lazy val root = (project in file("."))
   .settings(BuildSettings.publishSettings)
   .settings(BuildSettings.mavenCentralExtras)
   .settings(BuildSettings.mimaSettings)
+  .settings(BuildSettings.scoverageSettings)
   .settings(
     libraryDependencies ++= Seq(
       // Java
