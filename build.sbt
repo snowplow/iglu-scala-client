@@ -14,7 +14,7 @@
 lazy val root = (project in file("."))
   .settings(
     name := "iglu-scala-client",
-    version := "0.6.0",
+    version := "0.6.1",
     description := "Scala client and resolver for Iglu schema repositories"
   )
   .settings(BuildSettings.buildSettings)

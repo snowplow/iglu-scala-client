@@ -1,3 +1,11 @@
+Version 0.6.1 (2019-12-06)
+--------------------------
+Bump json-schema-validator to 1.0.28 (#121)
+Bump scalaj-http to 2.4.2 (#123)
+Bump circe to 0.11.2 (#127)
+Set typeLoose to false in JSON Validator (#122)
+Replace release badge with maven-central badge (#124)
+
 Version 0.6.0 (2019-08-09)
 --------------------------
 Use Iglu Core (#20)
