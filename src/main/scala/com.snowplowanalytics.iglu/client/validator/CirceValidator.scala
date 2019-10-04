@@ -194,12 +194,21 @@ object CirceValidator extends Validator[Json] {
   private val IgluMetaschemaFactory =
     JsonSchemaFactory.builder(JsonSchemaFactory.getInstance).addMetaSchema(IgluMetaschema).build()
 
+  private val SchemaValidatorsConfig: SchemaValidatorsConfig = {
+    val config = new SchemaValidatorsConfig()
+    // typeLoose is OpenAPI workaround to cast stringly typed properties
+    // e.g, with default true "5" string would validate against integer type
+    config.setTypeLoose(false)
+    config
+  };
+
   private lazy val V4Schema =
     JsonSchemaFactory.getInstance.getSchema(new ObjectMapper().readTree(V4SchemaText))
 
   def validate(data: Json, schema: Json): Either[ValidatorError, Unit] =
     Either
-      .catchNonFatal(IgluMetaschemaFactory.getSchema(circeToJackson(schema)))
+      .catchNonFatal(
+        IgluMetaschemaFactory.getSchema(circeToJackson(schema), SchemaValidatorsConfig))
       .leftMap[ValidatorError](ValidatorError.schemaIssue) // Should never be reached in Client
       .flatMap { schema =>
         validateOnReadySchema(schema, data).leftMap(ValidatorError.InvalidData.apply)

@@ -37,6 +37,8 @@ class RawValidationSpec extends Specification with DataTables {
   additionalProperties invalidates unexpected property $e5
   ipv4 format invalidates plain string $e6
   validate integers bigger than java.lang.Long.MAX_VALUE $e7
+  validate null in [array, null] type $e8
+  invalidate stringly integer with integer type $e9
   """
 
   val simpleSchemaResult: Json =
@@ -194,6 +196,18 @@ class RawValidationSpec extends Specification with DataTables {
   def e7 = {
     val schema = json"""{ "type": "integer" }"""
     val input  = json"""9223372036854775809"""
-    CirceValidator.validate(input, schema) must beRight(())
+    CirceValidator.validate(input, schema) must beRight
+  }
+
+  def e8 = {
+    val schema = json"""{ "type": ["array", "null"], "items": {"type": "object"} }"""
+    val input  = json"""null"""
+    CirceValidator.validate(input, schema) must beRight
+  }
+
+  def e9 = {
+    val schema = json"""{ "type": "integer" }"""
+    val input  = json""""5""""
+    CirceValidator.validate(input, schema) must beLeft
   }
 }
