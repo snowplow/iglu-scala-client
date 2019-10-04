@@ -187,7 +187,7 @@ object CirceValidator extends Validator[Json] {
   private val IgluMetaschema = JsonMetaSchema
     .builder(
       "http://iglucentral.com/schemas/com.snowplowanalytics.self-desc/schema/jsonschema/1-0-0#",
-      JsonMetaSchema.getDraftV4)
+      JsonMetaSchema.getV4)
     .addKeyword(new NonValidationKeyword("self"))
     .build()
 
@@ -200,7 +200,7 @@ object CirceValidator extends Validator[Json] {
     // e.g, with default true "5" string would validate against integer type
     config.setTypeLoose(false)
     config
-  };
+  }
 
   private lazy val V4Schema =
     JsonSchemaFactory.getInstance.getSchema(new ObjectMapper().readTree(V4SchemaText))
