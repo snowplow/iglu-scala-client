@@ -139,7 +139,7 @@ limitations under the License.
 [travis-image]: https://travis-ci.org/snowplow/iglu-scala-client.png?branch=master
 
 [releases]: https://github.com/snowplow/iglu-scala-client/releases
-[release-image]: http://img.shields.io/badge/release-0.6.0-blue.svg?style=flat
+[release-image]: https://maven-badges.herokuapp.com/maven-central/com.snowplowanalytics/iglu-scala-client_2.12/badge.svg
 
 [license]: http://www.apache.org/licenses/LICENSE-2.0
 [license-image]: http://img.shields.io/badge/license-Apache--2-blue.svg?style=flat
