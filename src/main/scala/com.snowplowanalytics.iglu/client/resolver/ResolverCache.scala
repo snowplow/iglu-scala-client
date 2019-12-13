@@ -33,7 +33,7 @@ import com.snowplowanalytics.iglu.core.SchemaKey
  */
 class ResolverCache[F[_]] private (
   schemas: LruMap[F, SchemaKey, (Int, SchemaLookup)],
-  schemaLists: LruMap[F, (String, String), (Int, ListLookup)],
+  schemaLists: LruMap[F, (String, String, Int), (Int, ListLookup)],
   val ttl: Option[Int]) {
 
   import ResolverCache._
@@ -67,16 +67,16 @@ class ResolverCache[F[_]] private (
     putItem(schemas, schemaKey, freshResult)
 
   /** Lookup a `SchemaList`, no TTL is available */
-  def getSchemaList(vendor: String, name: String)(
+  def getSchemaList(vendor: String, name: String, model: Int)(
     implicit F: Monad[F],
     C: Clock[F]): F[Option[ListLookup]] =
-    getItem(ttl, schemaLists, (vendor, name))
+    getItem(ttl, schemaLists, (vendor, name, model))
 
   /** Put a `SchemaList` result into a cache */
-  def putSchemaList(vendor: String, name: String, list: ListLookup)(
+  def putSchemaList(vendor: String, name: String, model: Int, list: ListLookup)(
     implicit F: Monad[F],
     C: Clock[F]): F[ListLookup] =
-    putItem(schemaLists, (vendor, name), list)
+    putItem(schemaLists, (vendor, name, model), list)
 }
 
 object ResolverCache {
@@ -85,14 +85,14 @@ object ResolverCache {
 
   def init[F[_]: Monad](size: Int, ttl: Option[Int])(
     implicit C: CreateLruMap[F, SchemaKey, (Int, SchemaLookup)],
-    L: CreateLruMap[F, (String, String), (Int, ListLookup)]): F[Option[ResolverCache[F]]] =
+    L: CreateLruMap[F, (String, String, Int), (Int, ListLookup)]): F[Option[ResolverCache[F]]] =
     Option(())
       .filter(_ => size > 0)
       .filter(_ => !ttl.exists(_ <= 0)) match {
       case Some(_) =>
         for {
           schemas     <- CreateLruMap[F, SchemaKey, (Int, SchemaLookup)].create(size)
-          schemaLists <- CreateLruMap[F, (String, String), (Int, ListLookup)].create(size)
+          schemaLists <- CreateLruMap[F, (String, String, Int), (Int, ListLookup)].create(size)
         } yield new ResolverCache[F](schemas, schemaLists, ttl).some
       case None =>
         Applicative[F].pure(none)

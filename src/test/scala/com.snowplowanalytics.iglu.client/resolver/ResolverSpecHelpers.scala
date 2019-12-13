@@ -92,13 +92,13 @@ object ResolverSpecHelpers {
     }
 
   val staticCacheForList: InitListCache[StaticLookup] =
-    new CreateLruMap[StaticLookup, (String, String), (Int, ListLookup)] {
+    new CreateLruMap[StaticLookup, (String, String, Int), (Int, ListLookup)] {
       def create(
-        size: Int): StaticLookup[LruMap[StaticLookup, (String, String), (Int, ListLookup)]] =
+        size: Int): StaticLookup[LruMap[StaticLookup, (String, String, Int), (Int, ListLookup)]] =
         State { s =>
-          val q: LruMap[StaticLookup, (String, String), (Int, ListLookup)] = StateCacheList
-          val ss                                                           = s.copy(cacheSize = size)
-          (ss, q)
+          val cache: LruMap[StaticLookup, (String, String, Int), (Int, ListLookup)] = StateCacheList
+          val state                                                                 = s.copy(cacheSize = size)
+          (state, cache)
         }
     }
 
@@ -131,12 +131,9 @@ object ResolverSpecHelpers {
         registry: Registry,
         vendor: String,
         name: String,
-        model: Option[Int]): StaticLookup[Either[RegistryError, SchemaList]] =
+        model: Int): StaticLookup[Either[RegistryError, SchemaList]] =
         State { x =>
-          l.filter(
-            key =>
-              key.vendor == vendor && key.name == name && (model
-                .contains(key.version.model) || model.isEmpty)) match {
+          l.filter(key => key.vendor == vendor && key.name == name && model == key.version.model) match {
             case Nil  => (x, Left(RegistryError.NotFound))
             case keys => (x, Right(SchemaList(keys)))
           }
@@ -163,12 +160,9 @@ object ResolverSpecHelpers {
         registry: Registry,
         vendor: String,
         name: String,
-        model: Option[Int]): StaticLookup[Either[RegistryError, SchemaList]] =
+        model: Int): StaticLookup[Either[RegistryError, SchemaList]] =
         State { x =>
-          l.filter(
-            key =>
-              key.vendor == vendor && key.name == name && (model
-                .contains(key.version.model) || model.isEmpty)) match {
+          l.filter(key => key.vendor == vendor && key.name == name && model == key.version.model) match {
             case Nil  => (x, Left(RegistryError.NotFound))
             case keys => (x, Right(SchemaList(keys)))
           }
@@ -186,20 +180,22 @@ object ResolverSpecHelpers {
     }
   }
 
-  private object StateCacheList extends LruMap[StaticLookup, (String, String), (Int, ListLookup)] {
-    def get(key: (String, String)): StaticLookup[Option[(Int, ListLookup)]] =
+  private object StateCacheList
+      extends LruMap[StaticLookup, (String, String, Int), (Int, ListLookup)] {
+    def get(key: (String, String, Int)): StaticLookup[Option[(Int, ListLookup)]] =
       State.apply[RegistryState, Option[(Int, ListLookup)]] { state =>
         val result = state.schemaLists.find {
           case (time, Right(list)) =>
             val head = list.schemas.head
-            head.vendor == key._1 && head.name == key._2
+            head.vendor == key._1 && head.name == key._2 && head.version.model == key._3
           case _ => false
         }
         (state.tick, result)
       }
 
-    def put(key: (String, String), value: (Int, ListLookup)): StaticLookup[Unit] = State { state =>
-      (state.copy(schemaLists = value :: state.schemaLists).tick, ())
+    def put(key: (String, String, Int), value: (Int, ListLookup)): StaticLookup[Unit] = State {
+      state =>
+        (state.copy(schemaLists = value :: state.schemaLists).tick, ())
     }
   }
 }

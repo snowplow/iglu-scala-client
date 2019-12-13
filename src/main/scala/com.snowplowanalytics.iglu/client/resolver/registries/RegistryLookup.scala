@@ -64,7 +64,7 @@ trait RegistryLookup[F[_]] {
     registry: Registry,
     vendor: String,
     name: String,
-    model: Option[Int]): F[Either[RegistryError, SchemaList]]
+    model: Int): F[Either[RegistryError, SchemaList]]
 }
 
 object RegistryLookup {
@@ -89,7 +89,7 @@ object RegistryLookup {
         registry: Registry,
         vendor: String,
         name: String,
-        model: Option[Int]): F[Either[RegistryError, SchemaList]] =
+        model: Int): F[Either[RegistryError, SchemaList]] =
         registry match {
           case Registry.Http(_, connection) => httpList(connection, vendor, name, model)
           case _                            => F.pure(RegistryError.NotFound.asLeft)
@@ -106,7 +106,7 @@ object RegistryLookup {
         registry: Registry,
         vendor: String,
         name: String,
-        model: Option[Int]): Eval[Either[RegistryError, SchemaList]] =
+        model: Int): Eval[Either[RegistryError, SchemaList]] =
         Eval.always(idLookupInstance.list(registry, vendor, name, model))
     }
 
@@ -129,7 +129,7 @@ object RegistryLookup {
       registry: Registry,
       vendor: String,
       name: String,
-      model: Option[Int]): Id[Either[RegistryError, SchemaList]] =
+      model: Int): Id[Either[RegistryError, SchemaList]] =
       registry match {
         case Registry.Http(_, connection) =>
           val subpath = toSubpath(connection.uri.toString, vendor, name, model)
@@ -148,11 +148,8 @@ object RegistryLookup {
   private[registries] def toPath(prefix: String, key: SchemaKey): String =
     s"${prefix.stripSuffix("/")}/schemas/${key.toPath}"
 
-  private def toSubpath(prefix: String, vendor: String, name: String, model: Option[Int]): String =
-    model match {
-      case None    => s"${prefix.stripSuffix("/")}/schemas/$vendor/$name/"
-      case Some(m) => s"${prefix.stripSuffix("/")}/schemas/$vendor/$name/jsonschema/$m"
-    }
+  private def toSubpath(prefix: String, vendor: String, name: String, model: Int): String =
+    s"${prefix.stripSuffix("/")}/schemas/$vendor/$name/jsonschema/$model"
 
   /** Retrieves an Iglu Schema from the Embedded Iglu Repo as a JSON
    *
@@ -213,7 +210,7 @@ object RegistryLookup {
     http: Registry.HttpConnection,
     vendor: String,
     name: String,
-    model: Option[Int]): F[Either[RegistryError, SchemaList]] = {
+    model: Int): F[Either[RegistryError, SchemaList]] = {
     Utils
       .stringToUri(toSubpath(http.uri.toString, vendor, name, model))
       .traverse(uri => Utils.getFromUri(uri, http.apikey))

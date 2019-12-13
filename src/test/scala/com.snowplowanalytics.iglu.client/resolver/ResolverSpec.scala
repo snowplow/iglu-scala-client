@@ -13,8 +13,10 @@
 package com.snowplowanalytics.iglu.client.resolver
 
 import java.time.Instant
+import java.net.URI
 
 // Cats
+import cats.Id
 import cats.effect.IO
 import cats.implicits._
 
@@ -65,6 +67,7 @@ class ResolverSpec extends Specification with DataTables with ValidatedMatchers 
   a Resolver should keep retrying and never overwrite a sucessful response $e7
   a Resolver should accumulate errors from all repositories $e8
   we can construct a Resolver from a valid resolver 1-0-2 configuration JSON $e10
+  a Resolver should cache SchemaLists with different models separately $e11
   """
 
   import ResolverSpec._
@@ -370,5 +373,22 @@ class ResolverSpec extends Specification with DataTables with ValidatedMatchers 
             (resolver.repos must contain(SpecHelpers.IgluCentral, Repos.three))
       })
       .unsafeRunSync()
+  }
+
+  def e11 = {
+    val IgluCentralServer = Registry.Http(
+      Registry.Config("Iglu Central  EU1", 0, List("com.snowplowanalytics")),
+      Registry
+        .HttpConnection(URI.create("https://com-iglucentral-eu1-prod.iglu.snplow.net/api"), None)
+    )
+
+    val resolver = Resolver.init[Id](10, None, IgluCentralServer)
+
+    val resultOne = resolver.listSchemas("com.sendgrid", "bounce", 2)
+    val resultTwo = resolver.listSchemas("com.sendgrid", "bounce", 1)
+    (resultOne, resultTwo) match {
+      case (Right(one), Right(two)) => one shouldNotEqual (two)
+      case _                        => ko("Unexpected result for two consequent listSchemas")
+    }
   }
 }

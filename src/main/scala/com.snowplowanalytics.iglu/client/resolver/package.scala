@@ -44,5 +44,5 @@ package object resolver {
 
   /** Ability to initialize the cache */
   type InitSchemaCache[F[_]] = CreateLruMap[F, SchemaKey, (Int, SchemaLookup)]
-  type InitListCache[F[_]]   = CreateLruMap[F, (String, String), (Int, ListLookup)]
+  type InitListCache[F[_]]   = CreateLruMap[F, (String, String, Int), (Int, ListLookup)]
 }

@@ -82,14 +82,14 @@ final case class Resolver[F[_]](repos: List[Registry], cache: Option[ResolverCac
    * Get list of available schemas for particular vendor and name part
    * Server supposed to return them in proper order
    */
-  def listSchemas(vendor: String, name: String, model: Option[Int])(
+  def listSchemas(vendor: String, name: String, model: Int)(
     implicit F: Monad[F],
     L: RegistryLookup[F],
     C: Clock[F]) = {
     val get: Registry => F[Either[RegistryError, SchemaList]] = r => L.list(r, vendor, name, model)
 
     val resultAction = cache
-      .fold(F.pure(none[ListLookup]))(_.getSchemaList(vendor, name))
+      .fold(F.pure(none[ListLookup]))(_.getSchemaList(vendor, name, model))
       .flatMap {
         case Some(listResult) =>
           listResult.fold(retryCached[F, SchemaList](get, vendor), finish[F, SchemaList])
@@ -99,12 +99,12 @@ final case class Resolver[F[_]](repos: List[Registry], cache: Option[ResolverCac
 
     for {
       result <- resultAction
-      _      <- cache.traverse(c => c.putSchemaList(vendor, name, result))
+      _      <- cache.traverse(c => c.putSchemaList(vendor, name, model, result))
     } yield postProcess(result)
   }
 
   /** Get list of full self-describing schemas available on Iglu Server for particular vendor/name pair */
-  def fetchSchemas(vendor: String, name: String, model: Option[Int])(
+  def fetchSchemas(vendor: String, name: String, model: Int)(
     implicit F: Monad[F],
     L: RegistryLookup[F],
     C: Clock[F]) =
