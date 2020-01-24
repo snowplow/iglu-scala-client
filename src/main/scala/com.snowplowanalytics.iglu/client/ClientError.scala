@@ -17,14 +17,14 @@ import java.time.Instant
 import cats.Show
 import cats.syntax.show._
 import cats.syntax.either._
-
 import io.circe.{Decoder, DecodingFailure, Encoder, Json}
 import io.circe.java8.time._
 import io.circe.syntax._
-
 import validator.ValidatorError
 import resolver.LookupHistory
 import resolver.registries.RegistryError
+
+import scala.collection.immutable.SortedMap
 
 /** Common type for Resolver's and Validator's errors */
 sealed trait ClientError extends Product with Serializable {
@@ -35,7 +35,7 @@ sealed trait ClientError extends Product with Serializable {
 object ClientError {
 
   /** Error happened during schema resolution step */
-  final case class ResolutionError(value: Map[String, LookupHistory]) extends ClientError {
+  final case class ResolutionError(value: SortedMap[String, LookupHistory]) extends ClientError {
     def isNotFound: Boolean =
       value.values.flatMap(_.errors).forall(_ == RegistryError.NotFound)
   }
@@ -68,7 +68,7 @@ object ClientError {
               .downField("lookupHistory")
               .as[List[RepoLookupHistory]]
               .map { history =>
-                ResolutionError(history.map(_.toField).toMap)
+                ResolutionError(SortedMap[String, LookupHistory]() ++ history.map(_.toField).toMap)
               }
           case "ValidationError" =>
             cursor

@@ -13,15 +13,14 @@
 package com.snowplowanalytics.iglu.client
 
 import cats.data.NonEmptyList
-
 import io.circe.syntax._
 import io.circe.literal._
-
 import com.snowplowanalytics.iglu.client.resolver.LookupHistory
 import com.snowplowanalytics.iglu.client.resolver.registries.RegistryError
 import com.snowplowanalytics.iglu.client.validator.{ValidatorError, ValidatorReport}
-
 import org.specs2.Specification
+
+import scala.collection.immutable.SortedMap
 
 class ClientErrorSpec extends Specification {
   def is =
@@ -32,7 +31,7 @@ class ClientErrorSpec extends Specification {
 
   def e1 = {
     val error: ClientError = ClientError.ResolutionError(
-      Map(
+      SortedMap(
         "First repo" -> LookupHistory(
           Set(RegistryError.NotFound, RegistryError.RepoFailure("Server outage")),
           1,
