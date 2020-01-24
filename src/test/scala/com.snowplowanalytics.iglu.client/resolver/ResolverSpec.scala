@@ -15,6 +15,8 @@ package com.snowplowanalytics.iglu.client.resolver
 import java.time.Instant
 import java.net.URI
 
+import scala.collection.immutable.SortedMap
+
 // Cats
 import cats.Id
 import cats.effect.IO
@@ -132,7 +134,7 @@ class ResolverSpec extends Specification with DataTables with ValidatedMatchers 
 
     val schemaKey = SchemaKey("com.acme.icarus", "wing", "jsonschema", SchemaVer.Full(1, 0, 0))
     val expected = ResolutionError(
-      Map(
+      SortedMap(
         "Iglu Client Embedded" -> LookupHistory(Set(RegistryError.NotFound), 1, SpecHelpers.now),
         "Iglu Test Embedded"   -> LookupHistory(Set(RegistryError.NotFound), 1, SpecHelpers.now)
       ))
@@ -151,7 +153,7 @@ class ResolverSpec extends Specification with DataTables with ValidatedMatchers 
         "jsonschema",
         SchemaVer.Full(1, 0, 0))
     val expected = ResolutionError(
-      Map(
+      SortedMap(
         "Iglu Client Embedded" -> LookupHistory(Set(RegistryError.NotFound), 1, SpecHelpers.now),
         "Iglu Test Embedded" -> LookupHistory(
           Set(RegistryError.RepoFailure("ParsingFailure: exhausted input")),
@@ -312,7 +314,7 @@ class ResolverSpec extends Specification with DataTables with ValidatedMatchers 
       Nil)
 
     val expected = ResolutionError(
-      Map(
+      SortedMap(
         "Mock Repo 1" -> LookupHistory(Set(error1, error2), 2, Instant.ofEpochMilli(2008L)),
         "Mock Repo 2" -> LookupHistory(Set(error3, error4), 2, Instant.ofEpochMilli(2009L)),
         "Iglu Client Embedded" -> LookupHistory(

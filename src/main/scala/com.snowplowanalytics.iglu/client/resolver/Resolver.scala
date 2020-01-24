@@ -17,13 +17,10 @@ import cats.{Applicative, Id, Monad}
 import java.time.Instant
 
 import scala.concurrent.duration.MILLISECONDS
-
 import cats.data._
 import cats.effect.Clock
 import cats.implicits._
-
 import io.circe.{Decoder, DecodingFailure, HCursor, Json}
-
 import com.snowplowanalytics.iglu.core.{
   SchemaCriterion,
   SchemaKey,
@@ -34,7 +31,6 @@ import com.snowplowanalytics.iglu.core.{
   SelfDescribingSchema
 }
 import com.snowplowanalytics.iglu.core.circe.CirceIgluCodecs._
-
 import com.snowplowanalytics.iglu.client.ClientError.ResolutionError
 import com.snowplowanalytics.iglu.client.resolver.registries.{
   Registry,
@@ -42,6 +38,8 @@ import com.snowplowanalytics.iglu.client.resolver.registries.{
   RegistryLookup
 }
 import com.snowplowanalytics.iglu.client.resolver.registries.Registry.Get
+
+import scala.collection.immutable.SortedMap
 
 /** Resolves schemas from one or more Iglu schema registries */
 final case class Resolver[F[_]](repos: List[Registry], cache: Option[ResolverCache[F]]) {
@@ -295,7 +293,9 @@ object Resolver {
 
   private def postProcess[F[_], A](result: Either[LookupFailureMap, A]) =
     result.leftMap { failure =>
-      ResolutionError(failure.map { case (key, value) => (key.config.name, value) })
+      ResolutionError(SortedMap[String, LookupHistory]() ++ failure.map {
+        case (key, value) => (key.config.name, value)
+      })
     }
 
   private def matchConfig[F[_]: Applicative](datum: SelfDescribingData[Json]) = {
