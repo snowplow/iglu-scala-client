@@ -16,8 +16,6 @@ package validator
 import io.circe._
 import io.circe.syntax._
 
-import cats.syntax.either._
-
 case class ValidatorReport(
   message: String,
   path: Option[String],

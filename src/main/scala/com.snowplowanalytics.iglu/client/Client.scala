@@ -13,7 +13,6 @@
 package com.snowplowanalytics.iglu.client
 
 import cats.Monad
-import cats.syntax.either._
 import cats.data.EitherT
 import cats.effect.{Clock, IO}
 

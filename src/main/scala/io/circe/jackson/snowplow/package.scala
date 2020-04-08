@@ -13,11 +13,12 @@
 package io.circe
 package jackson
 
+import scala.jdk.CollectionConverters._
+
 import java.math.{BigDecimal => JBigDecimal}
 
 import com.fasterxml.jackson.core.JsonParseException
 
-import scala.collection.JavaConverters._
 import com.fasterxml.jackson.databind.{JsonNode, ObjectMapper}
 import com.fasterxml.jackson.databind.node._
 
@@ -62,7 +63,9 @@ package object snowplow {
     },
     TextNode.valueOf(_),
     array => JsonNodeFactory.instance.arrayNode.addAll(array.map(circeToJackson).asJava),
-    obj => JsonNodeFactory.instance.objectNode.setAll(obj.toMap.mapValues(circeToJackson).asJava)
+    obj =>
+      JsonNodeFactory.instance.objectNode
+        .setAll(obj.toMap.map { case (k, v) => (k, circeToJackson(v)) }.toMap.asJava)
   )
 
   private def getJsonNodeFromStringContent(content: String): JsonNode =

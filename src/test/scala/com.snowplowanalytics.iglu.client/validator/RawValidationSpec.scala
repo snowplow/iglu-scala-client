@@ -39,6 +39,7 @@ class RawValidationSpec extends Specification with DataTables {
   validate integers bigger than java.lang.Long.MAX_VALUE $e7
   validate null in [array, null] type $e8
   invalidate stringly integer with integer type $e9
+  validate integer with number type $e10
   """
 
   val simpleSchemaResult: Json =
@@ -111,7 +112,7 @@ class RawValidationSpec extends Specification with DataTables {
     val doubleError = CirceValidator.validate(doubleErrorInput, simpleSchemaResult) must beLeft(
       doubleErrorExpected)
 
-    nonString and missingKey and heterogeneusArray
+    nonString and missingKey and heterogeneusArray and doubleError
   }
 
   def e3 = {
@@ -209,5 +210,11 @@ class RawValidationSpec extends Specification with DataTables {
     val schema = json"""{ "type": "integer" }"""
     val input  = json""""5""""
     CirceValidator.validate(input, schema) must beLeft
+  }
+
+  def e10 = {
+    val schema = json"""{ "type": "number" }"""
+    val input  = json"""5"""
+    CirceValidator.validate(input, schema) must beRight
   }
 }

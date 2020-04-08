@@ -29,10 +29,10 @@ lazy val root = (project in file("."))
       Dependencies.Libraries.igluCore,
       Dependencies.Libraries.igluCoreCirce,
       Dependencies.Libraries.cats,
-      Dependencies.Libraries.circeTime,
       Dependencies.Libraries.circeParser,
       Dependencies.Libraries.lruMap,
       Dependencies.Libraries.scalaj,
+      Dependencies.Libraries.collectionCompat,
       // Scala (test only)
       Dependencies.Libraries.circeLiteral,
       Dependencies.Libraries.specs2,

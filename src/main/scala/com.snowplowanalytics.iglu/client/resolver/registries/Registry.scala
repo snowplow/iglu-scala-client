@@ -18,9 +18,6 @@ import java.net.URI
 // circe
 import io.circe.{Decoder, HCursor, Json}
 
-// Cats
-import cats.syntax.either._
-
 // Iglu Core
 import com.snowplowanalytics.iglu.core.SelfDescribingSchema
 

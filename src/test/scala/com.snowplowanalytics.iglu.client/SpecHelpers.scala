@@ -30,7 +30,7 @@ object SpecHelpers {
 
   def cleanTimestamps(error: ClientError): ClientError = error match {
     case ClientError.ResolutionError(value) =>
-      ClientError.ResolutionError(value.mapValues(_.copy(lastAttempt = now)))
+      ClientError.ResolutionError(value.map { case (k, v) => (k, v.copy(lastAttempt = now)) })
     case other => other
   }
 

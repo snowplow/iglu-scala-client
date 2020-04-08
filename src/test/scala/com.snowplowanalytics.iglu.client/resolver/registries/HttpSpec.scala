@@ -139,7 +139,7 @@ class HttpSpec extends Specification with DataTables with ValidatedMatchers {
     val schemaKey = SchemaKey("de.ersatz.n-a", "null", "jsonschema", SchemaVer.Full(1, 0, 0))
     SpecHelpers.IgluCentral
       .lookupSchema[IO](schemaKey)
-      .unsafeRunSync() must beLeft(RegistryError.NotFound)
+      .unsafeRunSync() must beLeft(RegistryError.NotFound: RegistryError)
   }
 
   def e5 = {

@@ -32,12 +32,12 @@ import io.circe.parser.parse
 
 // Iglu Core
 import com.snowplowanalytics.iglu.core.{SchemaKey, SchemaList, SelfDescribingSchema}
-import com.snowplowanalytics.iglu.core.circe.instances._
+import com.snowplowanalytics.iglu.core.circe.implicits._
 
 /** A capability of `F` to communicate with Iglu registries, using `RepositoryRef` ADT,
  * in order to lookup for schemas or get schema lists
  *
- * @tparam F effect type, preferably referentially-transparent, but can be [[Id]]
+ * @tparam F effect type, preferably referentially-transparent, but can be `Id`
  *           in case of distributed engine like Spark
  */
 trait RegistryLookup[F[_]] {

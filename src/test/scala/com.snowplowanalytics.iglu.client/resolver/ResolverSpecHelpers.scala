@@ -14,8 +14,8 @@ package com.snowplowanalytics.iglu.client
 package resolver
 
 // Cats
-import cats.syntax.either._
 import cats.data.State
+import cats.syntax.either._
 import cats.effect.Clock
 
 import scala.concurrent.duration.TimeUnit
@@ -185,7 +185,7 @@ object ResolverSpecHelpers {
     def get(key: (String, String, Int)): StaticLookup[Option[(Int, ListLookup)]] =
       State.apply[RegistryState, Option[(Int, ListLookup)]] { state =>
         val result = state.schemaLists.find {
-          case (time, Right(list)) =>
+          case (_, Right(list)) =>
             val head = list.schemas.head
             head.vendor == key._1 && head.name == key._2 && head.version.model == key._3
           case _ => false
