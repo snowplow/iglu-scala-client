@@ -13,7 +13,6 @@
 package com.snowplowanalytics.iglu.client.resolver.registries
 
 // Cats
-import cats.syntax.either._
 import cats.effect.IO
 
 // circe
@@ -104,7 +103,7 @@ class EmbeddedSpec extends Specification with DataTables with ValidatedMatchers 
     val schemaKey = SchemaKey("com.acme.n-a", "null", "jsonschema", SchemaVer.Full(1, 0, 0))
     SpecHelpers.EmbeddedTest
       .lookupSchema[IO](schemaKey)
-      .unsafeRunSync() must beLeft(RegistryError.NotFound)
+      .unsafeRunSync() must beLeft(RegistryError.NotFound: RegistryError)
   }
 
   def e5 = {

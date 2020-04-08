@@ -14,7 +14,7 @@ package com.snowplowanalytics.iglu.client
 package validator
 
 // Scala
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 
 // Cats
 import cats.data.{EitherNel, NonEmptyList}

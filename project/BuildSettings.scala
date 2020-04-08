@@ -22,25 +22,11 @@ import bintray.BintrayKeys._
 object BuildSettings {
 
   lazy val buildSettings = Seq[Setting[_]](
-    organization  := "com.snowplowanalytics",
-    scalaVersion  := "2.12.8",
-    crossScalaVersions  := Seq("2.11.12", "2.12.8"),
-    scalacOptions := Seq(
-      "-Ypartial-unification",
-      "-deprecation",
-      "-encoding", "UTF-8",
-      "-feature",
-      "-unchecked",
-      "-Ywarn-dead-code",
-      "-Ywarn-inaccessible",
-      "-Ywarn-nullary-override",
-      "-Ywarn-nullary-unit",
-      "-Ywarn-numeric-widen",
-      "-Ywarn-value-discard",
-      "-language:higherKinds"
-    ),
+    organization := "com.snowplowanalytics",
+    scalaVersion := "2.13.2",
+    crossScalaVersions := Seq("2.12.8", "2.13.2"),
 
-    addCompilerPlugin("org.spire-math" %% "kind-projector" % "0.9.8"),
+    addCompilerPlugin("org.typelevel" %% "kind-projector" % "0.11.0" cross CrossVersion.full),
 
     addCompilerPlugin("com.olegpy" %% "better-monadic-for" % "0.3.0"),
 

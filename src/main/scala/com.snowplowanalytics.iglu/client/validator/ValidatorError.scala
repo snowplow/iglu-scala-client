@@ -13,8 +13,6 @@
 package com.snowplowanalytics.iglu.client
 package validator
 
-import cats.syntax.either._
-
 import io.circe._
 import io.circe.syntax._
 
@@ -43,8 +41,8 @@ object ValidatorError {
   private[client] def schemaIssue(issue: Throwable): ValidatorError =
     InvalidSchema(NonEmptyList.of(SchemaIssue("$", issue.getMessage)))
 
-  implicit val validatorErrorJsonEncoder: ObjectEncoder[ValidatorError] =
-    ObjectEncoder.instance {
+  implicit val validatorErrorJsonEncoder: Encoder.AsObject[ValidatorError] =
+    Encoder.AsObject.instance {
       case InvalidData(messages) => JsonObject.fromMap(Map("dataReports"  -> messages.asJson))
       case InvalidSchema(issues) => JsonObject.fromMap(Map("schemaIssues" -> issues.asJson))
     }

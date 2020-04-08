@@ -105,6 +105,7 @@ object ResolverCache {
     val wrapped = for {
       (timestamp, lookup) <- OptionT(c.get(key))
       seconds             <- OptionT.liftF(currentSeconds[F])
+      useSeconds = seconds
       if isViable(ttl, seconds, timestamp) || lookup.isLeft // isLeft
     } yield lookup
 

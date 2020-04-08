@@ -253,7 +253,7 @@ object Resolver {
 
   /** Ensure that every names encountered only once */
   private[client] def validateRefs[F[_]](refs: List[Registry]): Either[DecodingFailure, Unit] =
-    refs.map(_.config.name).groupBy(identity).mapValues(_.size).filter(_._2 > 1).toList match {
+    refs.map(_.config.name).groupBy(identity).filter(_._2.size > 1).toList match {
       case Nil =>
         ().asRight
       case some =>
