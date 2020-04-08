@@ -21,6 +21,10 @@ import bintray.BintrayKeys._
 
 object BuildSettings {
 
+  lazy val resolutionRepos = Seq(
+    "Snowplow Bintray Maven repo" at "https://snowplow.bintray.com/snowplow-maven"
+  )
+
   lazy val buildSettings = Seq[Setting[_]](
     organization  := "com.snowplowanalytics",
     scalaVersion  := "2.12.8",
@@ -44,7 +48,8 @@ object BuildSettings {
 
     addCompilerPlugin("com.olegpy" %% "better-monadic-for" % "0.3.0"),
 
-    parallelExecution in Test := false // possible race bugs
+    parallelExecution in Test := false, // possible race bugs
+    resolvers ++= resolutionRepos
   )
 
 
