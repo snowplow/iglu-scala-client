@@ -20,7 +20,6 @@ import cats.syntax.semigroup._
 import cats.syntax.either._
 
 import io.circe.{Decoder, Encoder, Json}
-import io.circe.java8.time._
 import io.circe.syntax._
 
 import registries.RegistryError

@@ -1,5 +1,4 @@
-/*
- * Copyright (c) 2014-2019 Snowplow Analytics Ltd. All rights reserved.
+/* Copyright (c) 2014-2019 Snowplow Analytics Ltd. All rights reserved.
  *
  * This program is licensed to you under the Apache License Version 2.0,
  * and you may not use this file except in compliance with the Apache License Version 2.0.
@@ -18,10 +17,9 @@ object Dependencies {
     val validator       = "1.0.28"
     val slf4j           = "1.7.26"
     // Scala
-    val igluCore        = "0.5.1"
-    val cats            = "1.6.1"
-    val circe           = "0.11.2"
-    val circeJava8      = "0.11.1"
+    val igluCore        = "1.0.0"
+    val cats            = "2.1.1"
+    val circe           = "0.13.0"
     val lruMap          = "0.3.0"
     val scalaj          = "2.4.2"
     // Scala (test only)
@@ -40,7 +38,6 @@ object Dependencies {
     val igluCoreCirce    = "com.snowplowanalytics"      %% "iglu-core-circe"         % V.igluCore
     val cats             = "org.typelevel"              %% "cats-core"               % V.cats
     val circeParser      = "io.circe"                   %% "circe-parser"            % V.circe
-    val circeTime        = "io.circe"                   %% "circe-java8"             % V.circeJava8
     val lruMap           = "com.snowplowanalytics"      %% "scala-lru-map"           % V.lruMap
     val scalaj           = "org.scalaj"                 %% "scalaj-http"             % V.scalaj
     // Scala (test only)

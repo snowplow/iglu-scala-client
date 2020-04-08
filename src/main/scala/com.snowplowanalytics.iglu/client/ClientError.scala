@@ -19,7 +19,6 @@ import cats.syntax.show._
 import cats.syntax.either._
 
 import io.circe.{Decoder, DecodingFailure, Encoder, Json}
-import io.circe.java8.time._
 import io.circe.syntax._
 
 import validator.ValidatorError
