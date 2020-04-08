@@ -1,4 +1,13 @@
-Version 0.6.2 (2012-12-13)
+Version 1.0.0 (2020-06-10)
+--------------------------
+Add Scala 2.13 support (#134)
+Use sbt-coveralls (#137)
+Integrate sbt-gh-pages to create GH Pages from Scaladoc (#120)
+Integrate scoverage (#119)
+Integrate MiMa (#118)
+Bump json-schema-validator to 1.0.39 (#135)
+
+Version 0.6.2 (2020-12-13)
 --------------------------
 Make model mandatory for listSchemas (#128)
 
