@@ -17,7 +17,7 @@ object Dependencies {
     val validator       = "1.0.28"
     val slf4j           = "1.7.26"
     // Scala
-    val igluCore        = "1.0.0"
+    val igluCore        = "1.0.0-M2"
     val cats            = "2.1.1"
     val circe           = "0.13.0"
     val lruMap          = "0.3.0"
