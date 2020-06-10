@@ -3,6 +3,7 @@
 [![Build Status][travis-image]][travis]
 [![Release][release-image]][releases]
 [![License][license-image]][license]
+[![Coverage Status][coveralls-image]][coveralls]
 
 A Scala client and resolver for **[Iglu schema repositories][iglu-wiki]** from the team at **[Snowplow Analytics][snowplow-website]**.
 
@@ -143,3 +144,6 @@ limitations under the License.
 
 [license]: http://www.apache.org/licenses/LICENSE-2.0
 [license-image]: http://img.shields.io/badge/license-Apache--2-blue.svg?style=flat
+
+[coveralls]: https://coveralls.io/github/snowplow/iglu-scala-client?branch=master
+[coveralls-image]: https://coveralls.io/repos/github/snowplow/iglu-scala-client/badge.svg?branch=master
