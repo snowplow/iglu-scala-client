@@ -106,7 +106,7 @@ or there some kind of resolution problems, or simply nothing (`Unit`) in case of
 
 ## Copyright and license
 
-Iglu Scala Client is copyright 2014-2019 Snowplow Analytics Ltd.
+Iglu Scala Client is copyright 2014-2020 Snowplow Analytics Ltd.
 
 Licensed under the **[Apache License, Version 2.0][license]** (the "License");
 you may not use this software except in compliance with the License.
