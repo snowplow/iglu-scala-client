@@ -191,8 +191,10 @@ object CirceValidator extends Validator[Json] {
     .addKeyword(new NonValidationKeyword("self"))
     .build()
 
+  private val V4SchemaInstance = JsonSchemaFactory.getInstance(SpecVersion.VersionFlag.V4)
+
   private val IgluMetaschemaFactory =
-    JsonSchemaFactory.builder(JsonSchemaFactory.getInstance).addMetaSchema(IgluMetaschema).build()
+    JsonSchemaFactory.builder(V4SchemaInstance).addMetaSchema(IgluMetaschema).build()
 
   private val SchemaValidatorsConfig: SchemaValidatorsConfig = {
     val config = new SchemaValidatorsConfig()
@@ -203,7 +205,7 @@ object CirceValidator extends Validator[Json] {
   }
 
   private lazy val V4Schema =
-    JsonSchemaFactory.getInstance.getSchema(new ObjectMapper().readTree(V4SchemaText))
+    V4SchemaInstance.getSchema(new ObjectMapper().readTree(V4SchemaText))
 
   def validate(data: Json, schema: Json): Either[ValidatorError, Unit] =
     Either
