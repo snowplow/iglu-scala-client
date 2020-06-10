@@ -14,7 +14,7 @@ import sbt._
 object Dependencies {
   object V {
     // Java
-    val validator        = "1.0.28"
+    val validator        = "1.0.39"
     val slf4j            = "1.7.26"
     // Scala
     val igluCore         = "1.0.0"
