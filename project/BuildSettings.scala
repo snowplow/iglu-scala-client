@@ -87,9 +87,8 @@ object BuildSettings {
   )
 
   val scoverageSettings = Seq(
-    coverageEnabled := true,
     coverageMinimum := 50,
-    coverageFailOnMinimum := true,
+    coverageFailOnMinimum := false,
     coverageHighlighting := false,
     (test in Test) := {
       (coverageReport dependsOn (test in Test)).value
