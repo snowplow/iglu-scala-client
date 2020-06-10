@@ -1,3 +1,8 @@
+Version 1.0.1 (2020-06-10)
+--------------------------
+Disable scoverage (#139)
+Fix GH Pages publishing (#141)
+
 Version 1.0.0 (2020-06-10)
 --------------------------
 Add Scala 2.13 support (#134)
