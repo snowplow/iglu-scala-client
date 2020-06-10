@@ -1,3 +1,9 @@
+Version 1.0.1 (2020-06-11)
+--------------------------
+Bump SBT to 1.3.12 (#142)
+Fix GH Pages publishing (#141)
+Disable scoverage (#139)
+
 Version 1.0.0 (2020-06-10)
 --------------------------
 Add Scala 2.13 support (#134)
