@@ -14,7 +14,7 @@
 lazy val root = (project in file("."))
   .settings(
     name := "iglu-scala-client",
-    version := "1.0.2",
+    version := "1.0.2-M4",
     description := "Scala client and resolver for Iglu schema repositories"
   )
   .enablePlugins(SiteScaladocPlugin, GhpagesPlugin, PreprocessPlugin)
