@@ -15,7 +15,7 @@ object Dependencies {
   object V {
     // Java
     val validator        = "1.0.39"
-    val slf4j            = "1.7.26"
+    val slf4j            = "1.7.30"
     val jackson          = "2.10.3"
     // Scala
     val igluCore         = "1.0.0"
