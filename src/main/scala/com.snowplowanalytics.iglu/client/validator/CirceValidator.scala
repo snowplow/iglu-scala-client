@@ -77,8 +77,7 @@ object CirceValidator extends Validator[Json] {
        |    "default": {},
        |    "multipleOf": {
        |      "type": "number",
-       |      "minimum": 0,
-       |      "exclusiveMinimum": true
+       |      "minimum": 0
        |    },
        |    "maximum": {
        |      "type": "number"
@@ -89,10 +88,6 @@ object CirceValidator extends Validator[Json] {
        |    },
        |    "minimum": {
        |      "type": "number"
-       |    },
-       |    "exclusiveMinimum": {
-       |      "type": "boolean",
-       |      "default": false
        |    },
        |    "maxLength": { "$ref": "#/definitions/positiveInteger" },
        |    "minLength": { "$ref": "#/definitions/positiveIntegerDefault0" },
@@ -177,8 +172,7 @@ object CirceValidator extends Validator[Json] {
        |    "not": { "$ref": "#" }
        |  },
        |  "dependencies": {
-       |    "exclusiveMaximum": [ "maximum" ],
-       |    "exclusiveMinimum": [ "minimum" ]
+       |    "exclusiveMaximum": [ "maximum" ]
        |  },
        |  "default": {}
        |}""".stripMargin
