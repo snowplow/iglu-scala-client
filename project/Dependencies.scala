@@ -16,6 +16,7 @@ object Dependencies {
     // Java
     val validator        = "1.0.39"
     val slf4j            = "1.7.26"
+    val jackson          = "2.10.3"
     // Scala
     val igluCore         = "1.0.0"
     val cats             = "2.1.1"
@@ -30,9 +31,8 @@ object Dependencies {
   object Libraries {
     // Java
     // Excluding binary-incompatible Jackson and include the latest from 2.9 series
-    val validatorFull    = "com.networknt"              %  "json-schema-validator"   % V.validator
-    val validator        = validatorFull.exclude("com.fasterxml.jackson.core", "jackson-databind")
-    val jackson          = "com.fasterxml.jackson.core" % "jackson-databind"         % "2.9.10.1"
+    val validator        = "com.networknt"              %  "json-schema-validator"   % V.validator
+    val jackson          = "com.fasterxml.jackson.core" % "jackson-databind"         % V.jackson
 
     // Scala
     val igluCore         = "com.snowplowanalytics"      %% "iglu-core"               % V.igluCore

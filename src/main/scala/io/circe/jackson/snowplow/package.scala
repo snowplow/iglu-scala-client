@@ -61,12 +61,16 @@ package object snowplow {
             }
         }
     },
-    TextNode.valueOf(_),
+    s => TextNode.valueOf(s),
     array => JsonNodeFactory.instance.arrayNode.addAll(array.map(circeToJackson).asJava),
     obj =>
-      JsonNodeFactory.instance.objectNode
-        .setAll(obj.toMap.map { case (k, v) => (k, circeToJackson(v)) }.toMap.asJava)
+      objectNodeSetAll(JsonNodeFactory.instance.objectNode, obj.toMap.map {
+        case (k, v) => (k, circeToJackson(v))
+      }.asJava)
   )
+
+  def objectNodeSetAll(node: ObjectNode, fields: java.util.Map[String, JsonNode]): JsonNode =
+    node.setAll[JsonNode](fields)
 
   private def getJsonNodeFromStringContent(content: String): JsonNode =
     mapper.readTree(content)
