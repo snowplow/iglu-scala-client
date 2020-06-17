@@ -9,12 +9,14 @@ jdk:
 addons:
   hostname: short-hostname
 before_install:
-- openssl aes-256-cbc -K $encrypted_38b5cd286219_key -iv $encrypted_38b5cd286219_iv
-  -in project/travis-deploy-key.enc -out project/travis-deploy-key -d
+- openssl aes-256-cbc -K $encrypted_38b5cd286219_key -iv $encrypted_38b5cd286219_iv -in project/travis-deploy-key.enc -out project/travis-deploy-key -d
+- npm install -g snyk
 script:
 - sbt clean coverage +test
 - sbt coverageReport
-after_success: sbt coveralls
+after_success:
+- snyk monitor
+- sbt coveralls
 deploy:
   cleanup: false
   provider: script
