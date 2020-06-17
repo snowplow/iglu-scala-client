@@ -8,11 +8,13 @@ jdk:
 - openjdk8
 addons:
   hostname: short-hostname
-before_install: 'openssl aes-256-cbc -K $encrypted_38b5cd286219_key -iv $encrypted_38b5cd286219_iv -in project/travis-deploy-key.enc -out project/travis-deploy-key -d'
+before_install:
+- openssl aes-256-cbc -K $encrypted_38b5cd286219_key -iv $encrypted_38b5cd286219_iv
+  -in project/travis-deploy-key.enc -out project/travis-deploy-key -d
 script:
 - sbt clean coverage +test
 - sbt coverageReport
-after_success: "sbt coveralls"
+after_success: sbt coveralls
 deploy:
   cleanup: false
   provider: script
@@ -28,3 +30,4 @@ env:
   - secure: ZdJH16Iz79TTwPCha92BuekZP07QsLAxMqaG4liH45ncK4TE+xfEE0lAmt2SqonPodXDbx94cFwjTEum0xFsEOp1ASsz393i265+qVKT+WwumpMe1/4Ta9UF6bAZMBQSeikgW7Qnh7uN2DVUKJ9LNrCg3xlBReWeqJC/1AjD+TM=
   - ENCRYPTION_LABEL: 38b5cd286219
   - secure: PQ/P9MzZt5vczMZBgrKQD2+lvFkwJJI644MxxUf1xX0SBocvyuB5xkjdlgmbQHtRW90WgiSJJ2AO+lj/SNc61zHyZaC1YrrPzbJZPTNzihcsWvKBJKdMOX3OpN3+eXmY5JgKcZ7MRiCIetuRkZ8LkdThl8DCFGvtPmNHayqpCOk=
+  - secure: cAcmKufGhrguRB471CXwhcqBrcbQfgqhnRoH7VjlISpIKBEPAV6x8inrkGfaT99KCDtqLdDT59bZUy8IBiqn9Xijzd9dZkM6uU8WCecLN0gnE1WNPCicikSNYDOLnK+tFkWpZgfqy+jCu6BpRa49audc7rpy4tGv2w+JyIr9clo=
