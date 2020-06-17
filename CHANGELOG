@@ -1,3 +1,13 @@
+Version 1.0.2 (2020-06-18)
+--------------------------
+Replace Map with SortedMap in ResolutionError (#147)
+Remove exclusiveMinimum and exclusiveMaximum properties from from metaschema (#132)
+Bump Scala to 2.12.11 (#146)
+Bump slf4j to 1.7.30 (#145)
+Bump jackson-databind to 2.10.3 (#143)
+Integrate Synk (#149)
+Add Snyk token to .travis.yml (#150)
+
 Version 1.0.1 (2020-06-11)
 --------------------------
 Bump SBT to 1.3.12 (#142)
