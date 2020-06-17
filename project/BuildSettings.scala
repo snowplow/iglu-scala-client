@@ -37,7 +37,7 @@ object BuildSettings {
 
   lazy val buildSettings = Seq[Setting[_]](
     organization := "com.snowplowanalytics",
-    scalaVersion := "2.13.2",
+    scalaVersion := "2.12.11",
     crossScalaVersions := Seq("2.12.11", "2.13.2"),
 
     addCompilerPlugin("org.typelevel" %% "kind-projector" % "0.11.0" cross CrossVersion.full),
