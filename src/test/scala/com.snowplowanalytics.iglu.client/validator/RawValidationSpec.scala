@@ -40,6 +40,9 @@ class RawValidationSpec extends Specification with DataTables {
   validate null in [array, null] type $e8
   invalidate stringly integer with integer type $e9
   validate integer with number type $e10
+  validate integer with minimum and maximum if value is within range $e11
+  invalidate integer with minimum and maximum if value is not within range $e12
+  validate null in [integer, null] with minimum and maximum $e13
   """
 
   val simpleSchemaResult: Json =
@@ -215,6 +218,30 @@ class RawValidationSpec extends Specification with DataTables {
   def e10 = {
     val schema = json"""{ "type": "number" }"""
     val input  = json"""5"""
+    CirceValidator.validate(input, schema) must beRight
+  }
+
+  // See https://snowplow.zendesk.com/agent/tickets/22868
+  def e11 = {
+    val schema  = json"""{ "type": ["null", "integer"], "minimum": -1000000, "maximum": 1000000 }"""
+    val inputs  = (-1000000 to 1000000).toList.map(v => json"""$v""")
+    val results = inputs.map(i => CirceValidator.validate(i, schema))
+
+    results.filter(_.isLeft).size mustEqual 0
+  }
+
+  def e12 = {
+    val schema  = json"""{ "type": ["null", "integer"], "minimum": -1000000, "maximum": 1000000 }"""
+    val inputs  = List(-1000001, 1000001).map(v => json"""$v""")
+    val results = inputs.map(i => CirceValidator.validate(i, schema))
+
+    results.filter(_.isLeft).size mustEqual 2
+  }
+
+  def e13 = {
+    val schema = json"""{ "type": ["null", "integer"], "minimum": -1000000, "maximum": 1000000 }"""
+    val input  = json"""null"""
+
     CirceValidator.validate(input, schema) must beRight
   }
 }
