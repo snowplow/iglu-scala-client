@@ -21,7 +21,7 @@ object Dependencies {
     val igluCore         = "1.0.0"
     val cats             = "2.1.1"
     val circe            = "0.13.0"
-    val lruMap           = "0.4.0"
+    val lruMap           = "0.5.0"
     val scalaj           = "2.4.2"
     val collectionCompat = "2.1.6"
     // Scala (test only)
