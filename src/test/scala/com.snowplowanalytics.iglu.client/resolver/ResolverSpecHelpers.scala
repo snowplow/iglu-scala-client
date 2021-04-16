@@ -115,7 +115,8 @@ object ResolverSpecHelpers {
     new RegistryLookup[StaticLookup] {
       def lookup(
         repositoryRef: Registry,
-        schemaKey: SchemaKey): StaticLookup[Either[RegistryError, Json]] =
+        schemaKey: SchemaKey,
+        blocker: BlockerF[StaticLookup]): StaticLookup[Either[RegistryError, Json]] =
         State { x =>
           repositoryRef match {
             case Registry.Embedded(_, _) => (x.tick, RegistryError.NotFound.asLeft)
@@ -131,7 +132,8 @@ object ResolverSpecHelpers {
         registry: Registry,
         vendor: String,
         name: String,
-        model: Int): StaticLookup[Either[RegistryError, SchemaList]] =
+        model: Int,
+        blocker: BlockerF[StaticLookup]): StaticLookup[Either[RegistryError, SchemaList]] =
         State { x =>
           l.filter(key => key.vendor == vendor && key.name == name && model == key.version.model) match {
             case Nil  => (x, Left(RegistryError.NotFound))
@@ -145,7 +147,8 @@ object ResolverSpecHelpers {
     new RegistryLookup[StaticLookup] {
       def lookup(
         repositoryRef: Registry,
-        key: SchemaKey): StaticLookup[Either[RegistryError, Json]] =
+        key: SchemaKey,
+        blocker: BlockerF[StaticLookup]): StaticLookup[Either[RegistryError, Json]] =
         State { state =>
           val name = repositoryRef.config.name
           requestsMap.get(name) match {
@@ -160,7 +163,8 @@ object ResolverSpecHelpers {
         registry: Registry,
         vendor: String,
         name: String,
-        model: Int): StaticLookup[Either[RegistryError, SchemaList]] =
+        model: Int,
+        blocker: BlockerF[StaticLookup]): StaticLookup[Either[RegistryError, SchemaList]] =
         State { x =>
           l.filter(key => key.vendor == vendor && key.name == name && model == key.version.model) match {
             case Nil  => (x, Left(RegistryError.NotFound))

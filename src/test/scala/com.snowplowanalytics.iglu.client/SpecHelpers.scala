@@ -23,6 +23,7 @@ import cats.effect.IO
 
 // This project
 import resolver.registries.Registry
+import resolver.BlockerF
 
 object SpecHelpers {
 
@@ -60,6 +61,6 @@ object SpecHelpers {
       IO.delay(unit.convert(System.nanoTime(), TimeUnit.NANOSECONDS))
   }
 
-  val TestResolver = Resolver.init[IO](10, None, EmbeddedTest)
+  val TestResolver = Resolver.init[IO](10, None, BlockerF.noop[IO], EmbeddedTest)
   val TestClient   = for { resolver <- TestResolver } yield Client(resolver, CirceValidator)
 }

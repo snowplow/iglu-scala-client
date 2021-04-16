@@ -42,7 +42,10 @@ import com.snowplowanalytics.iglu.client.resolver.registries.Registry.Get
 import scala.collection.immutable.SortedMap
 
 /** Resolves schemas from one or more Iglu schema registries */
-final case class Resolver[F[_]](repos: List[Registry], cache: Option[ResolverCache[F]]) {
+final case class Resolver[F[_]](
+  repos: List[Registry],
+  cache: Option[ResolverCache[F]],
+  blocker: BlockerF[F]) {
   import Resolver._
 
   private[client] val allRepos: NonEmptyList[Registry] =
@@ -62,7 +65,7 @@ final case class Resolver[F[_]](repos: List[Registry], cache: Option[ResolverCac
     F: Monad[F],
     L: RegistryLookup[F],
     C: Clock[F]): F[Either[ResolutionError, Json]] = {
-    val get: Registry => F[Either[RegistryError, Json]] = r => L.lookup(r, schemaKey)
+    val get: Registry => F[Either[RegistryError, Json]] = r => L.lookup(r, schemaKey, blocker)
     val resultAction = getFromCache(schemaKey).flatMap {
       case Some(lookupResult) =>
         lookupResult.fold(retryCached[F, Json](get, schemaKey.vendor), finish[F, Json])
@@ -84,7 +87,8 @@ final case class Resolver[F[_]](repos: List[Registry], cache: Option[ResolverCac
     implicit F: Monad[F],
     L: RegistryLookup[F],
     C: Clock[F]) = {
-    val get: Registry => F[Either[RegistryError, SchemaList]] = r => L.list(r, vendor, name, model)
+    val get: Registry => F[Either[RegistryError, SchemaList]] = r =>
+      L.list(r, vendor, name, model, blocker)
 
     val resultAction = cache
       .fold(F.pure(none[ListLookup]))(_.getSchemaList(vendor, name, model))
@@ -191,21 +195,22 @@ object Resolver {
   def init[F[_]: Monad: InitSchemaCache: InitListCache](
     cacheSize: Int,
     cacheTtl: Option[Int],
+    blocker: BlockerF[F],
     refs: Registry*): F[Resolver[F]] =
     ResolverCache
       .init[F](cacheSize, cacheTtl)
-      .map(cacheOpt => new Resolver(List(refs: _*), cacheOpt))
+      .map(cacheOpt => new Resolver(List(refs: _*), cacheOpt, blocker))
 
   /** Construct a pure resolver, working only with in-memory registries, no cache, no clock */
   def initPure(refs: Registry.InMemory*): Resolver[Id] =
-    new Resolver[Id](List(refs: _*), None)
+    new Resolver[Id](List(refs: _*), None, BlockerF.noop)
 
   // Keep this up-to-date
   private[client] val EmbeddedSchemaCount = 4
 
   /** A Resolver which only looks at our embedded repo */
   def bootstrap[F[_]: Monad: InitSchemaCache: InitListCache]: F[Resolver[F]] =
-    Resolver.init[F](EmbeddedSchemaCount, None, Registry.EmbeddedRegistry)
+    Resolver.init[F](EmbeddedSchemaCount, None, BlockerF.noop, Registry.EmbeddedRegistry)
 
   private final case class ResolverConfig(
     cacheSize: Int,
@@ -232,7 +237,8 @@ object Resolver {
    * @return a configured Resolver instance
    */
   def parse[F[_]: Monad: InitSchemaCache: InitListCache](
-    config: Json): F[Either[DecodingFailure, Resolver[F]]] = {
+    config: Json,
+    blocker: BlockerF[F] = BlockerF.noop[F]): F[Either[DecodingFailure, Resolver[F]]] = {
     val result: EitherT[F, DecodingFailure, Resolver[F]] = for {
       datum    <- EitherT.fromEither[F](config.as[SelfDescribingData[Json]])
       _        <- matchConfig[F](datum)
@@ -240,7 +246,7 @@ object Resolver {
       cacheOpt <- EitherT.liftF(ResolverCache.init[F](config.cacheSize, config.cacheTtl))
       refsE    <- EitherT.fromEither[F](config.repositoryRefs.traverse(Registry.parse))
       _        <- EitherT.fromEither[F](validateRefs(refsE))
-    } yield Resolver(refsE, cacheOpt)
+    } yield Resolver(refsE, cacheOpt, blocker)
 
     result.value
   }

@@ -50,7 +50,10 @@ trait RegistryLookup[F[_]] {
    * @return either schema parsed into `Json` or `RegistryError`, such as absent schema,
    *         or unexpected response
    */
-  def lookup(registry: Registry, schemaKey: SchemaKey): F[Either[RegistryError, Json]]
+  def lookup(
+    registry: Registry,
+    schemaKey: SchemaKey,
+    blocker: BlockerF[F] = BlockerF.noop): F[Either[RegistryError, Json]]
 
   /** List all schemas (formats and versions) for a given vendor/name pair in their
    * chronological order. It is up to Registry to build valid list
@@ -64,7 +67,8 @@ trait RegistryLookup[F[_]] {
     registry: Registry,
     vendor: String,
     name: String,
-    model: Int): F[Either[RegistryError, SchemaList]]
+    model: Int,
+    blocker: BlockerF[F] = BlockerF.noop): F[Either[RegistryError, SchemaList]]
 }
 
 object RegistryLookup {
@@ -78,9 +82,12 @@ object RegistryLookup {
 
   implicit def ioLookupInstance[F[_]](implicit F: Sync[F]): RegistryLookup[F] =
     new RegistryLookup[F] {
-      def lookup(repositoryRef: Registry, schemaKey: SchemaKey): F[Either[RegistryError, Json]] =
+      def lookup(
+        repositoryRef: Registry,
+        schemaKey: SchemaKey,
+        blocker: BlockerF[F]): F[Either[RegistryError, Json]] =
         repositoryRef match {
-          case Registry.Http(_, connection)  => httpLookup(connection, schemaKey)
+          case Registry.Http(_, connection)  => httpLookup(connection, schemaKey, blocker)
           case Registry.Embedded(_, path)    => embeddedLookup[F](path, schemaKey)
           case Registry.InMemory(_, schemas) => F.pure(inMemoryLookup(schemas, schemaKey))
         }
@@ -89,9 +96,10 @@ object RegistryLookup {
         registry: Registry,
         vendor: String,
         name: String,
-        model: Int): F[Either[RegistryError, SchemaList]] =
+        model: Int,
+        blocker: BlockerF[F]): F[Either[RegistryError, SchemaList]] =
         registry match {
-          case Registry.Http(_, connection) => httpList(connection, vendor, name, model)
+          case Registry.Http(_, connection) => httpList(connection, vendor, name, model, blocker)
           case _                            => F.pure(RegistryError.NotFound.asLeft)
         }
     }
@@ -100,19 +108,26 @@ object RegistryLookup {
 
   implicit def evalLookupInstance: RegistryLookup[Eval] =
     new RegistryLookup[Eval] {
-      def lookup(registry: Registry, schemaKey: SchemaKey): Eval[Either[RegistryError, Json]] =
+      def lookup(
+        registry: Registry,
+        schemaKey: SchemaKey,
+        blocker: BlockerF[Eval]): Eval[Either[RegistryError, Json]] =
         Eval.always(idLookupInstance.lookup(registry, schemaKey))
       def list(
         registry: Registry,
         vendor: String,
         name: String,
-        model: Int): Eval[Either[RegistryError, SchemaList]] =
+        model: Int,
+        blocker: BlockerF[Eval]): Eval[Either[RegistryError, SchemaList]] =
         Eval.always(idLookupInstance.list(registry, vendor, name, model))
     }
 
   // Id instance also swallows all exceptions into `RegistryError`
   implicit def idLookupInstance: RegistryLookup[Id] = new RegistryLookup[Id] {
-    def lookup(repositoryRef: Registry, schemaKey: SchemaKey): Id[Either[RegistryError, Json]] =
+    def lookup(
+      repositoryRef: Registry,
+      schemaKey: SchemaKey,
+      blocker: BlockerF[Id]): Id[Either[RegistryError, Json]] =
       repositoryRef match {
         case Registry.Http(_, connection) =>
           Utils
@@ -129,7 +144,8 @@ object RegistryLookup {
       registry: Registry,
       vendor: String,
       name: String,
-      model: Int): Id[Either[RegistryError, SchemaList]] =
+      model: Int,
+      blocker: BlockerF[Id]): Id[Either[RegistryError, SchemaList]] =
       registry match {
         case Registry.Http(_, connection) =>
           val subpath = toSubpath(connection.uri.toString, vendor, name, model)
@@ -182,10 +198,11 @@ object RegistryLookup {
    */
   private[registries] def httpLookup[F[_]: Sync](
     http: Registry.HttpConnection,
-    key: SchemaKey): F[Either[RegistryError, Json]] = {
+    key: SchemaKey,
+    blocker: BlockerF[F]): F[Either[RegistryError, Json]] = {
     Utils
       .stringToUri(toPath(http.uri.toString, key))
-      .traverse(uri => Utils.getFromUri(uri, http.apikey))
+      .traverse(uri => Utils.getFromUri(uri, http.apikey, blocker))
       .map { response =>
         val result = for {
           body <- OptionT(response)
@@ -210,10 +227,11 @@ object RegistryLookup {
     http: Registry.HttpConnection,
     vendor: String,
     name: String,
-    model: Int): F[Either[RegistryError, SchemaList]] = {
+    model: Int,
+    blocker: BlockerF[F]): F[Either[RegistryError, SchemaList]] = {
     Utils
       .stringToUri(toSubpath(http.uri.toString, vendor, name, model))
-      .traverse(uri => Utils.getFromUri(uri, http.apikey))
+      .traverse(uri => Utils.getFromUri(uri, http.apikey, blocker))
       .map { response =>
         for {
           body <- response

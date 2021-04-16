@@ -40,6 +40,7 @@ import scalaj.http._
 
 import com.snowplowanalytics.iglu.core.SchemaList
 import com.snowplowanalytics.iglu.core.circe.CirceIgluCodecs._
+import com.snowplowanalytics.iglu.client.resolver.BlockerF
 
 private[registries] object Utils {
 
@@ -55,12 +56,17 @@ private[registries] object Utils {
    * @param apikey optional apikey UUID to authenticate in Iglu Server
    * @return The document at that URL if code is 2xx
    */
-  def getFromUri[F[_]: Sync](uri: URI, apikey: Option[String]): F[Option[String]] =
-    Sync[F]
-      .delay(buildLookupRequest(uri, apikey).asString)
+  def getFromUri[F[_]: Sync](
+    uri: URI,
+    apikey: Option[String],
+    blocker: BlockerF[F]): F[Option[String]] = {
+    val req = buildLookupRequest(uri, apikey)
+    blocker
+      .blockOn(Sync[F].delay(req.asString))
       .map { response =>
         if (response.is2xx) response.body.some else None
       }
+  }
 
   /** Non-RT analog of [[getFromUri]] */
   def unsafeGetFromUri(uri: URI, apikey: Option[String]): Either[RegistryError, Json] =

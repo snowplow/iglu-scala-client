@@ -20,7 +20,7 @@ import io.circe.Json
 
 import com.snowplowanalytics.iglu.core.SelfDescribingData
 
-import resolver.{InitListCache, InitSchemaCache}
+import resolver.{BlockerF, InitListCache, InitSchemaCache}
 import resolver.registries.{Registry, RegistryLookup}
 
 /**
@@ -48,12 +48,14 @@ final case class Client[F[_], A](resolver: Resolver[F], validator: Validator[A])
 
 object Client {
 
-  /** Default Iglu Central client, without cache */
+  /** Default Iglu Central client, without cache or blocker */
   val IgluCentral: Client[IO, Json] =
-    Client[IO, Json](Resolver(List(Registry.IgluCentral), None), CirceValidator)
+    Client[IO, Json](Resolver(List(Registry.IgluCentral), None, BlockerF.noop[IO]), CirceValidator)
 
-  def parseDefault[F[_]: Monad: InitSchemaCache: InitListCache](json: Json) =
-    EitherT(Resolver.parse(json)).map { resolver =>
+  def parseDefault[F[_]: Monad: InitSchemaCache: InitListCache](
+    json: Json,
+    blocker: BlockerF[F] = BlockerF.noop[F]) =
+    EitherT(Resolver.parse(json, blocker)).map { resolver =>
       Client(resolver, CirceValidator)
     }
 }

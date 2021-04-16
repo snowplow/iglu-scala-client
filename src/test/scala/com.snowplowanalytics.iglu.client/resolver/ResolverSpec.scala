@@ -76,7 +76,14 @@ class ResolverSpec extends Specification with DataTables with ValidatedMatchers 
 
   def e1 = {
     val resolver =
-      Resolver.init[IO](10, None, SpecHelpers.IgluCentral, Repos.one, Repos.two, Repos.three)
+      Resolver.init[IO](
+        10,
+        None,
+        BlockerF.noop,
+        SpecHelpers.IgluCentral,
+        Repos.one,
+        Repos.two,
+        Repos.three)
     val schemaKey =
       SchemaKey("de.acompany.snowplow", "mobile_context", "jsonschema", SchemaVer.Full(1, 0, 0))
     val expected: List[Registry] =
@@ -210,7 +217,7 @@ class ResolverSpec extends Specification with DataTables with ValidatedMatchers 
     implicit val registryLookup = ResolverSpecHelpers.getLookup(responses, Nil)
 
     val result = for {
-      resolver  <- Resolver.init[StaticLookup](10, None, httpRep)
+      resolver  <- Resolver.init[StaticLookup](10, None, BlockerF.noop, httpRep)
       response1 <- resolver.lookupSchema(schemaKey)
       response2 <- resolver.lookupSchema(schemaKey)
       _         <- StaticLookup.addTime(600)
@@ -262,7 +269,7 @@ class ResolverSpec extends Specification with DataTables with ValidatedMatchers 
 
     val result = for {
       resolver <- Resolver
-        .init[StaticLookup](10, Some(1000), httpRep) // FIXME: its confusing to mix millis and sec
+        .init[StaticLookup](10, Some(1000), BlockerF.noop, httpRep) // FIXME: its confusing to mix millis and sec
       _      <- resolver.lookupSchema(schemaKey)
       _      <- StaticLookup.addTime(2000)
       _      <- resolver.lookupSchema(schemaKey)
@@ -324,7 +331,7 @@ class ResolverSpec extends Specification with DataTables with ValidatedMatchers 
       ))
 
     val result = for {
-      resolver <- Resolver.init[StaticLookup](10, Some(100), httpRep1, httpRep2)
+      resolver <- Resolver.init[StaticLookup](10, Some(100), BlockerF.noop, httpRep1, httpRep2)
       _        <- resolver.lookupSchema(schemaKey)
       _        <- StaticLookup.addTime(2000)
       result   <- resolver.lookupSchema(schemaKey)
@@ -384,7 +391,7 @@ class ResolverSpec extends Specification with DataTables with ValidatedMatchers 
         .HttpConnection(URI.create("https://com-iglucentral-eu1-prod.iglu.snplow.net/api"), None)
     )
 
-    val resolver = Resolver.init[Id](10, None, IgluCentralServer)
+    val resolver = Resolver.init[Id](10, None, BlockerF.noop, IgluCentralServer)
 
     val resultOne = resolver.listSchemas("com.sendgrid", "bounce", 2)
     val resultTwo = resolver.listSchemas("com.sendgrid", "bounce", 1)
