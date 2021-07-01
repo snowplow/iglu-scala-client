@@ -196,7 +196,7 @@ object RegistryLookup {
 
         result.getOrElseF[Json](RegistryError.NotFound.asLeft)
       }
-      .handleError {
+      .recover {
         case uhe: UnknownHostException =>
           val error = s"Unknown host issue fetching: ${uhe.getMessage}"
           RegistryError.RepoFailure(error).asLeft

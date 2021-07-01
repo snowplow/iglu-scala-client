@@ -115,7 +115,7 @@ class EmbeddedSpec extends Specification with DataTables with ValidatedMatchers 
         SchemaVer.Full(1, 0, 0))
     SpecHelpers.EmbeddedTest
       .lookupSchema[IO](schemaKey)
-      .unsafeRunSync must beLeft
+      .unsafeRunSync() must beLeft
   }
 
 }
