@@ -1,6 +1,6 @@
 addSbtPlugin("org.foundweekends" % "sbt-bintray" % "0.5.4")
-addSbtPlugin("io.github.davidgregory084" % "sbt-tpolecat" % "0.1.12")
-addSbtPlugin("com.lucidchart" % "sbt-scalafmt" % "1.15")
+addSbtPlugin("io.github.davidgregory084" % "sbt-tpolecat" % "0.1.20")
+addSbtPlugin("org.scalameta" % "sbt-scalafmt" % "2.4.2")
 addSbtPlugin("com.typesafe" % "sbt-mima-plugin" % "0.7.0")
 addSbtPlugin("org.scoverage" % "sbt-scoverage" % "1.6.1")
 addSbtPlugin("com.typesafe.sbt" % "sbt-site" % "1.4.0")
