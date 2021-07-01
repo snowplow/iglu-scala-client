@@ -190,7 +190,7 @@ object RegistryLookup {
         val result = for {
           body <- OptionT(response)
           json = parse(body)
-          result <- OptionT.liftF[Either[RegistryError, ?], Json](json.leftMap(e =>
+          result <- OptionT.liftF[Either[RegistryError, *], Json](json.leftMap(e =>
             RegistryError.RepoFailure(e.show)))
         } yield result
 
