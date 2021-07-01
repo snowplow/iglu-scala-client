@@ -44,7 +44,7 @@ object BuildSettings {
 
     addCompilerPlugin("com.olegpy" %% "better-monadic-for" % "0.3.0"),
 
-    parallelExecution in Test := false // possible race bugs
+    Test / parallelExecution := false // possible race bugs
   )
 
 
@@ -77,12 +77,12 @@ object BuildSettings {
   // removing other versions.
   val mimaPreviousVersions = Set()
 
-  val mimaSettings = MimaPlugin.mimaDefaultSettings ++ Seq(
+  val mimaSettings = Seq(
     mimaPreviousArtifacts := mimaPreviousVersions.map { organization.value %% name.value % _ },
     mimaBinaryIssueFilters ++= Seq(),
-    test in Test := {
+    Test / test := {
       mimaReportBinaryIssues.value
-      (test in Test).value
+      (Test / test).value
     }
   )
 
@@ -90,8 +90,8 @@ object BuildSettings {
     coverageMinimum := 50,
     coverageFailOnMinimum := false,
     coverageHighlighting := false,
-    (test in Test) := {
-      (coverageReport dependsOn (test in Test)).value
+    (Test / test) := {
+      (coverageReport dependsOn (Test / test)).value
     }
   )
 
@@ -100,9 +100,9 @@ object BuildSettings {
     ghpagesNoJekyll := false,
     gitRemoteRepo := "git@github.com:snowplow/iglu-scala-client.git",
     gitBranch := Some("gh-pages"),
-    siteSubdirName in SiteScaladoc := s"${version.value}",
-    preprocessVars in Preprocess := Map("VERSION" -> version.value),
-    excludeFilter in ghpagesCleanSite := new FileFilter {
+    SiteScaladoc / siteSubdirName := s"${version.value}",
+    Preprocess / preprocessVars := Map("VERSION" -> version.value),
+    ghpagesCleanSite / excludeFilter := new FileFilter {
       def accept(f: File) = true
     }
   )
