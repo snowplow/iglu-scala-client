@@ -11,7 +11,7 @@
  * See the Apache License Version 2.0 for the specific language governing permissions and limitations there under.
  */
 
-lazy val root = (project in file("."))
+lazy val core = (project in file("modules/core"))
   .settings(
     name := "iglu-scala-client",
     version := "1.0.2",
@@ -46,3 +46,27 @@ lazy val root = (project in file("."))
     ),
     scalafmtOnCompile := true
   )
+
+lazy val http4s = (project in file("modules/http4s"))
+  .settings(
+    name := "iglu-scala-client-http4s",
+    version := "1.0.2",
+    description := "Resolver for Iglu schema repositories backed by a http4s client"
+  )
+  .settings(BuildSettings.buildSettings)
+  .settings(BuildSettings.publishSettings)
+  .settings(BuildSettings.mimaSettings)
+  .settings(BuildSettings.scoverageSettings)
+  .settings(
+    libraryDependencies ++= Seq(
+      Dependencies.Libraries.http4sClient,
+      Dependencies.Libraries.http4sCirce,
+      // Scala (test only)
+      Dependencies.Libraries.circeCore,
+      Dependencies.Libraries.specs2,
+      Dependencies.Libraries.specs2CE,
+      Dependencies.Libraries.http4sDsl
+    ),
+    scalafmtOnCompile := true
+  )
+  .dependsOn(core)
