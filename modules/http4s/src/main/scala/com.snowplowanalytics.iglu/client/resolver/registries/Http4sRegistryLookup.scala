@@ -55,8 +55,8 @@ object Http4sRegistryLookup {
   ): EitherT[F, RegistryError, Json] =
     for {
       uri <- EitherT.fromEither[F](toPath(http, key))
-      headers = http.apikey.fold[Headers](Headers.empty)(apikey =>
-        Headers.of(Header("apikey", apikey)))
+      headers =
+        http.apikey.fold[Headers](Headers.empty)(apikey => Headers.of(Header("apikey", apikey)))
       request = Request[F](method = GET, uri = uri, headers = headers)
       json <- EitherT(Sync[F].attempt(client.expect[Json](request))).leftMap[RegistryError] { e =>
         val error = s"Unexpected exception fetching: $e"

@@ -25,7 +25,8 @@ trait Validator[A] {
   /** Main method, validating _non-self-describing_ instance */
   def validate(data: A, schema: Json): Either[ValidatorError, Unit]
 
-  /** Get validation errors for Schema
+  /**
+   * Get validation errors for Schema
    * Errors like empty `required` property or `minimum` property containing string
    * will be catched
    *
@@ -40,7 +41,8 @@ trait Validator[A] {
       case h :: t => ValidatorError.InvalidSchema(NonEmptyList(h, t)).asLeft
     }
 
-  /** Validate JSON Schema against it's own Schema
+  /**
+   * Validate JSON Schema against it's own Schema
    * Errors like empty `required` property or `minimum` property containing string
    * will be catched
    */

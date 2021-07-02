@@ -32,11 +32,13 @@ import resolver.registries.{Registry, RegistryLookup}
  * Almost identical to pre-0.6.0 resolver
  */
 final case class Client[F[_], A](resolver: Resolver[F], validator: Validator[A]) {
-  def check(instance: SelfDescribingData[A])(
-    implicit
+  def check(
+    instance: SelfDescribingData[A]
+  )(implicit
     M: Monad[F],
     L: RegistryLookup[F],
-    C: Clock[F]): EitherT[F, ClientError, Unit] =
+    C: Clock[F]
+  ): EitherT[F, ClientError, Unit] =
     for {
       schema <- EitherT(resolver.lookupSchema(instance.schema))
       schemaValidation = validator.validateSchema(schema)

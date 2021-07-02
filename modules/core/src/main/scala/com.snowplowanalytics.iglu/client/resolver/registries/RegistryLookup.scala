@@ -34,7 +34,8 @@ import io.circe.parser.parse
 import com.snowplowanalytics.iglu.core.{SchemaKey, SchemaList, SelfDescribingSchema}
 import com.snowplowanalytics.iglu.core.circe.implicits._
 
-/** A capability of `F` to communicate with Iglu registries, using `RepositoryRef` ADT,
+/**
+ * A capability of `F` to communicate with Iglu registries, using `RepositoryRef` ADT,
  * in order to lookup for schemas or get schema lists
  *
  * @tparam F effect type, preferably referentially-transparent, but can be `Id`
@@ -43,7 +44,8 @@ import com.snowplowanalytics.iglu.core.circe.implicits._
 trait RegistryLookup[F[_]] {
   // This can be abstracted over RepositoryRef to let others extend functionality of Resolver
 
-  /** Find a schema in the particular `RepositoryRef`
+  /**
+   * Find a schema in the particular `RepositoryRef`
    *
    * @param registry one of supported repository types
    * @param schemaKey The SchemaKey uniquely identifying the schema in Iglu
@@ -52,7 +54,8 @@ trait RegistryLookup[F[_]] {
    */
   def lookup(registry: Registry, schemaKey: SchemaKey): F[Either[RegistryError, Json]]
 
-  /** List all schemas (formats and versions) for a given vendor/name pair in their
+  /**
+   * List all schemas (formats and versions) for a given vendor/name pair in their
    * chronological order. It is up to Registry to build valid list
    *
    * @param registry one of supported repository types (only HTTP is supported)
@@ -64,7 +67,8 @@ trait RegistryLookup[F[_]] {
     registry: Registry,
     vendor: String,
     name: String,
-    model: Int): F[Either[RegistryError, SchemaList]]
+    model: Int
+  ): F[Either[RegistryError, SchemaList]]
 }
 
 object RegistryLookup {
@@ -89,7 +93,8 @@ object RegistryLookup {
         registry: Registry,
         vendor: String,
         name: String,
-        model: Int): F[Either[RegistryError, SchemaList]] =
+        model: Int
+      ): F[Either[RegistryError, SchemaList]] =
         registry match {
           case Registry.Http(_, connection) => httpList(connection, vendor, name, model)
           case _                            => F.pure(RegistryError.NotFound.asLeft)
@@ -106,52 +111,62 @@ object RegistryLookup {
         registry: Registry,
         vendor: String,
         name: String,
-        model: Int): Eval[Either[RegistryError, SchemaList]] =
+        model: Int
+      ): Eval[Either[RegistryError, SchemaList]] =
         Eval.always(idLookupInstance.list(registry, vendor, name, model))
     }
 
   // Id instance also swallows all exceptions into `RegistryError`
-  implicit def idLookupInstance: RegistryLookup[Id] = new RegistryLookup[Id] {
-    def lookup(repositoryRef: Registry, schemaKey: SchemaKey): Id[Either[RegistryError, Json]] =
-      repositoryRef match {
-        case Registry.Http(_, connection) =>
-          Utils
-            .stringToUri(toPath(connection.uri.toString, schemaKey))
-            .flatMap(uri => Utils.unsafeGetFromUri(uri, connection.apikey))
-        case Registry.Embedded(_, base) =>
-          val path = toPath(base, schemaKey)
-          Utils.unsafeEmbeddedLookup(path)
-        case Registry.InMemory(_, schemas) =>
-          inMemoryLookup(schemas, schemaKey)
-      }
+  implicit def idLookupInstance: RegistryLookup[Id] =
+    new RegistryLookup[Id] {
+      def lookup(repositoryRef: Registry, schemaKey: SchemaKey): Id[Either[RegistryError, Json]] =
+        repositoryRef match {
+          case Registry.Http(_, connection) =>
+            Utils
+              .stringToUri(toPath(connection.uri.toString, schemaKey))
+              .flatMap(uri => Utils.unsafeGetFromUri(uri, connection.apikey))
+          case Registry.Embedded(_, base) =>
+            val path = toPath(base, schemaKey)
+            Utils.unsafeEmbeddedLookup(path)
+          case Registry.InMemory(_, schemas) =>
+            inMemoryLookup(schemas, schemaKey)
+        }
 
-    def list(
-      registry: Registry,
-      vendor: String,
-      name: String,
-      model: Int): Id[Either[RegistryError, SchemaList]] =
-      registry match {
-        case Registry.Http(_, connection) =>
-          val subpath = toSubpath(connection.uri.toString, vendor, name, model)
-          Utils.stringToUri(subpath).flatMap(Utils.unsafeHttpList(_, connection.apikey))
-        case _ =>
-          RegistryError.NotFound.asLeft
-      }
-  }
+      def list(
+        registry: Registry,
+        vendor: String,
+        name: String,
+        model: Int
+      ): Id[Either[RegistryError, SchemaList]] =
+        registry match {
+          case Registry.Http(_, connection) =>
+            val subpath = toSubpath(connection.uri.toString, vendor, name, model)
+            Utils.stringToUri(subpath).flatMap(Utils.unsafeHttpList(_, connection.apikey))
+          case _ =>
+            RegistryError.NotFound.asLeft
+        }
+    }
 
   def inMemoryLookup(
     schemas: List[SelfDescribingSchema[Json]],
-    key: SchemaKey): Either[RegistryError, Json] =
+    key: SchemaKey
+  ): Either[RegistryError, Json] =
     schemas.find(s => s.self.schemaKey == key).toRight(RegistryError.NotFound).map(_.normalize)
 
   /** Common method to get an endpoint of `SchemaKey` */
   private[registries] def toPath(prefix: String, key: SchemaKey): String =
     s"${prefix.stripSuffix("/")}/schemas/${key.toPath}"
 
-  private def toSubpath(prefix: String, vendor: String, name: String, model: Int): String =
+  private def toSubpath(
+    prefix: String,
+    vendor: String,
+    name: String,
+    model: Int
+  ): String =
     s"${prefix.stripSuffix("/")}/schemas/$vendor/$name/jsonschema/$model"
 
-  /** Retrieves an Iglu Schema from the Embedded Iglu Repo as a JSON
+  /**
+   * Retrieves an Iglu Schema from the Embedded Iglu Repo as a JSON
    *
    * @param base path on the local filesystem system
    * @param key The SchemaKey uniquely identifying the schema in Iglu
@@ -160,7 +175,8 @@ object RegistryLookup {
    */
   private[registries] def embeddedLookup[F[_]: Sync](
     base: String,
-    key: SchemaKey): F[Either[RegistryError, Json]] = {
+    key: SchemaKey
+  ): F[Either[RegistryError, Json]] = {
     val path   = toPath(base, key)
     val is     = Utils.readResource[F](path)
     val schema = is.bracket(_.traverse(Utils.fromStream[F]))(_.traverse_(Utils.closeStream[F]))
@@ -173,7 +189,8 @@ object RegistryLookup {
     result.value
   }
 
-  /** Retrieves an Iglu Schema from the HTTP Iglu Repo as a JSON
+  /**
+   * Retrieves an Iglu Schema from the HTTP Iglu Repo as a JSON
    *
    * @param http endpoint and optional apikey
    * @param key The SchemaKey uniquely identifying the schema in Iglu
@@ -182,7 +199,8 @@ object RegistryLookup {
    */
   private[registries] def httpLookup[F[_]: Sync](
     http: Registry.HttpConnection,
-    key: SchemaKey): F[Either[RegistryError, Json]] = {
+    key: SchemaKey
+  ): F[Either[RegistryError, Json]] =
     Utils
       .stringToUri(toPath(http.uri.toString, key))
       .traverse(uri => Utils.getFromUri(uri, http.apikey))
@@ -190,8 +208,9 @@ object RegistryLookup {
         val result = for {
           body <- OptionT(response)
           json = parse(body)
-          result <- OptionT.liftF[Either[RegistryError, *], Json](json.leftMap(e =>
-            RegistryError.RepoFailure(e.show)))
+          result <- OptionT.liftF[Either[RegistryError, *], Json](
+            json.leftMap(e => RegistryError.RepoFailure(e.show))
+          )
         } yield result
 
         result.getOrElseF[Json](RegistryError.NotFound.asLeft)
@@ -204,13 +223,13 @@ object RegistryLookup {
           val error = s"Unexpected exception fetching: $nfe"
           RegistryError.RepoFailure(error).asLeft
       }
-  }
 
   private[registries] def httpList[F[_]: Sync](
     http: Registry.HttpConnection,
     vendor: String,
     name: String,
-    model: Int): F[Either[RegistryError, SchemaList]] = {
+    model: Int
+  ): F[Either[RegistryError, SchemaList]] =
     Utils
       .stringToUri(toSubpath(http.uri.toString, vendor, name, model))
       .traverse(uri => Utils.getFromUri(uri, http.apikey))
@@ -222,5 +241,4 @@ object RegistryLookup {
           list <- json.as[SchemaList].leftMap(e => RegistryError.RepoFailure(e.show))
         } yield list
       }
-  }
 }

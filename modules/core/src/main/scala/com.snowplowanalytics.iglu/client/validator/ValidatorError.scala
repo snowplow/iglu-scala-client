@@ -43,7 +43,7 @@ object ValidatorError {
 
   implicit val validatorErrorJsonEncoder: Encoder.AsObject[ValidatorError] =
     Encoder.AsObject.instance {
-      case InvalidData(messages) => JsonObject.fromMap(Map("dataReports"  -> messages.asJson))
+      case InvalidData(messages) => JsonObject.fromMap(Map("dataReports" -> messages.asJson))
       case InvalidSchema(issues) => JsonObject.fromMap(Map("schemaIssues" -> issues.asJson))
     }
 

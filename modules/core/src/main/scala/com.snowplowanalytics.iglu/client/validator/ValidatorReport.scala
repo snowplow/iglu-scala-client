@@ -20,7 +20,8 @@ case class ValidatorReport(
   message: String,
   path: Option[String],
   targets: List[String],
-  keyword: Option[String])
+  keyword: Option[String]
+)
 
 object ValidatorReport {
   implicit val validatorReportCirceEncoder: Encoder[ValidatorReport] =
