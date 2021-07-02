@@ -14,13 +14,11 @@
 lazy val core = (project in file("modules/core"))
   .settings(
     name := "iglu-scala-client",
-    version := "1.0.2",
     description := "Scala client and resolver for Iglu schema repositories"
   )
   .enablePlugins(SiteScaladocPlugin, GhpagesPlugin, PreprocessPlugin)
   .settings(BuildSettings.buildSettings)
   .settings(BuildSettings.publishSettings)
-  .settings(BuildSettings.mavenCentralExtras)
   .settings(BuildSettings.mimaSettings)
   .settings(BuildSettings.scoverageSettings)
   .settings(BuildSettings.ghPagesSettings)
@@ -43,14 +41,12 @@ lazy val core = (project in file("modules/core"))
       Dependencies.Libraries.specs2Cats,
       // Java (test only)
       Dependencies.Libraries.slf4jNop
-    ),
-    scalafmtOnCompile := true
+    )
   )
 
 lazy val http4s = (project in file("modules/http4s"))
   .settings(
     name := "iglu-scala-client-http4s",
-    version := "1.0.2",
     description := "Resolver for Iglu schema repositories backed by a http4s client"
   )
   .settings(BuildSettings.buildSettings)
@@ -66,7 +62,6 @@ lazy val http4s = (project in file("modules/http4s"))
       Dependencies.Libraries.specs2,
       Dependencies.Libraries.specs2CE,
       Dependencies.Libraries.http4sDsl
-    ),
-    scalafmtOnCompile := true
+    )
   )
   .dependsOn(core)
