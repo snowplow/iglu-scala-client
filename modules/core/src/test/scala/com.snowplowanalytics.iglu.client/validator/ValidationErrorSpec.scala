@@ -31,7 +31,8 @@ class ValidationErrorSpec extends Specification {
           ValidatorReport("Something went wrong", Some("$.path"), Nil, Some("type")),
           ValidatorReport("Something went wrong again", None, Nil, None),
           ValidatorReport("Something went wrong with targets", None, List("type", "property"), None)
-        ))
+        )
+      )
 
     val json = json"""{
       "dataReports" : [

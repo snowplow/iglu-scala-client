@@ -71,12 +71,16 @@ class HttpSpec extends Specification with DataTables with ValidatedMatchers {
           }"""
 
   def e1 = {
-    val resultWithSlash = RegistryLookup.toPath(
-      "http://iglucentral.com/api/",
-      SchemaKey("com.snowplow", "event", "jsonschema", SchemaVer.Full(1, 0, 0)))
-    val resultWithoutSlash = RegistryLookup.toPath(
-      "http://iglucentral.com/api",
-      SchemaKey("com.snowplow", "event", "jsonschema", SchemaVer.Full(1, 0, 0)))
+    val resultWithSlash =
+      RegistryLookup.toPath(
+        "http://iglucentral.com/api/",
+        SchemaKey("com.snowplow", "event", "jsonschema", SchemaVer.Full(1, 0, 0))
+      )
+    val resultWithoutSlash =
+      RegistryLookup.toPath(
+        "http://iglucentral.com/api",
+        SchemaKey("com.snowplow", "event", "jsonschema", SchemaVer.Full(1, 0, 0))
+      )
 
     val expected = "http://iglucentral.com/api/schemas/com.snowplow/event/jsonschema/1-0-0"
     (resultWithSlash must beEqualTo(expected)) and (resultWithoutSlash must beEqualTo(expected))
@@ -95,7 +99,8 @@ class HttpSpec extends Specification with DataTables with ValidatedMatchers {
       "com.snowplowanalytics.snowplow",
       "link_click",
       "jsonschema",
-      SchemaVer.Full(1, 0, 0))
+      SchemaVer.Full(1, 0, 0)
+    )
 
     val expected =
       json"""{
@@ -147,7 +152,8 @@ class HttpSpec extends Specification with DataTables with ValidatedMatchers {
       Registry.Config("Acme Secret Iglu Repo", 3, List("com.acme")),
       Registry.HttpConnection(
         URI.create("http://iglu.acme.com"),
-        Some("de305d54-75b4-431b-adb2-eb6b9e546014"))
+        Some("de305d54-75b4-431b-adb2-eb6b9e546014")
+      )
     )
     Registry.parse(AcmeConfigWithAuth) must beRight(expected)
   }

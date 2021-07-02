@@ -34,40 +34,42 @@ package object snowplow {
    * @param json instance of circe's Json
    * @return converted JsonNode
    */
-  final def circeToJackson(json: Json): JsonNode = json.fold(
-    NullNode.instance,
-    BooleanNode.valueOf(_),
-    number => {
-      if (json == negativeZeroJson) {
-        DoubleNode.valueOf(number.toDouble)
-      } else
-        number match {
-          case _: JsonBiggerDecimal | _: JsonBigDecimal =>
-            number.toBigDecimal
-              .map(bigDecimal => DecimalNode.valueOf(bigDecimal.underlying))
-              .getOrElse(TextNode.valueOf(number.toString))
-          case JsonLong(x)   => LongNode.valueOf(x)
-          case JsonDouble(x) => DoubleNode.valueOf(x)
-          case JsonFloat(x)  => FloatNode.valueOf(x)
-          case JsonDecimal(x) =>
-            try {
-              if (x.contains('.') || x.toLowerCase.contains('e'))
+  final def circeToJackson(json: Json): JsonNode =
+    json.fold(
+      NullNode.instance,
+      BooleanNode.valueOf(_),
+      number =>
+        if (json == negativeZeroJson)
+          DoubleNode.valueOf(number.toDouble)
+        else
+          number match {
+            case _: JsonBiggerDecimal | _: JsonBigDecimal =>
+              number.toBigDecimal
+                .map(bigDecimal => DecimalNode.valueOf(bigDecimal.underlying))
+                .getOrElse(TextNode.valueOf(number.toString))
+            case JsonLong(x)   => LongNode.valueOf(x)
+            case JsonDouble(x) => DoubleNode.valueOf(x)
+            case JsonFloat(x)  => FloatNode.valueOf(x)
+            case JsonDecimal(x) =>
+              try if (x.contains('.') || x.toLowerCase.contains('e'))
                 DecimalNode.valueOf(new JBigDecimal(x))
               else
                 getJsonNodeFromStringContent(x)
-            } catch {
-              case _: NumberFormatException => TextNode.valueOf(x)
-              case _: JsonParseException    => TextNode.valueOf(x)
-            }
-        }
-    },
-    s => TextNode.valueOf(s),
-    array => JsonNodeFactory.instance.arrayNode.addAll(array.map(circeToJackson).asJava),
-    obj =>
-      objectNodeSetAll(JsonNodeFactory.instance.objectNode, obj.toMap.map {
-        case (k, v) => (k, circeToJackson(v))
-      }.asJava)
-  )
+              catch {
+                case _: NumberFormatException => TextNode.valueOf(x)
+                case _: JsonParseException    => TextNode.valueOf(x)
+              }
+          },
+      s => TextNode.valueOf(s),
+      array => JsonNodeFactory.instance.arrayNode.addAll(array.map(circeToJackson).asJava),
+      obj =>
+        objectNodeSetAll(
+          JsonNodeFactory.instance.objectNode,
+          obj.toMap.map {
+            case (k, v) => (k, circeToJackson(v))
+          }.asJava
+        )
+    )
 
   def objectNodeSetAll(node: ObjectNode, fields: java.util.Map[String, JsonNode]): JsonNode =
     node.setAll[JsonNode](fields)

@@ -27,7 +27,8 @@ sealed trait Registry extends Product with Serializable {
   /** Our configuration for this RepositoryRef */
   def config: Registry.Config
 
-  /** All repositories with a search priority of
+  /**
+   * All repositories with a search priority of
    * 1 will be checked before any repository with a search priority of 2
    */
   def classPriority: Int
@@ -38,7 +39,8 @@ object Registry {
 
   type Get[F[_], A] = Registry => F[Either[RegistryError, A]]
 
-  /** An embedded repository is one which is embedded inside the calling code,
+  /**
+   * An embedded repository is one which is embedded inside the calling code,
    * e.g. inside the jar's resources folder
    */
   case class Embedded(config: Config, path: String) extends Registry {
@@ -56,9 +58,14 @@ object Registry {
   }
 
   /** Common config for RepositoryRef classes */
-  case class Config(name: String, instancePriority: Int, vendorPrefixes: List[String]) {
+  case class Config(
+    name: String,
+    instancePriority: Int,
+    vendorPrefixes: List[String]
+  ) {
 
-    /** Helper to check if this repository should take priority because of a
+    /**
+     * Helper to check if this repository should take priority because of a
      * vendor prefix match. Returns true if we matched our schema's vendor
      * in the list of vendor prefixes.
      *
@@ -101,7 +108,8 @@ object Registry {
       } yield Config(name, priority, vendorPrefixes)
     }
 
-  /** Builds a RepositoryRef sub-type from the given a Json.
+  /**
+   * Builds a RepositoryRef sub-type from the given a Json.
    * Uses the connection property to determine which RepositoryRef to build
    *
    * Currently supports:
@@ -111,7 +119,7 @@ object Registry {
    * @param config The JSON containing the configuration for this repository
    * @return our constructed RepositoryRef
    */
-  def parse(config: Json): Decoder.Result[Registry] = {
+  def parse(config: Json): Decoder.Result[Registry] =
     for {
       conf       <- config.as[Config]
       connection <- config.hcursor.downField("connection").as[Json]
@@ -124,6 +132,5 @@ object Registry {
 
       result <- embedded.orElse(http)
     } yield result
-  }
 
 }

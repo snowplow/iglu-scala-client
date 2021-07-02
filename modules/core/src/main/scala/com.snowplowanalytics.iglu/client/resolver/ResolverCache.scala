@@ -34,7 +34,8 @@ import com.snowplowanalytics.iglu.core.SchemaKey
 class ResolverCache[F[_]] private (
   schemas: LruMap[F, SchemaKey, (Int, SchemaLookup)],
   schemaLists: LruMap[F, (String, String, Int), (Int, ListLookup)],
-  val ttl: Option[Int]) {
+  val ttl: Option[Int]
+) {
 
   import ResolverCache._
 
@@ -61,21 +62,36 @@ class ResolverCache[F[_]] private (
    * @param freshResult response from registries, either failure details or schema
    * @return the same result or cached one if it was more appropriate
    */
-  def putSchema(schemaKey: SchemaKey, freshResult: SchemaLookup)(
-    implicit F: Monad[F],
-    C: Clock[F]): F[SchemaLookup] =
+  def putSchema(
+    schemaKey: SchemaKey,
+    freshResult: SchemaLookup
+  )(implicit
+    F: Monad[F],
+    C: Clock[F]
+  ): F[SchemaLookup] =
     putItem(schemas, schemaKey, freshResult)
 
   /** Lookup a `SchemaList`, no TTL is available */
-  def getSchemaList(vendor: String, name: String, model: Int)(
-    implicit F: Monad[F],
-    C: Clock[F]): F[Option[ListLookup]] =
+  def getSchemaList(
+    vendor: String,
+    name: String,
+    model: Int
+  )(implicit
+    F: Monad[F],
+    C: Clock[F]
+  ): F[Option[ListLookup]] =
     getItem(ttl, schemaLists, (vendor, name, model))
 
   /** Put a `SchemaList` result into a cache */
-  def putSchemaList(vendor: String, name: String, model: Int, list: ListLookup)(
-    implicit F: Monad[F],
-    C: Clock[F]): F[ListLookup] =
+  def putSchemaList(
+    vendor: String,
+    name: String,
+    model: Int,
+    list: ListLookup
+  )(implicit
+    F: Monad[F],
+    C: Clock[F]
+  ): F[ListLookup] =
     putItem(schemaLists, (vendor, name, model), list)
 }
 
@@ -83,9 +99,13 @@ object ResolverCache {
 
   type Lookup[A] = Either[LookupFailureMap, A]
 
-  def init[F[_]: Monad](size: Int, ttl: Option[Int])(
-    implicit C: CreateLruMap[F, SchemaKey, (Int, SchemaLookup)],
-    L: CreateLruMap[F, (String, String, Int), (Int, ListLookup)]): F[Option[ResolverCache[F]]] =
+  def init[F[_]: Monad](
+    size: Int,
+    ttl: Option[Int]
+  )(implicit
+    C: CreateLruMap[F, SchemaKey, (Int, SchemaLookup)],
+    L: CreateLruMap[F, (String, String, Int), (Int, ListLookup)]
+  ): F[Option[ResolverCache[F]]] =
     Option(())
       .filter(_ => size > 0)
       .filter(_ => !ttl.exists(_ <= 0)) match {
@@ -101,7 +121,8 @@ object ResolverCache {
   def getItem[F[_]: Monad: Clock, A, K](
     ttl: Option[Int],
     c: LruMap[F, K, (Int, Lookup[A])],
-    key: K): F[Option[Lookup[A]]] = {
+    key: K
+  ): F[Option[Lookup[A]]] = {
     val wrapped = for {
       (timestamp, lookup) <- OptionT(c.get(key))
       seconds             <- OptionT.liftF(currentSeconds[F])
@@ -127,7 +148,8 @@ object ResolverCache {
   def putItem[F[_]: Monad: Clock, A, K](
     c: LruMap[F, K, (Int, Lookup[A])],
     schemaKey: K,
-    freshResult: Lookup[A]): F[Lookup[A]] =
+    freshResult: Lookup[A]
+  ): F[Lookup[A]] =
     for {
       seconds <- currentSeconds[F]
       cached  <- c.get(schemaKey) // Ignore TTL invalidation
@@ -145,7 +167,11 @@ object ResolverCache {
    * @param storedTstamp timestamp when value was saved
    * @return true if
    */
-  private def isViable(ttl: Option[Int], unixSeconds: Int, storedTstamp: Int): Boolean =
+  private def isViable(
+    ttl: Option[Int],
+    unixSeconds: Int,
+    storedTstamp: Int
+  ): Boolean =
     ttl.fold(true)(ttlVal => unixSeconds - storedTstamp < ttlVal)
 
   /** Choose which result is more appropriate for being stored in cache or combine failures */
