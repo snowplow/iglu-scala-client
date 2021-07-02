@@ -46,7 +46,8 @@ class RawValidationSpec extends Specification with DataTables {
     parse(
       scala.io.Source
         .fromInputStream(getClass.getResourceAsStream("/raw-jsonschema/beer-schema.json"))
-        .mkString)
+        .mkString
+    )
       .fold(e => throw new RuntimeException(s"Cannot parse beer-schema.json, $e"), identity)
 
   def e1 =
@@ -56,7 +57,8 @@ class RawValidationSpec extends Specification with DataTables {
         json"""{"country": "AQ", "beers": []}""",
         json"""{"country":"GR","beers":["Fix","Mythos"]}""",
         json"""{"country": "fr","beers": ["Jenlain"]}"""
-      )) { json =>
+      )
+    ) { json =>
       val result = CirceValidator.validate(json, simpleSchemaResult)
 
       result must beRight
@@ -74,43 +76,57 @@ class RawValidationSpec extends Specification with DataTables {
           "$.country: integer found, string expected",
           Some("$.country"),
           List("integer", "string"),
-          Some("type"))))
+          Some("type")
+        )
+      )
+    )
     val missingKeyExpected = ValidatorError.InvalidData(
       NonEmptyList.of(
         ValidatorReport(
           "$.beers: is missing but it is required",
           Some("$"),
           List("beers"),
-          Some("required"))))
+          Some("required")
+        )
+      )
+    )
     val heterogeneusArrayExpected = ValidatorError.InvalidData(
       NonEmptyList.of(
         ValidatorReport(
           "$.beers[1]: boolean found, string expected",
           Some("$.beers[1]"),
           List("boolean", "string"),
-          Some("type"))))
+          Some("type")
+        )
+      )
+    )
     val doubleErrorExpected = ValidatorError.InvalidData(
       NonEmptyList.of(
         ValidatorReport(
           "$.country: integer found, string expected",
           Some("$.country"),
           List("integer", "string"),
-          Some("type")),
+          Some("type")
+        ),
         ValidatorReport(
           "$.beers[1]: boolean found, string expected",
           Some("$.beers[1]"),
           List("boolean", "string"),
-          Some("type"))
-      ))
+          Some("type")
+        )
+      )
+    )
 
-    val nonString = CirceValidator.validate(nonStringInput, simpleSchemaResult) must beLeft(
-      nonStringExpected)
-    val missingKey = CirceValidator.validate(missingKeyInput, simpleSchemaResult) must beLeft(
-      missingKeyExpected)
-    val heterogeneusArray = CirceValidator.validate(heterogeneusArrayInput, simpleSchemaResult) must beLeft(
-      heterogeneusArrayExpected)
-    val doubleError = CirceValidator.validate(doubleErrorInput, simpleSchemaResult) must beLeft(
-      doubleErrorExpected)
+    val nonString =
+      CirceValidator.validate(nonStringInput, simpleSchemaResult) must beLeft(nonStringExpected)
+    val missingKey =
+      CirceValidator.validate(missingKeyInput, simpleSchemaResult) must beLeft(missingKeyExpected)
+    val heterogeneusArray =
+      CirceValidator.validate(heterogeneusArrayInput, simpleSchemaResult) must beLeft(
+        heterogeneusArrayExpected
+      )
+    val doubleError =
+      CirceValidator.validate(doubleErrorInput, simpleSchemaResult) must beLeft(doubleErrorExpected)
 
     nonString and missingKey and heterogeneusArray and doubleError
   }
@@ -130,7 +146,10 @@ class RawValidationSpec extends Specification with DataTables {
           "$.shortKey: may only be 3 characters long",
           Some("$.shortKey"),
           List("3"),
-          Some("maxLength"))))
+          Some("maxLength")
+        )
+      )
+    )
 
     CirceValidator.validate(input, schema) must beLeft(expected)
   }
@@ -164,12 +183,15 @@ class RawValidationSpec extends Specification with DataTables {
       """
     val input  = json"""{"twoKeys": {"one": 1, "two": 2, "three": 3} }"""
     val expected = ValidatorError.InvalidData(
-      NonEmptyList.of(ValidatorReport(
-        "$.twoKeys.three: is not defined in the schema and the schema does not allow additional properties",
-        Some("$.twoKeys"),
-        List("three"),
-        Some("additionalProperties")
-      )))
+      NonEmptyList.of(
+        ValidatorReport(
+          "$.twoKeys.three: is not defined in the schema and the schema does not allow additional properties",
+          Some("$.twoKeys"),
+          List("three"),
+          Some("additionalProperties")
+        )
+      )
+    )
 
     CirceValidator.validate(input, schema) must beLeft(expected)
   }
@@ -184,12 +206,18 @@ class RawValidationSpec extends Specification with DataTables {
       """
     val input  = json"""{"address": "non-ip" }"""
     val expected = ValidatorError.InvalidData(
-      NonEmptyList.of(ValidatorReport(
-        "$.address: does not match the ipv4 pattern ^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$",
-        Some("$.address"),
-        List("ipv4", "^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$"),
-        Some("format")
-      )))
+      NonEmptyList.of(
+        ValidatorReport(
+          "$.address: does not match the ipv4 pattern ^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$",
+          Some("$.address"),
+          List(
+            "ipv4",
+            "^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$"
+          ),
+          Some("format")
+        )
+      )
+    )
 
     CirceValidator.validate(input, schema) must beLeft(expected)
   }

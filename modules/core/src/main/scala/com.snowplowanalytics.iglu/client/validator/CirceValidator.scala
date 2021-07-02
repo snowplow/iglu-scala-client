@@ -181,7 +181,8 @@ object CirceValidator extends Validator[Json] {
   private val IgluMetaschema = JsonMetaSchema
     .builder(
       "http://iglucentral.com/schemas/com.snowplowanalytics.self-desc/schema/jsonschema/1-0-0#",
-      JsonMetaSchema.getV4)
+      JsonMetaSchema.getV4
+    )
     .addKeyword(new NonValidationKeyword("self"))
     .build()
 
@@ -204,7 +205,8 @@ object CirceValidator extends Validator[Json] {
   def validate(data: Json, schema: Json): Either[ValidatorError, Unit] =
     Either
       .catchNonFatal(
-        IgluMetaschemaFactory.getSchema(circeToJackson(schema), SchemaValidatorsConfig))
+        IgluMetaschemaFactory.getSchema(circeToJackson(schema), SchemaValidatorsConfig)
+      )
       .leftMap[ValidatorError](ValidatorError.schemaIssue) // Should never be reached in Client
       .flatMap { schema =>
         validateOnReadySchema(schema, data).leftMap(ValidatorError.InvalidData.apply)
@@ -222,7 +224,8 @@ object CirceValidator extends Validator[Json] {
   /** Validate instance against schema and return same instance */
   private def validateOnReadySchema(
     schema: JsonSchema,
-    instance: Json): EitherNel[ValidatorReport, Unit] = {
+    instance: Json
+  ): EitherNel[ValidatorReport, Unit] = {
     val messages = schema
       .validate(circeToJackson(instance))
       .asScala

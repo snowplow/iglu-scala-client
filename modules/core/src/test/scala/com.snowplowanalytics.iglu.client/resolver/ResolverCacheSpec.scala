@@ -65,28 +65,33 @@ class ResolverCacheSpec extends Specification {
       Registry.Http(Registry.Config("one", 1, List.empty), null) -> LookupHistory(
         Set(RegistryError.NotFound),
         1,
-        Instant.ofEpochMilli(10000)),
+        Instant.ofEpochMilli(10000)
+      ),
       Registry.Http(Registry.Config("two", 1, List.empty), null) -> LookupHistory(
         Set(RegistryError.NotFound),
         2,
-        Instant.ofEpochMilli(10005))
+        Instant.ofEpochMilli(10005)
+      )
     )
     val failure2: LookupFailureMap = Map(
       Registry.Http(Registry.Config("one", 1, List.empty), null) -> LookupHistory(
         Set(RegistryError.RepoFailure("Doesn't matter")),
         4,
-        Instant.ofEpochMilli(10000))
+        Instant.ofEpochMilli(10000)
+      )
     )
 
     val expectedLookup = Map(
       Registry.Http(Registry.Config("one", 1, List()), null) -> LookupHistory(
         Set(RegistryError.NotFound, RegistryError.RepoFailure("Doesn't matter")),
         4,
-        Instant.ofEpochMilli(10000)),
+        Instant.ofEpochMilli(10000)
+      ),
       Registry.Http(Registry.Config("two", 1, List()), null) -> LookupHistory(
         Set(RegistryError.NotFound),
         2,
-        Instant.ofEpochMilli(10005))
+        Instant.ofEpochMilli(10005)
+      )
     )
 
     val test = for {
