@@ -41,7 +41,8 @@ class SelfDescValidationSpec extends Specification with ValidatedMatchers {
         "com.snowplowanalytics.iglu-test",
         "stock-item",
         "jsonschema",
-        SchemaVer.Full(1, 0, 0)),
+        SchemaVer.Full(1, 0, 0)
+      ),
       json"""{"id": "123-12", "name": "t-shirt", "price": 29.99 }"""
     )
 
@@ -51,7 +52,8 @@ class SelfDescValidationSpec extends Specification with ValidatedMatchers {
         "com.snowplowanalytics.iglu-test",
         "stock-item",
         "jsonschema",
-        SchemaVer.Full(1, 0, 0)),
+        SchemaVer.Full(1, 0, 0)
+      ),
       json"""{ "id": "123-12", "newName": "t-shirt", "price": "tbc"}"""
     )
 

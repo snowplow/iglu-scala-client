@@ -35,12 +35,15 @@ class ClientErrorSpec extends Specification {
         "First repo" -> LookupHistory(
           Set(RegistryError.NotFound, RegistryError.RepoFailure("Server outage")),
           1,
-          SpecHelpers.now),
+          SpecHelpers.now
+        ),
         "Second repo" -> LookupHistory(
           Set(RegistryError.ClientFailure("Internal exception")),
           1,
-          SpecHelpers.now.plusMillis(100))
-      ))
+          SpecHelpers.now.plusMillis(100)
+        )
+      )
+    )
 
     val json =
       json"""{
@@ -87,7 +90,8 @@ class ClientErrorSpec extends Specification {
           ValidatorReport("Something went wrong", Some("$.path"), Nil, Some("type")),
           ValidatorReport("Something went wrong again", None, Nil, None),
           ValidatorReport("Something went wrong with targets", None, List("type", "property"), None)
-        ))
+        )
+      )
     )
 
     val json =

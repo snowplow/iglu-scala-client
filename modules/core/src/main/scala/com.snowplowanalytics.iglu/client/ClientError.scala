@@ -78,7 +78,8 @@ object ClientError {
           case _ =>
             DecodingFailure(
               s"Error type $error cannot be recognized as Iglu Client Error",
-              cursor.history).asLeft
+              cursor.history
+            ).asLeft
         }
 
       } yield result
@@ -115,7 +116,8 @@ object ClientError {
     repository: String,
     errors: Set[RegistryError],
     attempts: Int,
-    lastAttempt: Instant) {
+    lastAttempt: Instant
+  ) {
     def toField: (String, LookupHistory) =
       (repository, LookupHistory(errors, attempts, lastAttempt))
   }

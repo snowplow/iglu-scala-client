@@ -31,7 +31,11 @@ import registries.RegistryError
  * @param attempts amount of undertaken attempts, *since last TTL invalidation*
  * @param lastAttempt when Resolver tried to fetch it last time
  */
-case class LookupHistory(errors: Set[RegistryError], attempts: Int, lastAttempt: Instant) {
+case class LookupHistory(
+  errors: Set[RegistryError],
+  attempts: Int,
+  lastAttempt: Instant
+) {
   def incrementAttempt: LookupHistory =
     LookupHistory(errors, attempts + 1, lastAttempt)
 }
@@ -47,7 +51,8 @@ object LookupHistory {
         LookupHistory(
           (a.errors |+| b.errors).take(MaxErrors),
           a.attempts.max(b.attempts),
-          maxInstant(a.lastAttempt, b.lastAttempt))
+          maxInstant(a.lastAttempt, b.lastAttempt)
+        )
     }
 
   implicit val lookupHistoryEncoder: Encoder[LookupHistory] = Encoder.instance { history =>

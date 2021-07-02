@@ -67,7 +67,8 @@ class EmbeddedSpec extends Specification with DataTables with ValidatedMatchers 
         "com.snowplowanalytics.iglu-test",
         "stock-item",
         "jsonschema",
-        SchemaVer.Full(1, 0, 0))
+        SchemaVer.Full(1, 0, 0)
+      )
     val expected =
       json"""{
         "$$schema":"http://iglucentral.com/schemas/com.snowplowanalytics.self-desc/schema/jsonschema/1-0-0#",
@@ -112,7 +113,8 @@ class EmbeddedSpec extends Specification with DataTables with ValidatedMatchers 
         "com.snowplowanalytics.iglu-test",
         "corrupted_schema",
         "jsonschema",
-        SchemaVer.Full(1, 0, 0))
+        SchemaVer.Full(1, 0, 0)
+      )
     SpecHelpers.EmbeddedTest
       .lookupSchema[IO](schemaKey)
       .unsafeRunSync() must beLeft

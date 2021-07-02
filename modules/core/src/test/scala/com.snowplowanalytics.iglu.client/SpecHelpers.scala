@@ -28,21 +28,24 @@ object SpecHelpers {
 
   val now: Instant = Instant.ofEpochSecond(1562598285)
 
-  def cleanTimestamps(error: ClientError): ClientError = error match {
-    case ClientError.ResolutionError(value) =>
-      ClientError.ResolutionError(value.map { case (k, v) => (k, v.copy(lastAttempt = now)) })
-    case other => other
-  }
+  def cleanTimestamps(error: ClientError): ClientError =
+    error match {
+      case ClientError.ResolutionError(value) =>
+        ClientError.ResolutionError(value.map { case (k, v) => (k, v.copy(lastAttempt = now)) })
+      case other => other
+    }
 
   val IgluCentral: Registry =
     Registry.Http(
       Registry.Config("Iglu Central", 0, List("com.snowplowanalytics")),
-      Registry.HttpConnection(URI.create("http://iglucentral.com"), None))
+      Registry.HttpConnection(URI.create("http://iglucentral.com"), None)
+    )
 
   val EmbeddedTest: Registry =
     Registry.Embedded(
       Registry.Config("Iglu Test Embedded", 0, List("com.snowplowanalytics")),
-      path = "/iglu-test-embedded")
+      path = "/iglu-test-embedded"
+    )
 
   implicit val idClock: Clock[Id] = new Clock[Id] {
     final def realTime(unit: TimeUnit): Id[Long] =

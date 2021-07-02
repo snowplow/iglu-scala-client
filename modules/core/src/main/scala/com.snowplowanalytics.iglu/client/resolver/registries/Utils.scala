@@ -105,9 +105,8 @@ private[registries] object Utils {
    * @return an URI, or an error message, all wrapped in an Either
    */
   def stringToUri(url: String): Either[RegistryError, URI] =
-    try {
-      URI.create(url).asRight
-    } catch {
+    try URI.create(url).asRight
+    catch {
       case _: NullPointerException =>
         RegistryError.ClientFailure("Provided URL was null").asLeft
       case e: IllegalArgumentException =>

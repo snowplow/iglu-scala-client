@@ -122,10 +122,9 @@ class ResolverSpec extends Specification with DataTables with ValidatedMatchers 
 
     val result = for {
       parsed <- Resolver.parse[IO](config)
-    } yield
-      parsed must beRight.like {
-        case resolver => resolver.repos must contain(SpecHelpers.IgluCentral, Repos.three)
-      }
+    } yield parsed must beRight.like {
+      case resolver => resolver.repos must contain(SpecHelpers.IgluCentral, Repos.three)
+    }
 
     result.unsafeRunSync()
   }
@@ -137,7 +136,8 @@ class ResolverSpec extends Specification with DataTables with ValidatedMatchers 
       SortedMap(
         "Iglu Client Embedded" -> LookupHistory(Set(RegistryError.NotFound), 1, SpecHelpers.now),
         "Iglu Test Embedded"   -> LookupHistory(Set(RegistryError.NotFound), 1, SpecHelpers.now)
-      ))
+      )
+    )
 
     SpecHelpers.TestResolver
       .flatMap(resolver => resolver.lookupSchema(schemaKey))
@@ -151,15 +151,18 @@ class ResolverSpec extends Specification with DataTables with ValidatedMatchers 
         "com.snowplowanalytics.iglu-test",
         "corrupted_schema",
         "jsonschema",
-        SchemaVer.Full(1, 0, 0))
+        SchemaVer.Full(1, 0, 0)
+      )
     val expected = ResolutionError(
       SortedMap(
         "Iglu Client Embedded" -> LookupHistory(Set(RegistryError.NotFound), 1, SpecHelpers.now),
         "Iglu Test Embedded" -> LookupHistory(
           Set(RegistryError.RepoFailure("ParsingFailure: exhausted input")),
           1,
-          SpecHelpers.now)
-      ))
+          SpecHelpers.now
+        )
+      )
+    )
 
     val result = SpecHelpers.TestResolver
       .flatMap(resolver => resolver.lookupSchema(schemaKey))
@@ -175,7 +178,8 @@ class ResolverSpec extends Specification with DataTables with ValidatedMatchers 
         "com.snowplowanalytics.iglu-test",
         "invalid_schema",
         "jsonschema",
-        SchemaVer.Full(1, 0, 0))
+        SchemaVer.Full(1, 0, 0)
+      )
 
     SpecHelpers.TestResolver
       .flatMap(resolver => resolver.lookupSchema(schemaKey))
@@ -193,7 +197,8 @@ class ResolverSpec extends Specification with DataTables with ValidatedMatchers 
         "com.snowplowanalytics.iglu-test",
         "mock_schema",
         "jsonschema",
-        SchemaVer.Full(1, 0, 0))
+        SchemaVer.Full(1, 0, 0)
+      )
     val timeoutError =
       RegistryError.RepoFailure("shouldn't matter").asLeft[Json]
     val correctSchema =
@@ -223,12 +228,14 @@ class ResolverSpec extends Specification with DataTables with ValidatedMatchers 
     val firstFailed = response1 must beLeft.like {
       case ResolutionError(history) =>
         history must haveValue(
-          LookupHistory(Set(RegistryError.RepoFailure("shouldn't matter")), 1, time))
+          LookupHistory(Set(RegistryError.RepoFailure("shouldn't matter")), 1, time)
+        )
     }
     val secondFailed = response2 must beLeft.like {
       case ResolutionError(history) =>
         history must haveValue(
-          LookupHistory(Set(RegistryError.RepoFailure("shouldn't matter")), 1, time))
+          LookupHistory(Set(RegistryError.RepoFailure("shouldn't matter")), 1, time)
+        )
     }
 
     val thirdSucceeded = response3 must beEqualTo(correctSchema)
@@ -243,7 +250,8 @@ class ResolverSpec extends Specification with DataTables with ValidatedMatchers 
         "com.snowplowanalytics.iglu-test",
         "future_schema",
         "jsonschema",
-        SchemaVer.Full(1, 0, 0))
+        SchemaVer.Full(1, 0, 0)
+      )
     val correctSchema = Json.Null
     val responses = List(
       RegistryError.RepoFailure("Timeout exception 1").asLeft,
@@ -261,8 +269,9 @@ class ResolverSpec extends Specification with DataTables with ValidatedMatchers 
     implicit val registryLookup = ResolverSpecHelpers.getLookup(responses, Nil)
 
     val result = for {
-      resolver <- Resolver
-        .init[StaticLookup](10, Some(1000), httpRep) // FIXME: its confusing to mix millis and sec
+      resolver <-
+        Resolver
+          .init[StaticLookup](10, Some(1000), httpRep) // FIXME: its confusing to mix millis and sec
       _      <- resolver.lookupSchema(schemaKey)
       _      <- StaticLookup.addTime(2000)
       _      <- resolver.lookupSchema(schemaKey)
@@ -289,7 +298,8 @@ class ResolverSpec extends Specification with DataTables with ValidatedMatchers 
         "com.snowplowanalytics.iglu-test",
         "future_schema",
         "jsonschema",
-        SchemaVer.Full(1, 0, 0))
+        SchemaVer.Full(1, 0, 0)
+      )
     val error1 = RegistryError.RepoFailure("Timeout exception")
     val error2 = RegistryError.RepoFailure("Network exception")
     val error3 = RegistryError.RepoFailure("Unknown exception")
@@ -298,10 +308,12 @@ class ResolverSpec extends Specification with DataTables with ValidatedMatchers 
     // Mocking repositories
     val httpRep1 = Registry.Http(
       Registry.Config("Mock Repo 1", 1, List("com.snowplowanalytics.iglu-test")),
-      null)
+      null
+    )
     val httpRep2 = Registry.Http(
       Registry.Config("Mock Repo 2", 1, List("com.snowplowanalytics.iglu-test")),
-      null)
+      null
+    )
 
     implicit val cache     = ResolverSpecHelpers.staticCache
     implicit val cacheList = ResolverSpecHelpers.staticCacheForList
@@ -311,7 +323,8 @@ class ResolverSpec extends Specification with DataTables with ValidatedMatchers 
         "Mock Repo 1" -> List(error1.asLeft, error2.asLeft),
         "Mock Repo 2" -> List(error3.asLeft, error4.asLeft)
       ),
-      Nil)
+      Nil
+    )
 
     val expected = ResolutionError(
       SortedMap(
@@ -320,8 +333,10 @@ class ResolverSpec extends Specification with DataTables with ValidatedMatchers 
         "Iglu Client Embedded" -> LookupHistory(
           Set(RegistryError.NotFound),
           1,
-          Instant.ofEpochMilli(4L))
-      ))
+          Instant.ofEpochMilli(4L)
+        )
+      )
+    )
 
     val result = for {
       resolver <- Resolver.init[StaticLookup](10, Some(100), httpRep1, httpRep2)
@@ -389,7 +404,7 @@ class ResolverSpec extends Specification with DataTables with ValidatedMatchers 
     val resultOne = resolver.listSchemas("com.sendgrid", "bounce", 2)
     val resultTwo = resolver.listSchemas("com.sendgrid", "bounce", 1)
     (resultOne, resultTwo) match {
-      case (Right(one), Right(two)) => one shouldNotEqual (two)
+      case (Right(one), Right(two)) => one shouldNotEqual two
       case _                        => ko("Unexpected result for two consequent listSchemas")
     }
   }

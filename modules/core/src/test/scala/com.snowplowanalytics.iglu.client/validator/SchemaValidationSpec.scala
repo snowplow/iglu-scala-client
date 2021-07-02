@@ -38,7 +38,8 @@ class SchemaValidationSpec extends Specification {
         "com.snowplowanalytics.iglu-test",
         "stock-item",
         "jsonschema",
-        SchemaVer.Full(1, 0, 0)),
+        SchemaVer.Full(1, 0, 0)
+      ),
       json"""{"id": "123-12", "name": "t-shirt", "price": 29.99 }"""
     )
 
@@ -48,7 +49,8 @@ class SchemaValidationSpec extends Specification {
         "com.snowplowanalytics.iglu-test",
         "invalid-protocol",
         "jsonschema",
-        SchemaVer.Full(1, 0, 0)),
+        SchemaVer.Full(1, 0, 0)
+      ),
       json"""{"schema": "iglu://jsonschema/1-0-0", "data": { "id": 0 } }"""
     )
 
