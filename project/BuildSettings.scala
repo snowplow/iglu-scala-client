@@ -15,9 +15,8 @@
 import sbt._
 import Keys._
 
-// Bintray plugin
-import bintray.BintrayPlugin._
-import bintray.BintrayKeys._
+// dynver plugin
+import sbtdynver.DynVerPlugin.autoImport._
 
 // Mima plugin
 import com.typesafe.tools.mima.plugin.MimaKeys._
@@ -39,6 +38,7 @@ object BuildSettings {
     organization := "com.snowplowanalytics",
     scalaVersion := "2.12.14",
     crossScalaVersions := Seq("2.12.14", "2.13.6"),
+    licenses += ("Apache-2.0", url("http://www.apache.org/licenses/LICENSE-2.0.html")),
 
     addCompilerPlugin("org.typelevel" %% "kind-projector" % "0.13.0" cross CrossVersion.full),
 
@@ -49,36 +49,35 @@ object BuildSettings {
 
 
   // Bintray publishing settings
-  lazy val publishSettings = bintraySettings ++ Seq[Setting[_]](
-    licenses += ("Apache-2.0", url("http://www.apache.org/licenses/LICENSE-2.0.html")),
-    bintrayOrganization := Some("snowplow"),
-    bintrayRepository := "snowplow-maven"
-  )
-
-  // Maven Central publishing settings
-  lazy val mavenCentralExtras = Seq[Setting[_]](
-    pomIncludeRepository := { x => false },
+  lazy val publishSettings = Seq[Setting[_]](
+    publishArtifact := true,
+    Test / publishArtifact := false,
+    pomIncludeRepository := { _ => false },
     homepage := Some(url("http://snowplowanalytics.com")),
-    scmInfo := Some(ScmInfo(url("https://github.com/snowplow/iglu-scala-client"), "scm:git@github.com:snowplow/iglu-scala-client.git")),
-    pomExtra := (
-      <developers>
-        <developer>
-          <name>Snowplow Analytics Ltd</name>
-          <email>support@snowplowanalytics.com</email>
-          <organization>Snowplow Analytics Ltd</organization>
-          <organizationUrl>http://snowplowanalytics.com</organizationUrl>
-        </developer>
-      </developers>)
+    ThisBuild / dynverVTagPrefix := false, // Otherwise git tags required to have v-prefix
+    developers := List(
+      Developer(
+        "Snowplow Analytics Ltd",
+        "Snowplow Analytics Ltd",
+        "support@snowplowanalytics.com",
+        url("https://snowplowanalytics.com")
+      )
+    )
   )
 
   // If new version introduces breaking changes,
   // clear-out mimaBinaryIssueFilters and mimaPreviousVersions.
   // Otherwise, add previous version to set without
   // removing other versions.
-  val mimaPreviousVersions = Set()
+  val mimaPreviousVersionsCore = Set("1.0.2")
+  val mimaPreviousVersionsHttp4s = Set()
 
-  val mimaSettings = Seq(
-    mimaPreviousArtifacts := mimaPreviousVersions.map { organization.value %% name.value % _ },
+  lazy val mimaSettings = Seq(
+    mimaPreviousArtifacts := {
+      val mimaPreviousVersions = if (name.value.endsWith("http4s")) mimaPreviousVersionsHttp4s else mimaPreviousVersionsCore
+      mimaPreviousVersions.map { organization.value %% name.value % _ },
+    },
+    ThisBuild / mimaFailOnNoPrevious := false,
     mimaBinaryIssueFilters ++= Seq(),
     Test / test := {
       mimaReportBinaryIssues.value
