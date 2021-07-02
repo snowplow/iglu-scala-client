@@ -1,3 +1,16 @@
+Version 1.1.0 (2021-07-09)
+--------------------------
+Run scalafmtCheckAll in github action (#163)
+Migrate from travis to github actions (#162)
+Add http4s module with a RegistryLookup (#161)
+Bump kind-projector to 0.13.0 (#160)
+Bump sbt to 1.5.4 (#159)
+Bump scala compiler versions to 2.13.6 and 2.12.14 (#158)
+Bump scala-collection-compat to 2.4.4 (#157)
+Bump circe to 0.14.0 (#156)
+Bump cats to 2.6.1 (#155)
+Bump jackson to 2.10.5.1 (#154)
+
 Version 1.0.2 (2020-08-27)
 --------------------------
 Replace Map with SortedMap in ResolutionError (#147)
