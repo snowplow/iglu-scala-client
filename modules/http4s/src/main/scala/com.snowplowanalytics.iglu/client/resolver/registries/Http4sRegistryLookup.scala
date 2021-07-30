@@ -12,16 +12,20 @@
  */
 package com.snowplowanalytics.iglu.client.resolver.registries
 
+import scala.util.control.NonFatal
+
 import cats.implicits._
 import cats.data.EitherT
 import cats.effect.Sync
+
 import io.circe.Json
+
+import org.http4s.{EntityDecoder, Header, Headers, Method, Request, Status, Uri}
 import org.http4s.circe._
 import org.http4s.client.{Client => HttpClient}
-import org.http4s.{EntityDecoder, Header, Headers, Request, Uri}
+
 import com.snowplowanalytics.iglu.core.{SchemaKey, SchemaList}
 import com.snowplowanalytics.iglu.core.circe.CirceIgluCodecs._
-import org.http4s.Method.GET
 
 object Http4sRegistryLookup {
 
@@ -57,12 +61,10 @@ object Http4sRegistryLookup {
       uri <- EitherT.fromEither[F](toPath(http, key))
       headers =
         http.apikey.fold[Headers](Headers.empty)(apikey => Headers.of(Header("apikey", apikey)))
-      request = Request[F](method = GET, uri = uri, headers = headers)
-      json <- EitherT(Sync[F].attempt(client.expect[Json](request))).leftMap[RegistryError] { e =>
-        val error = s"Unexpected exception fetching: $e"
-        RegistryError.RepoFailure(error)
-      }
-    } yield json
+      response =
+        runRequest[F, Json](client, Request[F](method = Method.GET, uri = uri, headers = headers))
+      result <- EitherT(response)
+    } yield result
 
   def httpList[F[_]: Sync](
     client: HttpClient[F],
@@ -73,11 +75,14 @@ object Http4sRegistryLookup {
   ): EitherT[F, RegistryError, SchemaList] =
     for {
       uri <- EitherT.fromEither[F](toSubpath(http, vendor, name, model))
-      sl <- EitherT(Sync[F].attempt(client.expect[SchemaList](uri))).leftMap[RegistryError] { e =>
-        val error = s"Unexpected exception listing: $e"
-        RegistryError.RepoFailure(error)
-      }
-    } yield sl
+      headers =
+        http.apikey.fold[Headers](Headers.empty)(apikey => Headers.of(Header("apikey", apikey)))
+      response = runRequest[F, SchemaList](
+        client,
+        Request[F](method = Method.GET, uri = uri, headers = headers)
+      )
+      result <- EitherT(response)
+    } yield result
 
   def toPath(cxn: Registry.HttpConnection, key: SchemaKey): Either[RegistryError, Uri] =
     Uri
@@ -93,6 +98,45 @@ object Http4sRegistryLookup {
     Uri
       .fromString(s"${cxn.uri.toString.stripSuffix("/")}/schemas/$vendor/$name/jsonschema/$model")
       .leftMap(e => RegistryError.ClientFailure(e.message))
+
+  def runRequest[F[_]: Sync, A: EntityDecoder[F, *]](
+    client: HttpClient[F],
+    req: Request[F]
+  ): F[Either[RegistryError, A]] = {
+    val responseResult = client.run(req).use[F, Either[RegistryError, A]] {
+      case Status.Successful(response) =>
+        response
+          .as[A]
+          .map(_.asRight[RegistryError])
+          .handleError {
+            case NonFatal(exception) =>
+              RegistryError.ClientFailure(s"Could not decode server response. $exception").asLeft[A]
+          }
+      case Status.ClientError(response) if response.status.code == 404 =>
+        (RegistryError.NotFound: RegistryError).asLeft[A].pure[F]
+      case Status.ServerError(response) =>
+        response.bodyText.compile.string.map { body =>
+          val error = s"Unexpected server response: $body"
+          RegistryError.RepoFailure(error).asLeft
+        }
+      case Status.ClientError(response) =>
+        response.bodyText.compile.string.map { body =>
+          val error = s"Unexpected server response: $body"
+          RegistryError.ClientFailure(error).asLeft
+        }
+      case response =>
+        response.bodyText.compile.string.map { body =>
+          val error = s"Unexpected response: $body"
+          RegistryError.ClientFailure(error).asLeft
+        }
+    }
+
+    responseResult.recover {
+      case NonFatal(exception) =>
+        val error = Option(exception.getMessage).getOrElse(exception.toString)
+        RegistryError.ClientFailure(error).asLeft
+    }
+  }
 
   implicit def schemaListDecoder[F[_]: Sync]: EntityDecoder[F, SchemaList] = jsonOf[F, SchemaList]
 }
