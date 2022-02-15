@@ -47,12 +47,15 @@ private[registries] object Utils {
   val ReadTimeoutMs = 4000
 
   /**
-   * Read a Json from an URI using optional apikey
-   * with added optional header, so it is unsafe as well and throws same exceptions
+   * Read a Json from an URI using optional apikey with added optional header, so it is unsafe as
+   * well and throws same exceptions
    *
-   * @param uri the URL to fetch the JSON document from
-   * @param apikey optional apikey UUID to authenticate in Iglu Server
-   * @return The document at that URL if code is 2xx
+   * @param uri
+   *   the URL to fetch the JSON document from
+   * @param apikey
+   *   optional apikey UUID to authenticate in Iglu Server
+   * @return
+   *   The document at that URL if code is 2xx
    */
   def getFromUri[F[_]: Sync](uri: URI, apikey: Option[String]): F[Option[String]] =
     Sync[F]
@@ -100,8 +103,10 @@ private[registries] object Utils {
   /**
    * A wrapper around Java's URI.
    *
-   * @param url The String to convert to a URI
-   * @return an URI, or an error message, all wrapped in an Either
+   * @param url
+   *   The String to convert to a URI
+   * @return
+   *   an URI, or an error message, all wrapped in an Either
    */
   def stringToUri(url: String): Either[RegistryError, URI] =
     try URI.create(url).asRight

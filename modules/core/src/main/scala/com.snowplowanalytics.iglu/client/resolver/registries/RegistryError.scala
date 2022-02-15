@@ -37,12 +37,12 @@ object RegistryError {
         Json.obj("error" := Json.fromString("NotFound"))
       case RepoFailure(message) =>
         Json.obj(
-          "error" := Json.fromString("RepoFailure"),
+          "error"   := Json.fromString("RepoFailure"),
           "message" := Json.fromString(message)
         )
       case ClientFailure(message) =>
         Json.obj(
-          "error" := Json.fromString("ClientFailure"),
+          "error"   := Json.fromString("ClientFailure"),
           "message" := Json.fromString(message)
         )
     }
@@ -56,7 +56,7 @@ object RegistryError {
           case Some("RepoFailure")   => message.map(m => RepoFailure(m))
           case Some("ClientFailure") => message.map(m => ClientFailure(m))
           case Some("NotFound")      => NotFound.asRight
-          case _                     => DecodingFailure("RegistryError is not recognized", cursor.history).asLeft
+          case _ => DecodingFailure("RegistryError is not recognized", cursor.history).asLeft
         }
       } yield registryError
     }

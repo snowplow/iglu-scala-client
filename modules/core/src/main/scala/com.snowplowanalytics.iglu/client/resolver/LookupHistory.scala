@@ -24,12 +24,15 @@ import io.circe.syntax._
 import registries.RegistryError
 
 /**
- * Helper class responsible for aggregating repository lookup errors
- * Using to aggregate all errors for single schema for single repo during all retries
+ * Helper class responsible for aggregating repository lookup errors Using to aggregate all errors
+ * for single schema for single repo during all retries
  *
- * @param errors set of all errors happened during all attempts
- * @param attempts amount of undertaken attempts, *since last TTL invalidation*
- * @param lastAttempt when Resolver tried to fetch it last time
+ * @param errors
+ *   set of all errors happened during all attempts
+ * @param attempts
+ *   amount of undertaken attempts, *since last TTL invalidation*
+ * @param lastAttempt
+ *   when Resolver tried to fetch it last time
  */
 case class LookupHistory(
   errors: Set[RegistryError],
@@ -57,8 +60,8 @@ object LookupHistory {
 
   implicit val lookupHistoryEncoder: Encoder[LookupHistory] = Encoder.instance { history =>
     Json.obj(
-      "errors" := history.errors.asJson,
-      "attempts" := history.attempts.asJson,
+      "errors"      := history.errors.asJson,
+      "attempts"    := history.attempts.asJson,
       "lastAttempt" := history.lastAttempt.asJson
     )
   }

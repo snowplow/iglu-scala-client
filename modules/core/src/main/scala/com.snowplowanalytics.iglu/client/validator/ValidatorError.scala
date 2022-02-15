@@ -33,8 +33,10 @@ object ValidatorError {
 
   /**
    * Short human-readable description of problem discovered in JSON Schema
-   * @param path JSON Path to problematic schema property
-   * @param message human-readable error message
+   * @param path
+   *   JSON Path to problematic schema property
+   * @param message
+   *   human-readable error message
    */
   final case class SchemaIssue(path: String, message: String)
 

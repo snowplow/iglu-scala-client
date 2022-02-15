@@ -119,8 +119,8 @@ class ResolverSpec extends Specification with CatsEffect {
           }"""
 
     Resolver.parse[IO](config).map { parsed =>
-      parsed must beRight[Resolver[IO]].like {
-        case resolver => resolver.repos must contain(SpecHelpers.IgluCentral, Repos.three)
+      parsed must beRight[Resolver[IO]].like { case resolver =>
+        resolver.repos must contain(SpecHelpers.IgluCentral, Repos.three)
       }
     }
   }
@@ -222,11 +222,10 @@ class ResolverSpec extends Specification with CatsEffect {
     val (state, (response1, response2, response3)) =
       result.run(ResolverSpecHelpers.RegistryState.init).value
 
-    val firstFailed = response1 must beLeft[ResolutionError].like {
-      case ResolutionError(history) =>
-        history must haveValue(
-          LookupHistory(Set(RegistryError.RepoFailure("shouldn't matter")), 1, time)
-        )
+    val firstFailed = response1 must beLeft[ResolutionError].like { case ResolutionError(history) =>
+      history must haveValue(
+        LookupHistory(Set(RegistryError.RepoFailure("shouldn't matter")), 1, time)
+      )
     }
     val secondFailed = response2 must beLeft[ResolutionError].like {
       case ResolutionError(history) =>
@@ -382,10 +381,9 @@ class ResolverSpec extends Specification with CatsEffect {
     Resolver
       .parse[IO](config)
       .map { parsed =>
-        parsed must beRight[Resolver[IO]].like {
-          case resolver =>
-            resolver.cache.flatMap(_.ttl) must beSome(10.seconds) and
-              (resolver.repos must contain(SpecHelpers.IgluCentral, Repos.three))
+        parsed must beRight[Resolver[IO]].like { case resolver =>
+          resolver.cache.flatMap(_.ttl) must beSome(10.seconds) and
+            (resolver.repos must contain(SpecHelpers.IgluCentral, Repos.three))
         }
       }
   }

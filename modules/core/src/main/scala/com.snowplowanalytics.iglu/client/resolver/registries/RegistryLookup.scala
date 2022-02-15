@@ -36,11 +36,12 @@ import com.snowplowanalytics.iglu.core.circe.implicits._
 import com.snowplowanalytics.iglu.core.{SchemaKey, SchemaList, SelfDescribingSchema}
 
 /**
- * A capability of `F` to communicate with Iglu registries, using `RepositoryRef` ADT,
- * in order to lookup for schemas or get schema lists
+ * A capability of `F` to communicate with Iglu registries, using `RepositoryRef` ADT, in order to
+ * lookup for schemas or get schema lists
  *
- * @tparam F effect type, preferably referentially-transparent, but can be `Id`
- *           in case of distributed engine like Spark
+ * @tparam F
+ *   effect type, preferably referentially-transparent, but can be `Id` in case of distributed
+ *   engine like Spark
  */
 trait RegistryLookup[F[_]] {
   // This can be abstracted over RepositoryRef to let others extend functionality of Resolver
@@ -48,21 +49,28 @@ trait RegistryLookup[F[_]] {
   /**
    * Find a schema in the particular `RepositoryRef`
    *
-   * @param registry one of supported repository types
-   * @param schemaKey The SchemaKey uniquely identifying the schema in Iglu
-   * @return either schema parsed into `Json` or `RegistryError`, such as absent schema,
-   *         or unexpected response
+   * @param registry
+   *   one of supported repository types
+   * @param schemaKey
+   *   The SchemaKey uniquely identifying the schema in Iglu
+   * @return
+   *   either schema parsed into `Json` or `RegistryError`, such as absent schema, or unexpected
+   *   response
    */
   def lookup(registry: Registry, schemaKey: SchemaKey): F[Either[RegistryError, Json]]
 
   /**
-   * List all schemas (formats and versions) for a given vendor/name pair in their
-   * chronological order. It is up to Registry to build valid list
+   * List all schemas (formats and versions) for a given vendor/name pair in their chronological
+   * order. It is up to Registry to build valid list
    *
-   * @param registry one of supported repository types (only HTTP is supported)
-   * @param vendor precise schema vendor
-   * @param name schema name
-   * @return some parsed `SchemaList` (order is trusted) or none in any unexpected case
+   * @param registry
+   *   one of supported repository types (only HTTP is supported)
+   * @param vendor
+   *   precise schema vendor
+   * @param name
+   *   schema name
+   * @return
+   *   some parsed `SchemaList` (order is trusted) or none in any unexpected case
    */
   def list(
     registry: Registry,
@@ -169,10 +177,13 @@ object RegistryLookup {
   /**
    * Retrieves an Iglu Schema from the Embedded Iglu Repo as a JSON
    *
-   * @param base path on the local filesystem system
-   * @param key The SchemaKey uniquely identifying the schema in Iglu
-   * @return either a `Json` on success, or `RegistryError` in case of any failure
-   *         (i.e. all exceptions should be swallowed by `RegistryError`)
+   * @param base
+   *   path on the local filesystem system
+   * @param key
+   *   The SchemaKey uniquely identifying the schema in Iglu
+   * @return
+   *   either a `Json` on success, or `RegistryError` in case of any failure (i.e. all exceptions
+   *   should be swallowed by `RegistryError`)
    */
   private[registries] def embeddedLookup[F[_]: Sync](
     base: String,
@@ -193,10 +204,13 @@ object RegistryLookup {
   /**
    * Retrieves an Iglu Schema from the HTTP Iglu Repo as a JSON
    *
-   * @param http endpoint and optional apikey
-   * @param key The SchemaKey uniquely identifying the schema in Iglu
-   * @return either a `Json` on success, or `RegistryError` in case of any failure
-   *         (i.e. all exceptions should be swallowed by `RegistryError`)
+   * @param http
+   *   endpoint and optional apikey
+   * @param key
+   *   The SchemaKey uniquely identifying the schema in Iglu
+   * @return
+   *   either a `Json` on success, or `RegistryError` in case of any failure (i.e. all exceptions
+   *   should be swallowed by `RegistryError`)
    */
   private[registries] def httpLookup[F[_]: Sync](
     http: Registry.HttpConnection,

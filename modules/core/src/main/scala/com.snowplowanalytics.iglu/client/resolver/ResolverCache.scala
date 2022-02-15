@@ -27,11 +27,14 @@ import com.snowplowanalytics.lrumap.{CreateLruMap, LruMap}
 import com.snowplowanalytics.iglu.core.SchemaKey
 
 /**
- * Resolver cache and associated logic to (in)validate entities,
- * based on TTL and registry responses (failure/success)
- * @param schemas LRUMap with schemas
- * @param schemaLists LRUMap with schema lists
- * @param ttl optional TTL in seconds
+ * Resolver cache and associated logic to (in)validate entities, based on TTL and registry responses
+ * (failure/success)
+ * @param schemas
+ *   LRUMap with schemas
+ * @param schemaLists
+ *   LRUMap with schema lists
+ * @param ttl
+ *   optional TTL in seconds
  */
 class ResolverCache[F[_]] private (
   schemas: LruMap[F, SchemaKey, SchemaCacheEntry],
@@ -44,25 +47,26 @@ class ResolverCache[F[_]] private (
   /**
    * Looks up the given schema key in the cache, respecting TTL
    *
-   * @param key The SchemaKey uniquely identifying
-   *        the schema in Iglu
-   * @return the schema if found as Some Json or None
-   *         if not found, or cache is not enabled.
+   * @param key
+   *   The SchemaKey uniquely identifying the schema in Iglu
+   * @return
+   *   the schema if found as Some Json or None if not found, or cache is not enabled.
    */
   def getSchema(key: SchemaKey)(implicit F: Monad[F], C: Clock[F]): F[Option[SchemaLookup]] =
     getItem(ttl, schemas, key)
 
   /**
-   * Caches and returns the given schema.
-   * If new value is a failure, but cached is success - return cached value in order
-   * to avoid invalidating entity due registry outage
-   * If new value is a failure, but cached is success -  update TTL in order
-   * to avoid flooding poorly behaving registry
+   * Caches and returns the given schema. If new value is a failure, but cached is success - return
+   * cached value in order to avoid invalidating entity due registry outage If new value is a
+   * failure, but cached is success - update TTL in order to avoid flooding poorly behaving registry
    * Also responsible for combining failures
    *
-   * @param schemaKey iglu URI that has been requested
-   * @param freshResult response from registries, either failure details or schema
-   * @return the same result or cached one if it was more appropriate
+   * @param schemaKey
+   *   iglu URI that has been requested
+   * @param freshResult
+   *   response from registries, either failure details or schema
+   * @return
+   *   the same result or cached one if it was more appropriate
    */
   def putSchema(
     schemaKey: SchemaKey,
@@ -133,16 +137,17 @@ object ResolverCache {
   }
 
   /**
-   * Caches and returns the given schema.
-   * If new value is a failure, but cached is success - return cached value in order
-   * to avoid invalidating entity due registry outage
-   * If new value is a failure, but cached is success -  update TTL in order
-   * to avoid flooding poorly behaving registry
+   * Caches and returns the given schema. If new value is a failure, but cached is success - return
+   * cached value in order to avoid invalidating entity due registry outage If new value is a
+   * failure, but cached is success - update TTL in order to avoid flooding poorly behaving registry
    * Also responsible for combining failures
    *
-   * @param schemaKey iglu URI that has been requested
-   * @param freshResult response from registries, either failure details or schema
-   * @return the same result or cached one if it was more appropriate
+   * @param schemaKey
+   *   iglu URI that has been requested
+   * @param freshResult
+   *   response from registries, either failure details or schema
+   * @return
+   *   the same result or cached one if it was more appropriate
    */
   def putItem[F[_]: Monad: Clock, A, K](
     c: LruMap[F, K, (FiniteDuration, Lookup[A])],
@@ -159,8 +164,10 @@ object ResolverCache {
   /**
    * Check if cached value is still valid based on resolver's `cacheTtl`
    *
-   * @param storedTstamp timestamp when value was saved
-   * @return true if
+   * @param storedTstamp
+   *   timestamp when value was saved
+   * @return
+   *   true if
    */
   private def isViable(
     ttl: Option[FiniteDuration],

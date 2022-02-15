@@ -28,11 +28,13 @@ package object snowplow {
   private val negativeZeroJson: Json = Json.fromDoubleOrNull(-0.0)
 
   /**
-   * Converts given circe's Json instance to Jackson's JsonNode
-   * Numbers with exponents exceeding Integer.MAX_VALUE are converted to strings
-   * '''Warning: This implementation is not stack safe and will fail on very deep structures'''
-   * @param json instance of circe's Json
-   * @return converted JsonNode
+   * Converts given circe's Json instance to Jackson's JsonNode Numbers with exponents exceeding
+   * Integer.MAX_VALUE are converted to strings '''Warning: This implementation is not stack safe
+   * and will fail on very deep structures'''
+   * @param json
+   *   instance of circe's Json
+   * @return
+   *   converted JsonNode
    */
   final def circeToJackson(json: Json): JsonNode =
     json.fold(
@@ -51,10 +53,11 @@ package object snowplow {
             case JsonDouble(x) => DoubleNode.valueOf(x)
             case JsonFloat(x)  => FloatNode.valueOf(x)
             case JsonDecimal(x) =>
-              try if (x.contains('.') || x.toLowerCase.contains('e'))
-                DecimalNode.valueOf(new JBigDecimal(x))
-              else
-                getJsonNodeFromStringContent(x)
+              try
+                if (x.contains('.') || x.toLowerCase.contains('e'))
+                  DecimalNode.valueOf(new JBigDecimal(x))
+                else
+                  getJsonNodeFromStringContent(x)
               catch {
                 case _: NumberFormatException => TextNode.valueOf(x)
                 case _: JsonParseException    => TextNode.valueOf(x)
@@ -65,8 +68,8 @@ package object snowplow {
       obj =>
         objectNodeSetAll(
           JsonNodeFactory.instance.objectNode,
-          obj.toMap.map {
-            case (k, v) => (k, circeToJackson(v))
+          obj.toMap.map { case (k, v) =>
+            (k, circeToJackson(v))
           }.asJava
         )
     )

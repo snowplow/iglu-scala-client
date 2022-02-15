@@ -28,8 +28,8 @@ sealed trait Registry extends Product with Serializable {
   def config: Registry.Config
 
   /**
-   * All repositories with a search priority of
-   * 1 will be checked before any repository with a search priority of 2
+   * All repositories with a search priority of 1 will be checked before any repository with a
+   * search priority of 2
    */
   def classPriority: Int
 }
@@ -40,8 +40,8 @@ object Registry {
   type Get[F[_], A] = Registry => F[Either[RegistryError, A]]
 
   /**
-   * An embedded repository is one which is embedded inside the calling code,
-   * e.g. inside the jar's resources folder
+   * An embedded repository is one which is embedded inside the calling code, e.g. inside the jar's
+   * resources folder
    */
   case class Embedded(config: Config, path: String) extends Registry {
     val classPriority = 2
@@ -65,12 +65,13 @@ object Registry {
   ) {
 
     /**
-     * Helper to check if this repository should take priority because of a
-     * vendor prefix match. Returns true if we matched our schema's vendor
-     * in the list of vendor prefixes.
+     * Helper to check if this repository should take priority because of a vendor prefix match.
+     * Returns true if we matched our schema's vendor in the list of vendor prefixes.
      *
-     * @param vendor a schema's vendor to find among specified in resolver
-     * @return whether this is a priority lookup or not
+     * @param vendor
+     *   a schema's vendor to find among specified in resolver
+     * @return
+     *   whether this is a priority lookup or not
      */
     def vendorMatched(vendor: String): Boolean =
       vendorPrefixes.exists(vendor.startsWith)
@@ -109,15 +110,16 @@ object Registry {
     }
 
   /**
-   * Builds a RepositoryRef sub-type from the given a Json.
-   * Uses the connection property to determine which RepositoryRef to build
+   * Builds a RepositoryRef sub-type from the given a Json. Uses the connection property to
+   * determine which RepositoryRef to build
    *
    * Currently supports:
-   * 1. EmbeddedRepositoryRef
-   * 2. HttpRepositoryRef
+   *   1. EmbeddedRepositoryRef 2. HttpRepositoryRef
    *
-   * @param config The JSON containing the configuration for this repository
-   * @return our constructed RepositoryRef
+   * @param config
+   *   The JSON containing the configuration for this repository
+   * @return
+   *   our constructed RepositoryRef
    */
   def parse(config: Json): Decoder.Result[Registry] =
     for {

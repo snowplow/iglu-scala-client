@@ -48,9 +48,8 @@ object ClientError {
         Json.obj(
           "error" := Json.fromString("ResolutionError"),
           "lookupHistory" := lookupHistory.toList
-            .map {
-              case (repo, lookups) =>
-                lookups.asJson.deepMerge(Json.obj("repository" := repo.asJson))
+            .map { case (repo, lookups) =>
+              lookups.asJson.deepMerge(Json.obj("repository" := repo.asJson))
             }
         )
       case ValidationError(error) =>
@@ -91,12 +90,11 @@ object ClientError {
       case ClientError.ValidationError(ValidatorError.InvalidData(reports)) =>
         val issues = reports.toList
           .groupBy(_.path)
-          .map {
-            case (path, messages) =>
-              s"* At ${path.getOrElse("unknown path")}:\n" ++ messages
-                .map(_.message)
-                .map(m => s"  - $m")
-                .mkString("\n")
+          .map { case (path, messages) =>
+            s"* At ${path.getOrElse("unknown path")}:\n" ++ messages
+              .map(_.message)
+              .map(m => s"  - $m")
+              .mkString("\n")
           }
         s"Instance is not valid against its schema:\n${issues.mkString("\n")}"
       case ClientError.ValidationError(ValidatorError.InvalidSchema(reports)) =>
@@ -104,9 +102,8 @@ object ClientError {
         s"Resolved schema cannot be used to validate an instance. Following issues found:\n$r"
       case ClientError.ResolutionError(lookup) =>
         val attempts = (a: Int) => if (a == 1) "1 attempt" else s"$a attempts"
-        val errors = lookup.map {
-          case (repo, tries) =>
-            s"* $repo due [${tries.errors.map(_.show).mkString(", ")}] after ${attempts(tries.attempts)}"
+        val errors = lookup.map { case (repo, tries) =>
+          s"* $repo due [${tries.errors.map(_.show).mkString(", ")}] after ${attempts(tries.attempts)}"
         }
         s"Schema cannot be resolved in following repositories:\n${errors.mkString("\n")}"
     }

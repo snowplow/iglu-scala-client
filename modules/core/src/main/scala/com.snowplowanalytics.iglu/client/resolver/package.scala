@@ -29,16 +29,15 @@ import resolver.registries.Registry
 package object resolver {
 
   /**
-   * Map of all repositories to its aggregated state of failure
-   * None as value means repository already responded with `not-found`,
-   * meaning all previous 500-like failures could probably been discarded
+   * Map of all repositories to its aggregated state of failure None as value means repository
+   * already responded with `not-found`, meaning all previous 500-like failures could probably been
+   * discarded
    */
   type LookupFailureMap = Map[Registry, LookupHistory]
 
   /**
-   * Validated schema lookup result containing, cache result which is
-   * Json in case of success or Map of all currently failed repositories
-   * in case of failure
+   * Validated schema lookup result containing, cache result which is Json in case of success or Map
+   * of all currently failed repositories in case of failure
    */
   type SchemaLookup = Either[LookupFailureMap, Json]
 

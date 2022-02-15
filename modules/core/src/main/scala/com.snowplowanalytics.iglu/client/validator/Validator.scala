@@ -26,12 +26,13 @@ trait Validator[A] {
   def validate(data: A, schema: Json): Either[ValidatorError, Unit]
 
   /**
-   * Get validation errors for Schema
-   * Errors like empty `required` property or `minimum` property containing string
-   * will be catched
+   * Get validation errors for Schema Errors like empty `required` property or `minimum` property
+   * containing string will be catched
    *
-   * @param schema JSON Schema
-   * @return list of Processing Messages with log level above warning
+   * @param schema
+   *   JSON Schema
+   * @return
+   *   list of Processing Messages with log level above warning
    */
   def checkSchema(schema: Json): List[ValidatorError.SchemaIssue]
 
@@ -42,9 +43,8 @@ trait Validator[A] {
     }
 
   /**
-   * Validate JSON Schema against it's own Schema
-   * Errors like empty `required` property or `minimum` property containing string
-   * will be catched
+   * Validate JSON Schema against it's own Schema Errors like empty `required` property or `minimum`
+   * property containing string will be catched
    */
   def isValidSchema(schema: Json): Boolean = checkSchema(schema).isEmpty
 }

@@ -40,13 +40,13 @@ final case class Resolver[F[_]](repos: List[Registry], cache: Option[ResolverCac
     NonEmptyList[Registry](Registry.EmbeddedRegistry, repos)
 
   /**
-   * Tries to find the given schema in any of the provided repository refs
-   * If any of repositories gives non-non-found error, lookup will retried
+   * Tries to find the given schema in any of the provided repository refs If any of repositories
+   * gives non-non-found error, lookup will retried
    *
-   * @param schemaKey The SchemaKey uniquely identifying the schema in Iglu
-   * @return a Validation boxing either the Schema's
-   *         Json on Success, or an error String
-   *         on Failure
+   * @param schemaKey
+   *   The SchemaKey uniquely identifying the schema in Iglu
+   * @return
+   *   a Validation boxing either the Schema's Json on Success, or an error String on Failure
    */
   def lookupSchema(
     schemaKey: SchemaKey
@@ -66,8 +66,8 @@ final case class Resolver[F[_]](repos: List[Registry], cache: Option[ResolverCac
   }
 
   /**
-   * Get list of available schemas for particular vendor and name part
-   * Server supposed to return them in proper order
+   * Get list of available schemas for particular vendor and name part Server supposed to return
+   * them in proper order
    */
   def listSchemas(
     vendor: String,
@@ -91,7 +91,10 @@ final case class Resolver[F[_]](repos: List[Registry], cache: Option[ResolverCac
     } yield postProcess(result)
   }
 
-  /** Get list of full self-describing schemas available on Iglu Server for particular vendor/name pair */
+  /**
+   * Get list of full self-describing schemas available on Iglu Server for particular vendor/name
+   * pair
+   */
   def fetchSchemas(
     vendor: String,
     name: String,
@@ -131,14 +134,15 @@ object Resolver {
   /**
    * Tail-recursive function to find our schema in one of our repositories
    *
-   * @param get a function to get an entity from first registry
-   * @param remaining A List of repositories we have to look in
-   *                  (not-tried yet or with non-404 error)
-   * @param tried A Map of repositories with their accumulated errors
-   *              we have looked in fruitlessly so far
-   * @return either a Success-boxed schema (as a Json),
-   *         or a Failure-boxing of Map of repositories with all their
-   *         accumulated errors
+   * @param get
+   *   a function to get an entity from first registry
+   * @param remaining
+   *   A List of repositories we have to look in (not-tried yet or with non-404 error)
+   * @param tried
+   *   A Map of repositories with their accumulated errors we have looked in fruitlessly so far
+   * @return
+   *   either a Success-boxed schema (as a Json), or a Failure-boxing of Map of repositories with
+   *   all their accumulated errors
    */
   def traverseRepos[F[_]: Monad: RegistryLookup: Clock, A](
     get: Registry => F[Either[RegistryError, A]],
@@ -155,7 +159,7 @@ object Resolver {
             for {
               timestamp <- Clock[F].realTime.map(_.toMillis).map(Instant.ofEpochMilli)
               combinedMap = Map(repo -> LookupHistory(Set(e), 0, timestamp)) |+| tried
-              failureMap  = updateMap[Registry, LookupHistory](combinedMap, repo, _.incrementAttempt)
+              failureMap = updateMap[Registry, LookupHistory](combinedMap, repo, _.incrementAttempt)
               result <- traverseRepos[F, A](get, tail, failureMap |+| tried)
             } yield result
         }
@@ -183,13 +187,16 @@ object Resolver {
     )
 
   /**
-   * Constructs a Resolver instance from an arg array
-   * of RepositoryRefs.
+   * Constructs a Resolver instance from an arg array of RepositoryRefs.
    *
-   * @param cacheSize The size of the cache
-   * @param cacheTtl Optional time to live for schemas
-   * @param refs Any RepositoryRef to add to this resolver
-   * @return a configured Resolver instance
+   * @param cacheSize
+   *   The size of the cache
+   * @param cacheTtl
+   *   Optional time to live for schemas
+   * @param refs
+   *   Any RepositoryRef to add to this resolver
+   * @return
+   *   a configured Resolver instance
    */
   def init[F[_]: Monad: InitSchemaCache: InitListCache](
     cacheSize: Int,
@@ -228,12 +235,13 @@ object Resolver {
     }
 
   /**
-   * Construct a Resolver instance from a Json *and* validates
-   * against embedded schema (hence side-effect)
+   * Construct a Resolver instance from a Json *and* validates against embedded schema (hence
+   * side-effect)
    *
-   * @param config The JSON containing the configuration
-   *        for this resolver
-   * @return a configured Resolver instance
+   * @param config
+   *   The JSON containing the configuration for this resolver
+   * @return
+   *   a configured Resolver instance
    */
   def parse[F[_]: Monad: InitSchemaCache: InitListCache](
     config: Json
@@ -270,13 +278,14 @@ object Resolver {
     }
 
   /**
-   * Re-sorts RepositoryRefs into the optimal order for querying
-   * (optimal = minimizing unsafe I/O).
+   * Re-sorts RepositoryRefs into the optimal order for querying (optimal = minimizing unsafe I/O).
    *
-   * @param vendor vendor of a schema
-   * @param repositoryRefs list of repository refs to be sorted
-   * @return the prioritized List of RepositoryRefs.
-   *         Pragmatically sorted to minimize lookups.
+   * @param vendor
+   *   vendor of a schema
+   * @param repositoryRefs
+   *   list of repository refs to be sorted
+   * @return
+   *   the prioritized List of RepositoryRefs. Pragmatically sorted to minimize lookups.
    */
   private[client] def prioritize(vendor: String, repositoryRefs: List[Registry]) =
     repositoryRefs.sortBy(r =>
@@ -284,11 +293,13 @@ object Resolver {
     )
 
   /**
-   * Get from Map of repository failures only those repository which
-   * were failed with recoverable errors (like timeout or accidental server segfault)
+   * Get from Map of repository failures only those repository which were failed with recoverable
+   * errors (like timeout or accidental server segfault)
    *
-   * @param failuresMap Map of repositories to their aggregated errors
-   * @return repository refs which still need to be requested
+   * @param failuresMap
+   *   Map of repositories to their aggregated errors
+   * @return
+   *   repository refs which still need to be requested
    */
   private[client] def getReposForRetry(
     failuresMap: LookupFailureMap,
@@ -305,8 +316,8 @@ object Resolver {
 
   private def postProcess[F[_], A](result: Either[LookupFailureMap, A]) =
     result.leftMap { failure =>
-      ResolutionError(SortedMap[String, LookupHistory]() ++ failure.map {
-        case (key, value) => (key.config.name, value)
+      ResolutionError(SortedMap[String, LookupHistory]() ++ failure.map { case (key, value) =>
+        (key.config.name, value)
       })
     }
 

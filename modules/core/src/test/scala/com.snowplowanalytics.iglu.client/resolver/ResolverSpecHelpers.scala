@@ -71,8 +71,8 @@ object ResolverSpecHelpers {
       s"""requests made: $req
          |time passed:   $time
          |cache:         ${cache
-        .map { case (key, (time, l)) => s"${key.toPath} ->\n\t\t\t$l (at ${time})" }
-        .mkString(",")}
+          .map { case (key, (time, l)) => s"${key.toPath} ->\n\t\t\t$l (at ${time})" }
+          .mkString(",")}
        """.stripMargin
   }
 

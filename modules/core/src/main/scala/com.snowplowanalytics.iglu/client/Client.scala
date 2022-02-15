@@ -25,9 +25,9 @@ import resolver.registries.{Registry, RegistryLookup}
 
 /**
  * Umbrella entity, able to perform all necessary actions:
- * - resolve schema
- * - validate schema
- * - validate datum against the schema
+ *   - resolve schema
+ *   - validate schema
+ *   - validate datum against the schema
  *
  * Almost identical to pre-0.6.0 resolver
  */
