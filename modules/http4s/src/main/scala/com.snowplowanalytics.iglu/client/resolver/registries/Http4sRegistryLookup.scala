@@ -131,10 +131,9 @@ object Http4sRegistryLookup {
         }
     }
 
-    responseResult.recover {
-      case NonFatal(exception) =>
-        val error = Option(exception.getMessage).getOrElse(exception.toString)
-        RegistryError.ClientFailure(error).asLeft
+    responseResult.recover { case NonFatal(exception) =>
+      val error = Option(exception.getMessage).getOrElse(exception.toString)
+      RegistryError.ClientFailure(error).asLeft
     }
   }
 

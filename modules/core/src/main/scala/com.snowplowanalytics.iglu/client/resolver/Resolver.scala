@@ -155,7 +155,7 @@ object Resolver {
             for {
               timestamp <- Clock[F].realTime.map(_.toMillis).map(Instant.ofEpochMilli)
               combinedMap = Map(repo -> LookupHistory(Set(e), 0, timestamp)) |+| tried
-              failureMap  = updateMap[Registry, LookupHistory](combinedMap, repo, _.incrementAttempt)
+              failureMap = updateMap[Registry, LookupHistory](combinedMap, repo, _.incrementAttempt)
               result <- traverseRepos[F, A](get, tail, failureMap |+| tried)
             } yield result
         }
@@ -305,8 +305,8 @@ object Resolver {
 
   private def postProcess[F[_], A](result: Either[LookupFailureMap, A]) =
     result.leftMap { failure =>
-      ResolutionError(SortedMap[String, LookupHistory]() ++ failure.map {
-        case (key, value) => (key.config.name, value)
+      ResolutionError(SortedMap[String, LookupHistory]() ++ failure.map { case (key, value) =>
+        (key.config.name, value)
       })
     }
 

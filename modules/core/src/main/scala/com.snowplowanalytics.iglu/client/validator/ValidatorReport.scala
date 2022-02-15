@@ -28,7 +28,7 @@ object ValidatorReport {
     Encoder.instance { report =>
       Json.obj(
         "message" := report.message,
-        "path" := report.path,
+        "path"    := report.path,
         "keyword" := report.keyword,
         "targets" := report.targets
       )

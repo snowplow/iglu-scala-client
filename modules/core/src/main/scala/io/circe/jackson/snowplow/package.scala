@@ -51,10 +51,11 @@ package object snowplow {
             case JsonDouble(x) => DoubleNode.valueOf(x)
             case JsonFloat(x)  => FloatNode.valueOf(x)
             case JsonDecimal(x) =>
-              try if (x.contains('.') || x.toLowerCase.contains('e'))
-                DecimalNode.valueOf(new JBigDecimal(x))
-              else
-                getJsonNodeFromStringContent(x)
+              try
+                if (x.contains('.') || x.toLowerCase.contains('e'))
+                  DecimalNode.valueOf(new JBigDecimal(x))
+                else
+                  getJsonNodeFromStringContent(x)
               catch {
                 case _: NumberFormatException => TextNode.valueOf(x)
                 case _: JsonParseException    => TextNode.valueOf(x)
@@ -65,8 +66,8 @@ package object snowplow {
       obj =>
         objectNodeSetAll(
           JsonNodeFactory.instance.objectNode,
-          obj.toMap.map {
-            case (k, v) => (k, circeToJackson(v))
+          obj.toMap.map { case (k, v) =>
+            (k, circeToJackson(v))
           }.asJava
         )
     )

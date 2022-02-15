@@ -139,7 +139,7 @@ class RawValidationSpec extends Specification with DataTables {
         }
       }
       """
-    val input  = json"""{"shortKey": "aaaa" }"""
+    val input = json"""{"shortKey": "aaaa" }"""
     val expected = ValidatorError.InvalidData(
       NonEmptyList.of(
         ValidatorReport(
@@ -162,7 +162,7 @@ class RawValidationSpec extends Specification with DataTables {
         }
       }
       """
-    val input  = json"""{"shortKey": 5 }"""
+    val input = json"""{"shortKey": 5 }"""
 
     CirceValidator.validate(input, schema) must beRight
   }
@@ -181,7 +181,7 @@ class RawValidationSpec extends Specification with DataTables {
         }
       }
       """
-    val input  = json"""{"twoKeys": {"one": 1, "two": 2, "three": 3} }"""
+    val input = json"""{"twoKeys": {"one": 1, "two": 2, "three": 3} }"""
     val expected = ValidatorError.InvalidData(
       NonEmptyList.of(
         ValidatorReport(
@@ -204,7 +204,7 @@ class RawValidationSpec extends Specification with DataTables {
         }
       }
       """
-    val input  = json"""{"address": "non-ip" }"""
+    val input = json"""{"address": "non-ip" }"""
     val expected = ValidatorError.InvalidData(
       NonEmptyList.of(
         ValidatorReport(

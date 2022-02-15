@@ -57,8 +57,8 @@ object LookupHistory {
 
   implicit val lookupHistoryEncoder: Encoder[LookupHistory] = Encoder.instance { history =>
     Json.obj(
-      "errors" := history.errors.asJson,
-      "attempts" := history.attempts.asJson,
+      "errors"      := history.errors.asJson,
+      "attempts"    := history.attempts.asJson,
       "lastAttempt" := history.lastAttempt.asJson
     )
   }
