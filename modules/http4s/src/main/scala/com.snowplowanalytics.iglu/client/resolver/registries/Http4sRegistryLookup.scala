@@ -12,31 +12,30 @@
  */
 package com.snowplowanalytics.iglu.client.resolver.registries
 
-import scala.util.control.NonFatal
-
-import cats.implicits._
 import cats.data.EitherT
-import cats.effect.Sync
-
+import cats.effect.Concurrent
+import cats.effect.kernel.Async
+import cats.implicits._
+import com.snowplowanalytics.iglu.core.circe.CirceIgluCodecs._
+import com.snowplowanalytics.iglu.core.{SchemaKey, SchemaList}
 import io.circe.Json
-
-import org.http4s.{EntityDecoder, Header, Headers, Method, Request, Status, Uri}
 import org.http4s.circe._
 import org.http4s.client.{Client => HttpClient}
+import org.http4s.{EntityDecoder, Header, Headers, Method, Request, Status, Uri}
+import org.typelevel.ci.CIString
 
-import com.snowplowanalytics.iglu.core.{SchemaKey, SchemaList}
-import com.snowplowanalytics.iglu.core.circe.CirceIgluCodecs._
+import scala.util.control.NonFatal
 
 object Http4sRegistryLookup {
 
-  def apply[F[_]: Sync](client: HttpClient[F]): RegistryLookup[F] =
+  def apply[F[_]: Async](client: HttpClient[F]): RegistryLookup[F] =
     new RegistryLookup[F] {
       def lookup(repositoryRef: Registry, schemaKey: SchemaKey): F[Either[RegistryError, Json]] =
         repositoryRef match {
           case Registry.Http(_, connection) => httpLookup(client, connection, schemaKey).value
           case Registry.Embedded(_, path)   => RegistryLookup.embeddedLookup[F](path, schemaKey)
           case Registry.InMemory(_, schemas) =>
-            Sync[F].pure(RegistryLookup.inMemoryLookup(schemas, schemaKey))
+            Async[F].pure(RegistryLookup.inMemoryLookup(schemas, schemaKey))
         }
 
       def list(
@@ -48,25 +47,26 @@ object Http4sRegistryLookup {
         registry match {
           case Registry.Http(_, connection) =>
             httpList(client, connection, vendor, name, model).value
-          case _ => Sync[F].pure(RegistryError.NotFound.asLeft)
+          case _ => Async[F].pure(RegistryError.NotFound.asLeft)
         }
     }
 
-  def httpLookup[F[_]: Sync](
+  def httpLookup[F[_]: Concurrent](
     client: HttpClient[F],
     http: Registry.HttpConnection,
     key: SchemaKey
   ): EitherT[F, RegistryError, Json] =
     for {
       uri <- EitherT.fromEither[F](toPath(http, key))
-      headers =
-        http.apikey.fold[Headers](Headers.empty)(apikey => Headers.of(Header("apikey", apikey)))
+      headers = http.apikey.fold[Headers](Headers.empty)(apikey =>
+        Headers(Header.Raw(CIString("apikey"), apikey))
+      )
       response =
         runRequest[F, Json](client, Request[F](method = Method.GET, uri = uri, headers = headers))
       result <- EitherT(response)
     } yield result
 
-  def httpList[F[_]: Sync](
+  def httpList[F[_]: Concurrent](
     client: HttpClient[F],
     http: Registry.HttpConnection,
     vendor: String,
@@ -75,8 +75,9 @@ object Http4sRegistryLookup {
   ): EitherT[F, RegistryError, SchemaList] =
     for {
       uri <- EitherT.fromEither[F](toSubpath(http, vendor, name, model))
-      headers =
-        http.apikey.fold[Headers](Headers.empty)(apikey => Headers.of(Header("apikey", apikey)))
+      headers = http.apikey.fold[Headers](Headers.empty)(apikey =>
+        Headers(Header.Raw(CIString("apikey"), apikey))
+      )
       response = runRequest[F, SchemaList](
         client,
         Request[F](method = Method.GET, uri = uri, headers = headers)
@@ -99,11 +100,11 @@ object Http4sRegistryLookup {
       .fromString(s"${cxn.uri.toString.stripSuffix("/")}/schemas/$vendor/$name/jsonschema/$model")
       .leftMap(e => RegistryError.ClientFailure(e.message))
 
-  def runRequest[F[_]: Sync, A: EntityDecoder[F, *]](
+  def runRequest[F[_]: Concurrent, A: EntityDecoder[F, *]](
     client: HttpClient[F],
     req: Request[F]
   ): F[Either[RegistryError, A]] = {
-    val responseResult = client.run(req).use[F, Either[RegistryError, A]] {
+    val responseResult = client.run(req).use[Either[RegistryError, A]] {
       case Status.Successful(response) =>
         response
           .as[A]
@@ -137,5 +138,6 @@ object Http4sRegistryLookup {
     }
   }
 
-  implicit def schemaListDecoder[F[_]: Sync]: EntityDecoder[F, SchemaList] = jsonOf[F, SchemaList]
+  implicit def schemaListDecoder[F[_]: Concurrent]: EntityDecoder[F, SchemaList] =
+    jsonOf[F, SchemaList]
 }

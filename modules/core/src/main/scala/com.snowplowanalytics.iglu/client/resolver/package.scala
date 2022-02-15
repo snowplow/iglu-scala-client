@@ -15,6 +15,8 @@ package com.snowplowanalytics.iglu.client
 // circe
 import io.circe.Json
 
+import scala.concurrent.duration.FiniteDuration
+
 // LRU
 import com.snowplowanalytics.lrumap.CreateLruMap
 
@@ -25,6 +27,15 @@ import com.snowplowanalytics.iglu.core.{SchemaKey, SchemaList}
 import resolver.registries.Registry
 
 package object resolver {
+
+  /** Schema's vendor */
+  type Vendor = String
+
+  /** Schema's name */
+  type Name = String
+
+  /** Schema's model */
+  type Model = Int
 
   /**
    * Map of all repositories to its aggregated state of failure
@@ -40,9 +51,38 @@ package object resolver {
    */
   type SchemaLookup = Either[LookupFailureMap, Json]
 
+  /**
+   * Validated schema list lookup result containing, cache result which is
+   * Json in case of success or Map of all currently failed repositories
+   * in case of failure
+   */
   type ListLookup = Either[LookupFailureMap, SchemaList]
 
+  /** Time to live for cached items */
+  type TTL = FiniteDuration
+
+  /** Indicates the moment in time when item has been stored in the cache */
+  type StorageTime = FiniteDuration
+
+  /**
+   * Key to identify stored schema list in the cache.
+   * Consists of the schema's vendor, name and model
+   */
+  type ListCacheKey = (Vendor, Name, Model)
+
+  /**
+   * Single entry stored in the cache.
+   * Entry consists of the time item has been stored and the item itself.
+   */
+  type CacheEntry[A] = (StorageTime, A)
+
+  /** Cache entry for schema lookup results */
+  type SchemaCacheEntry = CacheEntry[SchemaLookup]
+
+  /** Cache entry for schema list lookup results */
+  type ListCacheEntry = CacheEntry[ListLookup]
+
   /** Ability to initialize the cache */
-  type InitSchemaCache[F[_]] = CreateLruMap[F, SchemaKey, (Int, SchemaLookup)]
-  type InitListCache[F[_]]   = CreateLruMap[F, (String, String, Int), (Int, ListLookup)]
+  type InitSchemaCache[F[_]] = CreateLruMap[F, SchemaKey, SchemaCacheEntry]
+  type InitListCache[F[_]]   = CreateLruMap[F, ListCacheKey, ListCacheEntry]
 }

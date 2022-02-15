@@ -31,6 +31,7 @@ lazy val core = (project in file("modules/core"))
       Dependencies.Libraries.igluCore,
       Dependencies.Libraries.igluCoreCirce,
       Dependencies.Libraries.cats,
+      Dependencies.Libraries.catsEffect,
       Dependencies.Libraries.circeParser,
       Dependencies.Libraries.lruMap,
       Dependencies.Libraries.scalaj,
@@ -39,6 +40,7 @@ lazy val core = (project in file("modules/core"))
       Dependencies.Libraries.circeLiteral,
       Dependencies.Libraries.specs2,
       Dependencies.Libraries.specs2Cats,
+      Dependencies.Libraries.specs2CatsEffect,
       // Java (test only)
       Dependencies.Libraries.slf4jNop
     )
@@ -60,7 +62,7 @@ lazy val http4s = (project in file("modules/http4s"))
       // Scala (test only)
       Dependencies.Libraries.circeCore,
       Dependencies.Libraries.specs2,
-      Dependencies.Libraries.specs2CE,
+      Dependencies.Libraries.specs2CatsEffect,
       Dependencies.Libraries.http4sDsl
     )
   )

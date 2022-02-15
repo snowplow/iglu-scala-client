@@ -12,10 +12,10 @@
  */
 package com.snowplowanalytics.iglu.client.resolver
 
-import java.time.Instant
 import java.net.URI
-
+import java.time.Instant
 import scala.collection.immutable.SortedMap
+import scala.concurrent.duration.DurationInt
 
 // Cats
 import cats.Id
@@ -30,17 +30,16 @@ import io.circe.literal._
 import com.snowplowanalytics.iglu.core.{SchemaKey, SchemaVer}
 
 // This project
-import com.snowplowanalytics.iglu.client.SpecHelpers
 import com.snowplowanalytics.iglu.client.ClientError._
-import com.snowplowanalytics.iglu.client.resolver.registries.{Registry, RegistryError}
-import com.snowplowanalytics.iglu.client.resolver.registries.RegistryLookup._
+import com.snowplowanalytics.iglu.client.SpecHelpers
 import com.snowplowanalytics.iglu.client.resolver.ResolverSpecHelpers.StaticLookup
+import com.snowplowanalytics.iglu.client.resolver.registries.RegistryLookup._
+import com.snowplowanalytics.iglu.client.resolver.registries.{Registry, RegistryError}
 
 // Specs2
-import org.specs2.Specification
-import org.specs2.matcher.{DataTables, ValidatedMatchers}
-
+import cats.effect.testing.specs2.CatsEffect
 import com.snowplowanalytics.iglu.client.SpecHelpers._
+import org.specs2.Specification
 
 object ResolverSpec {
 
@@ -55,7 +54,7 @@ object ResolverSpec {
   }
 }
 
-class ResolverSpec extends Specification with DataTables with ValidatedMatchers {
+class ResolverSpec extends Specification with CatsEffect {
   def is = s2"""
 
   This is a specification to test the Resolver functionality
@@ -86,7 +85,6 @@ class ResolverSpec extends Specification with DataTables with ValidatedMatchers 
       .map { resolver =>
         Resolver.prioritize(schemaKey.vendor, resolver.allRepos.toList) must_== expected
       }
-      .unsafeRunSync()
   }
 
   def e2 = {
@@ -120,13 +118,11 @@ class ResolverSpec extends Specification with DataTables with ValidatedMatchers 
             }
           }"""
 
-    val result = for {
-      parsed <- Resolver.parse[IO](config)
-    } yield parsed must beRight.like {
-      case resolver => resolver.repos must contain(SpecHelpers.IgluCentral, Repos.three)
+    Resolver.parse[IO](config).map { parsed =>
+      parsed must beRight[Resolver[IO]].like {
+        case resolver => resolver.repos must contain(SpecHelpers.IgluCentral, Repos.three)
+      }
     }
-
-    result.unsafeRunSync()
   }
 
   def e3 = {
@@ -141,8 +137,9 @@ class ResolverSpec extends Specification with DataTables with ValidatedMatchers 
 
     SpecHelpers.TestResolver
       .flatMap(resolver => resolver.lookupSchema(schemaKey))
-      .unsafeRunSync()
-      .leftMap(SpecHelpers.cleanTimestamps) must beLeft(expected)
+      .map { result =>
+        result.leftMap(SpecHelpers.cleanTimestamps) must beLeft(expected)
+      }
   }
 
   def e4 = {
@@ -164,12 +161,11 @@ class ResolverSpec extends Specification with DataTables with ValidatedMatchers 
       )
     )
 
-    val result = SpecHelpers.TestResolver
+    SpecHelpers.TestResolver
       .flatMap(resolver => resolver.lookupSchema(schemaKey))
-      .unsafeRunSync()
-      .leftMap(SpecHelpers.cleanTimestamps)
-
-    result must beLeft(expected)
+      .map { result =>
+        result.leftMap(SpecHelpers.cleanTimestamps) must beLeft(expected)
+      }
   }
 
   def e5 = {
@@ -183,12 +179,13 @@ class ResolverSpec extends Specification with DataTables with ValidatedMatchers 
 
     SpecHelpers.TestResolver
       .flatMap(resolver => resolver.lookupSchema(schemaKey))
-      .unsafeRunSync()
-      .leftMap {
-        case ResolutionError(errors) =>
-          errors.foldLeft(0) { case (acc, (_, LookupHistory(e, _, _))) => acc + e.size }
-        case _ => 0
-      } must beLeft(2)
+      .map { result =>
+        result.leftMap {
+          case ResolutionError(errors) =>
+            errors.foldLeft(0) { case (acc, (_, LookupHistory(e, _, _))) => acc + e.size }
+          case _ => 0
+        } must beLeft(2)
+      }
   }
 
   def e6 = {
@@ -218,20 +215,20 @@ class ResolverSpec extends Specification with DataTables with ValidatedMatchers 
       resolver  <- Resolver.init[StaticLookup](10, None, httpRep)
       response1 <- resolver.lookupSchema(schemaKey)
       response2 <- resolver.lookupSchema(schemaKey)
-      _         <- StaticLookup.addTime(600)
+      _         <- StaticLookup.addTime(600.millis)
       response3 <- resolver.lookupSchema(schemaKey)
     } yield (response1, response2, response3)
 
     val (state, (response1, response2, response3)) =
       result.run(ResolverSpecHelpers.RegistryState.init).value
 
-    val firstFailed = response1 must beLeft.like {
+    val firstFailed = response1 must beLeft[ResolutionError].like {
       case ResolutionError(history) =>
         history must haveValue(
           LookupHistory(Set(RegistryError.RepoFailure("shouldn't matter")), 1, time)
         )
     }
-    val secondFailed = response2 must beLeft.like {
+    val secondFailed = response2 must beLeft[ResolutionError].like {
       case ResolutionError(history) =>
         history must haveValue(
           LookupHistory(Set(RegistryError.RepoFailure("shouldn't matter")), 1, time)
@@ -271,13 +268,13 @@ class ResolverSpec extends Specification with DataTables with ValidatedMatchers 
     val result = for {
       resolver <-
         Resolver
-          .init[StaticLookup](10, Some(1000), httpRep) // FIXME: its confusing to mix millis and sec
+          .init[StaticLookup](10, Some(1.second), httpRep)
       _      <- resolver.lookupSchema(schemaKey)
-      _      <- StaticLookup.addTime(2000)
+      _      <- StaticLookup.addTime(2.seconds)
       _      <- resolver.lookupSchema(schemaKey)
-      _      <- StaticLookup.addTime(2000)
+      _      <- StaticLookup.addTime(2.seconds)
       _      <- resolver.lookupSchema(schemaKey)
-      _      <- StaticLookup.addTime(2000)
+      _      <- StaticLookup.addTime(2.seconds)
       result <- resolver.lookupSchema(schemaKey) // ... but don't try to overwrite it
     } yield result
 
@@ -339,9 +336,9 @@ class ResolverSpec extends Specification with DataTables with ValidatedMatchers 
     )
 
     val result = for {
-      resolver <- Resolver.init[StaticLookup](10, Some(100), httpRep1, httpRep2)
+      resolver <- Resolver.init[StaticLookup](10, Some(100.seconds), httpRep1, httpRep2)
       _        <- resolver.lookupSchema(schemaKey)
-      _        <- StaticLookup.addTime(2000)
+      _        <- StaticLookup.addTime(2000.millis)
       result   <- resolver.lookupSchema(schemaKey)
     } yield result
 
@@ -384,12 +381,13 @@ class ResolverSpec extends Specification with DataTables with ValidatedMatchers 
 
     Resolver
       .parse[IO](config)
-      .map(_ must beRight.like {
-        case resolver =>
-          resolver.cache.flatMap(_.ttl) must beSome(10) and
-            (resolver.repos must contain(SpecHelpers.IgluCentral, Repos.three))
-      })
-      .unsafeRunSync()
+      .map { parsed =>
+        parsed must beRight[Resolver[IO]].like {
+          case resolver =>
+            resolver.cache.flatMap(_.ttl) must beSome(10.seconds) and
+              (resolver.repos must contain(SpecHelpers.IgluCentral, Repos.three))
+        }
+      }
   }
 
   def e11 = {

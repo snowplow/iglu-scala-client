@@ -13,10 +13,12 @@
 package com.snowplowanalytics.iglu.client.resolver
 
 // Cats
-import cats.{Applicative, Functor, Monad}
+import cats.{Applicative, Monad}
 import cats.data.OptionT
 import cats.effect.Clock
 import cats.implicits._
+
+import scala.concurrent.duration.{DurationInt, FiniteDuration}
 
 // LruMap
 import com.snowplowanalytics.lrumap.{CreateLruMap, LruMap}
@@ -32,9 +34,9 @@ import com.snowplowanalytics.iglu.core.SchemaKey
  * @param ttl optional TTL in seconds
  */
 class ResolverCache[F[_]] private (
-  schemas: LruMap[F, SchemaKey, (Int, SchemaLookup)],
-  schemaLists: LruMap[F, (String, String, Int), (Int, ListLookup)],
-  val ttl: Option[Int]
+  schemas: LruMap[F, SchemaKey, SchemaCacheEntry],
+  schemaLists: LruMap[F, ListCacheKey, ListCacheEntry],
+  val ttl: Option[TTL]
 ) {
 
   import ResolverCache._
@@ -73,9 +75,9 @@ class ResolverCache[F[_]] private (
 
   /** Lookup a `SchemaList`, no TTL is available */
   def getSchemaList(
-    vendor: String,
-    name: String,
-    model: Int
+    vendor: Vendor,
+    name: Name,
+    model: Model
   )(implicit
     F: Monad[F],
     C: Clock[F]
@@ -84,9 +86,9 @@ class ResolverCache[F[_]] private (
 
   /** Put a `SchemaList` result into a cache */
   def putSchemaList(
-    vendor: String,
-    name: String,
-    model: Int,
+    vendor: Vendor,
+    name: Name,
+    model: Model,
     list: ListLookup
   )(implicit
     F: Monad[F],
@@ -97,37 +99,35 @@ class ResolverCache[F[_]] private (
 
 object ResolverCache {
 
-  type Lookup[A] = Either[LookupFailureMap, A]
+  type Lookup[A]   = Either[LookupFailureMap, A]
+  type CurrentTime = FiniteDuration
 
   def init[F[_]: Monad](
     size: Int,
-    ttl: Option[Int]
+    ttl: Option[TTL]
   )(implicit
-    C: CreateLruMap[F, SchemaKey, (Int, SchemaLookup)],
-    L: CreateLruMap[F, (String, String, Int), (Int, ListLookup)]
-  ): F[Option[ResolverCache[F]]] =
-    Option(())
-      .filter(_ => size > 0)
-      .filter(_ => !ttl.exists(_ <= 0)) match {
-      case Some(_) =>
-        for {
-          schemas     <- CreateLruMap[F, SchemaKey, (Int, SchemaLookup)].create(size)
-          schemaLists <- CreateLruMap[F, (String, String, Int), (Int, ListLookup)].create(size)
-        } yield new ResolverCache[F](schemas, schemaLists, ttl).some
-      case None =>
-        Applicative[F].pure(none)
-    }
+    C: CreateLruMap[F, SchemaKey, SchemaCacheEntry],
+    L: CreateLruMap[F, ListCacheKey, ListCacheEntry]
+  ): F[Option[ResolverCache[F]]] = {
+    if (size >= 0 && ttl.forall(_ > 0.seconds)) {
+      for {
+        schemas     <- CreateLruMap[F, SchemaKey, SchemaCacheEntry].create(size)
+        schemaLists <- CreateLruMap[F, ListCacheKey, ListCacheEntry].create(size)
+      } yield new ResolverCache[F](schemas, schemaLists, ttl).some
+    } else
+      Applicative[F].pure(none)
+  }
 
   def getItem[F[_]: Monad: Clock, A, K](
-    ttl: Option[Int],
-    c: LruMap[F, K, (Int, Lookup[A])],
+    ttl: Option[TTL],
+    c: LruMap[F, K, CacheEntry[Lookup[A]]],
     key: K
   ): F[Option[Lookup[A]]] = {
     val wrapped = for {
-      (timestamp, lookup) <- OptionT(c.get(key))
-      seconds             <- OptionT.liftF(currentSeconds[F])
-      useSeconds = seconds
-      if isViable(ttl, seconds, timestamp) || lookup.isLeft // isLeft
+      (storageTime, lookup) <- OptionT(c.get(key))
+      currentTime           <- OptionT.liftF(Clock[F].realTime)
+      _ = currentTime
+      if isViable(ttl, currentTime, storageTime) || lookup.isLeft // isLeft
     } yield lookup
 
     wrapped.value
@@ -146,33 +146,32 @@ object ResolverCache {
    * @return the same result or cached one if it was more appropriate
    */
   def putItem[F[_]: Monad: Clock, A, K](
-    c: LruMap[F, K, (Int, Lookup[A])],
+    c: LruMap[F, K, (TTL, Lookup[A])],
     schemaKey: K,
     freshResult: Lookup[A]
   ): F[Lookup[A]] =
     for {
-      seconds <- currentSeconds[F]
-      cached  <- c.get(schemaKey) // Ignore TTL invalidation
+      currentTime <- Clock[F].realTime
+      cached      <- c.get(schemaKey) // Ignore TTL invalidation
       result = chooseResult(cached.map(_._2), freshResult)
-      _ <- c.put(schemaKey, (seconds, result)) // Overwrite or bump TTL
+      _ <- c.put(schemaKey, (currentTime, result)) // Overwrite or bump TTL
     } yield result
-
-  /** Get Unix epoch timestamp in seconds */
-  private def currentSeconds[F[_]: Functor: Clock]: F[Int] =
-    Clock[F].realTime(java.util.concurrent.TimeUnit.SECONDS).map(_.toInt)
 
   /**
    * Check if cached value is still valid based on resolver's `cacheTtl`
    *
-   * @param storedTstamp timestamp when value was saved
+   * @param storageTime time when value was saved
    * @return true if
    */
   private def isViable(
-    ttl: Option[Int],
-    unixSeconds: Int,
-    storedTstamp: Int
+    ttl: Option[TTL],
+    currentTime: CurrentTime,
+    storageTime: StorageTime
   ): Boolean =
-    ttl.fold(true)(ttlVal => unixSeconds - storedTstamp < ttlVal)
+    ttl match {
+      case Some(definedTtl) => currentTime - storageTime < definedTtl
+      case None             => true
+    }
 
   /** Choose which result is more appropriate for being stored in cache or combine failures */
   private def chooseResult[A](cachedResult: Option[Lookup[A]], newResult: Lookup[A]): Lookup[A] =

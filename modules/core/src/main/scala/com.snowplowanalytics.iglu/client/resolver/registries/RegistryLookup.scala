@@ -14,25 +14,26 @@ package com.snowplowanalytics.iglu.client.resolver
 package registries
 
 // Java
+import cats.effect.Sync
+
 import java.net.UnknownHostException
 
 // Scala
 import scala.util.control.NonFatal
 
 // cats
-import cats.{Eval, Id}
 import cats.data.{EitherT, OptionT}
-import cats.effect.Sync
-import cats.implicits._
 import cats.effect.implicits._
+import cats.implicits._
+import cats.{Eval, Id}
 
 // circe
 import io.circe.Json
 import io.circe.parser.parse
 
 // Iglu Core
-import com.snowplowanalytics.iglu.core.{SchemaKey, SchemaList, SelfDescribingSchema}
 import com.snowplowanalytics.iglu.core.circe.implicits._
+import com.snowplowanalytics.iglu.core.{SchemaKey, SchemaList, SelfDescribingSchema}
 
 /**
  * A capability of `F` to communicate with Iglu registries, using `RepositoryRef` ADT,

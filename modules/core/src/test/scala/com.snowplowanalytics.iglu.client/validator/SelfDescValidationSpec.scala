@@ -13,6 +13,7 @@
 package com.snowplowanalytics.iglu.client.validator
 
 // circe
+import cats.effect.testing.specs2.CatsEffect
 import io.circe.Json
 import io.circe.literal._
 
@@ -20,13 +21,10 @@ import io.circe.literal._
 import com.snowplowanalytics.iglu.core.{SchemaKey, SchemaVer, SelfDescribingData}
 
 // Specs2
-import org.specs2.Specification
-import org.specs2.matcher.ValidatedMatchers
-
 import com.snowplowanalytics.iglu.client.SpecHelpers
-import com.snowplowanalytics.iglu.client.SpecHelpers._
+import org.specs2.Specification
 
-class SelfDescValidationSpec extends Specification with ValidatedMatchers {
+class SelfDescValidationSpec extends Specification with CatsEffect {
   def is = s2"""
 
   This is a specification to test validation of self-describing JSONs
@@ -58,20 +56,16 @@ class SelfDescValidationSpec extends Specification with ValidatedMatchers {
     )
 
   def e1 = {
-    val action = for {
+    for {
       client <- SpecHelpers.TestClient
       result <- client.check(validJson).value
     } yield result must beRight(())
-
-    action.unsafeRunSync()
   }
 
   def e3 = {
-    val action = for {
+    for {
       client <- SpecHelpers.TestClient
       result <- client.check(invalidJson).value
     } yield result must beLeft
-
-    action.unsafeRunSync()
   }
 }

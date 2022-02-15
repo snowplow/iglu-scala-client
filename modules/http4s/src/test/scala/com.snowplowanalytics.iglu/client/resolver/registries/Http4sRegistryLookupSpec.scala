@@ -12,19 +12,18 @@
  */
 package com.snowplowanalytics.iglu.client.resolver.registries
 
+import cats.effect.testing.specs2.CatsEffect
 import cats.effect.{IO, Resource}
-import cats.effect.testing.specs2.CatsIO
+import com.snowplowanalytics.iglu.core.{SchemaKey, SchemaList, SchemaVer}
 import io.circe.Json
-import java.net.URI
 import org.http4s.client.{Client => HttpClient}
 import org.http4s.dsl.Http4sDsl
 import org.http4s.implicits._
-
-import com.snowplowanalytics.iglu.core.{SchemaKey, SchemaList, SchemaVer}
-
 import org.specs2.mutable.Specification
 
-class Http4sRegistryLookupSpec extends Specification with CatsIO {
+import java.net.URI
+
+class Http4sRegistryLookupSpec extends Specification with CatsEffect {
 
   "The Http4sRegistryLookup lookup" should {
     "lookup a valid schema" in {

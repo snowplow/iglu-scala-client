@@ -22,24 +22,23 @@ import scala.io.Source
 import scala.util.control.NonFatal
 
 // Cats
-import cats.syntax.either._
-import cats.syntax.option._
-import cats.syntax.functor._
-import cats.syntax.show._
 import cats.effect.Sync
+import cats.syntax.either._
+import cats.syntax.functor._
+import cats.syntax.option._
+import cats.syntax.show._
 
 // circe
-import io.circe.{Decoder, DecodingFailure, Json, ParsingFailure}
 import io.circe.parser.parse
+import io.circe.{Decoder, DecodingFailure, Json, ParsingFailure}
 
 // Apache Commons
 import org.apache.commons.lang3.exception.ExceptionUtils
 
 // scalaj
-import scalaj.http._
-
 import com.snowplowanalytics.iglu.core.SchemaList
 import com.snowplowanalytics.iglu.core.circe.CirceIgluCodecs._
+import scalaj.http._
 
 private[registries] object Utils {
 
