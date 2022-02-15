@@ -12,9 +12,12 @@
  */
 package com.snowplowanalytics.iglu.client
 
+import cats.Applicative
+
 import java.net.URI
 import java.time.Instant
 import java.util.concurrent.TimeUnit
+import scala.concurrent.duration.FiniteDuration
 
 // Cats
 import cats.Id
@@ -48,19 +51,15 @@ object SpecHelpers {
     )
 
   implicit val idClock: Clock[Id] = new Clock[Id] {
-    final def realTime(unit: TimeUnit): Id[Long] =
-      unit.convert(System.currentTimeMillis(), TimeUnit.MILLISECONDS)
 
-    final def monotonic(unit: TimeUnit): Id[Long] =
-      unit.convert(System.nanoTime(), TimeUnit.NANOSECONDS)
-  }
+    override def applicative: Applicative[Id] = Applicative[Id]
 
-  implicit val ioClock: Clock[IO] = new Clock[IO] {
-    final def realTime(unit: TimeUnit): IO[Long] =
-      IO.delay(unit.convert(System.currentTimeMillis(), TimeUnit.MILLISECONDS))
+    override def monotonic: Id[FiniteDuration] =
+      FiniteDuration(System.currentTimeMillis(), TimeUnit.MILLISECONDS)
 
-    final def monotonic(unit: TimeUnit): IO[Long] =
-      IO.delay(unit.convert(System.nanoTime(), TimeUnit.NANOSECONDS))
+    override def realTime: Id[FiniteDuration] =
+      FiniteDuration(System.nanoTime(), TimeUnit.NANOSECONDS)
+
   }
 
   val TestResolver = Resolver.init[IO](10, None, EmbeddedTest)

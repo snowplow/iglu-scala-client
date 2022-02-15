@@ -13,6 +13,8 @@
 package com.snowplowanalytics.iglu.client.resolver.registries
 
 // Java
+import cats.effect.testing.specs2.CatsEffect
+
 import java.net.URI
 
 // Cats
@@ -28,12 +30,10 @@ import com.snowplowanalytics.iglu.core.{SchemaKey, SchemaVer}
 import com.snowplowanalytics.iglu.client.resolver.registries.RegistryLookup._
 
 // Specs2
-import org.specs2.Specification
-import org.specs2.matcher.{DataTables, ValidatedMatchers}
-
 import com.snowplowanalytics.iglu.client.SpecHelpers
+import org.specs2.Specification
 
-class HttpSpec extends Specification with DataTables with ValidatedMatchers {
+class HttpSpec extends Specification with CatsEffect {
   def is = s2"""
 
   This is a specification to test an HTTP-based RepositoryRef
@@ -137,14 +137,14 @@ class HttpSpec extends Specification with DataTables with ValidatedMatchers {
 
     SpecHelpers.IgluCentral
       .lookupSchema[IO](schemaKey)
-      .unsafeRunSync() must beRight(expected)
+      .map(result => result must beRight(expected))
   }
 
   def e4 = {
     val schemaKey = SchemaKey("de.ersatz.n-a", "null", "jsonschema", SchemaVer.Full(1, 0, 0))
     SpecHelpers.IgluCentral
       .lookupSchema[IO](schemaKey)
-      .unsafeRunSync() must beLeft(RegistryError.NotFound: RegistryError)
+      .map(result => result must beLeft(RegistryError.NotFound: RegistryError))
   }
 
   def e5 = {

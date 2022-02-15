@@ -14,6 +14,7 @@ package com.snowplowanalytics.iglu.client.resolver.registries
 
 // Cats
 import cats.effect.IO
+import cats.effect.testing.specs2.CatsEffect
 
 // circe
 import io.circe.literal._
@@ -25,12 +26,10 @@ import com.snowplowanalytics.iglu.core.{SchemaKey, SchemaVer}
 import com.snowplowanalytics.iglu.client.resolver.registries.RegistryLookup._
 
 // Specs2
-import org.specs2.Specification
-import org.specs2.matcher.{DataTables, ValidatedMatchers}
-
 import com.snowplowanalytics.iglu.client.SpecHelpers
+import org.specs2.Specification
 
-class EmbeddedSpec extends Specification with DataTables with ValidatedMatchers {
+class EmbeddedSpec extends Specification with CatsEffect {
   def is = s2"""
 
   This is a specification to test an embedded RepositoryRef
@@ -97,14 +96,14 @@ class EmbeddedSpec extends Specification with DataTables with ValidatedMatchers 
 
     SpecHelpers.EmbeddedTest
       .lookupSchema[IO](schemaKey)
-      .unsafeRunSync() must beRight(expected)
+      .map(result => result must beRight(expected))
   }
 
   def e4 = {
     val schemaKey = SchemaKey("com.acme.n-a", "null", "jsonschema", SchemaVer.Full(1, 0, 0))
     SpecHelpers.EmbeddedTest
       .lookupSchema[IO](schemaKey)
-      .unsafeRunSync() must beLeft(RegistryError.NotFound: RegistryError)
+      .map(result => result must beLeft(RegistryError.NotFound: RegistryError))
   }
 
   def e5 = {
@@ -117,7 +116,7 @@ class EmbeddedSpec extends Specification with DataTables with ValidatedMatchers 
       )
     SpecHelpers.EmbeddedTest
       .lookupSchema[IO](schemaKey)
-      .unsafeRunSync() must beLeft
+      .map(result => result must beLeft)
   }
 
 }

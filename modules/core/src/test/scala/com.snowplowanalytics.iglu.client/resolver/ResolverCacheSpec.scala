@@ -12,21 +12,16 @@
  */
 package com.snowplowanalytics.iglu.client.resolver
 
-import java.time.Instant
-
-import cats.implicits._
 import cats.effect.Clock
-import com.snowplowanalytics.iglu.core.{SchemaKey, SchemaVer}
-import org.specs2.Specification
+import cats.implicits._
+import com.snowplowanalytics.iglu.client.resolver.ResolverSpecHelpers._
 import com.snowplowanalytics.iglu.client.resolver.registries.{Registry, RegistryError}
-import com.snowplowanalytics.iglu.client.resolver.ResolverSpecHelpers.{
-  RegistryState,
-  StaticLookup,
-  staticCache,
-  staticCacheForList,
-  staticClock
-}
+import com.snowplowanalytics.iglu.core.{SchemaKey, SchemaVer}
 import io.circe.Json
+import org.specs2.Specification
+
+import java.time.Instant
+import scala.concurrent.duration.DurationInt
 
 class ResolverCacheSpec extends Specification {
   def is = s2"""
@@ -41,10 +36,11 @@ class ResolverCacheSpec extends Specification {
     val schema       = Json.Null
     val lookupResult = schema.asRight[LookupFailureMap]
 
-    val expectedState = RegistryState(Map.empty, 4, List((key, (2, Right(Json.Null)))), 5, List())
+    val expectedState =
+      RegistryState(Map.empty, 4.millis, List((key, (2.millis, Right(Json.Null)))), 5, List())
 
     val test = for {
-      cache <- ResolverCache.init[StaticLookup](5, Some(10))
+      cache <- ResolverCache.init[StaticLookup](5, Some(10.seconds))
       cacheUnsafe = cache.getOrElse(throw new RuntimeException("Cache cannot be created"))
       _      <- cacheUnsafe.putSchema(key, lookupResult)
       result <- cacheUnsafe.putSchema(key, Map.empty[Registry, LookupHistory].asLeft[Json])
@@ -95,7 +91,7 @@ class ResolverCacheSpec extends Specification {
     )
 
     val test = for {
-      cache <- ResolverCache.init[StaticLookup](5, Some(10))
+      cache <- ResolverCache.init[StaticLookup](5, Some(10.seconds))
       cacheUnsafe = cache.getOrElse(throw new RuntimeException("Cache cannot be created"))
       _      <- cacheUnsafe.putSchema(key, failure1.asLeft[Json])
       result <- cacheUnsafe.putSchema(key, failure2.asLeft[Json])

@@ -15,6 +15,8 @@ package com.snowplowanalytics.iglu.client
 // circe
 import io.circe.Json
 
+import scala.concurrent.duration.FiniteDuration
+
 // LRU
 import com.snowplowanalytics.lrumap.CreateLruMap
 
@@ -42,7 +44,15 @@ package object resolver {
 
   type ListLookup = Either[LookupFailureMap, SchemaList]
 
+  type CacheEntry[A] = (FiniteDuration, A)
+
+  type SchemaCacheEntry = CacheEntry[SchemaLookup]
+
+  type ListCacheEntry = CacheEntry[ListLookup]
+
+  type ListCacheKey = (String, String, Int)
+
   /** Ability to initialize the cache */
-  type InitSchemaCache[F[_]] = CreateLruMap[F, SchemaKey, (Int, SchemaLookup)]
-  type InitListCache[F[_]]   = CreateLruMap[F, (String, String, Int), (Int, ListLookup)]
+  type InitSchemaCache[F[_]] = CreateLruMap[F, SchemaKey, SchemaCacheEntry]
+  type InitListCache[F[_]]   = CreateLruMap[F, ListCacheKey, ListCacheEntry]
 }

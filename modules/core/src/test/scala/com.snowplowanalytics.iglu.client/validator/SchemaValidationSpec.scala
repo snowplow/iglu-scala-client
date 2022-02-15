@@ -13,17 +13,15 @@
 package com.snowplowanalytics.iglu.client.validator
 
 // circe
+import cats.effect.testing.specs2.CatsEffect
 import io.circe.literal._
 
 // Specs2
+import com.snowplowanalytics.iglu.client.SpecHelpers
+import com.snowplowanalytics.iglu.core.{SchemaKey, SchemaVer, SelfDescribingData}
 import org.specs2.Specification
 
-import com.snowplowanalytics.iglu.core.{SchemaKey, SchemaVer, SelfDescribingData}
-
-import com.snowplowanalytics.iglu.client.SpecHelpers
-import com.snowplowanalytics.iglu.client.SpecHelpers._
-
-class SchemaValidationSpec extends Specification {
+class SchemaValidationSpec extends Specification with CatsEffect {
   def is = s2"""
 
   This is a specification to test Schema Validation
@@ -57,20 +55,16 @@ class SchemaValidationSpec extends Specification {
   val testResolver = SpecHelpers.TestResolver
 
   def e1 = {
-    val action = for {
+    for {
       client <- SpecHelpers.TestClient
       result <- client.check(validJson).value
     } yield result must beRight
-
-    action.unsafeRunSync()
   }
 
   def e2 = {
-    val action = for {
+    for {
       client <- SpecHelpers.TestClient
       result <- client.check(validJsonWithInvalidSchema).value
     } yield result must beLeft
-
-    action.unsafeRunSync()
   }
 }
