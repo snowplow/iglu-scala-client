@@ -22,10 +22,10 @@ import java.net.UnknownHostException
 import scala.util.control.NonFatal
 
 // cats
+import cats.Id
 import cats.data.{EitherT, OptionT}
 import cats.effect.implicits._
 import cats.implicits._
-import cats.{Eval, Id}
 
 // circe
 import io.circe.Json
@@ -108,21 +108,6 @@ object RegistryLookup {
           case Registry.Http(_, connection) => httpList(connection, vendor, name, model)
           case _                            => F.pure(RegistryError.NotFound.asLeft)
         }
-    }
-
-  // Non-RT instances. Use with caution
-
-  implicit def evalLookupInstance: RegistryLookup[Eval] =
-    new RegistryLookup[Eval] {
-      def lookup(registry: Registry, schemaKey: SchemaKey): Eval[Either[RegistryError, Json]] =
-        Eval.always(idLookupInstance.lookup(registry, schemaKey))
-      def list(
-        registry: Registry,
-        vendor: String,
-        name: String,
-        model: Int
-      ): Eval[Either[RegistryError, SchemaList]] =
-        Eval.always(idLookupInstance.list(registry, vendor, name, model))
     }
 
   // Id instance also swallows all exceptions into `RegistryError`
