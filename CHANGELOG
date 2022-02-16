@@ -1,3 +1,16 @@
+Version 2.0.0 (2022-02-16)
+--------------------------
+Remove `RegistryLookup` instance for `cats.Eval` (#182)
+Bump sbt-coveralls to 1.3.1 (#181)
+Bump sbt-site to 1.4.1 (#180)
+Bump sbt-scoverage 1.9.3 (#179)
+Bump sbt-mima to 1.0.1 (#178)
+Bump sbt-scalafmt to 2.4.6 (#177)
+Bump sbt to 1.6.2 (#176)
+Update copyright to 2022 (#175)
+Bump scala compiler to 2.13.8, 2.12.15 (#174)
+Add support for Cats Effect 3 (#172)
+
 Version 1.1.1 (2021-08-05)
 --------------------------
 Fix ScalaDoc publishing (#168)
