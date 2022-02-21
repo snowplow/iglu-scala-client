@@ -12,25 +12,21 @@
  */
 
 // SBT
+import sbt.Keys._
 import sbt._
-import Keys._
 
 // dynver plugin
 import sbtdynver.DynVerPlugin.autoImport._
 
 // Mima plugin
 import com.typesafe.tools.mima.plugin.MimaKeys._
-import com.typesafe.tools.mima.plugin.MimaPlugin
 
 // Scoverage plugin
 import scoverage.ScoverageKeys._
 
-// GHPages plugin
-import com.typesafe.sbt.sbtghpages.GhpagesPlugin.autoImport._
-import com.typesafe.sbt.site.SitePlugin.autoImport.{makeSite, siteSubdirName}
-import com.typesafe.sbt.SbtGit.GitKeys.{gitBranch, gitRemoteRepo}
+// Site plugin
+import com.typesafe.sbt.site.SitePlugin.autoImport.siteSubdirName
 import com.typesafe.sbt.site.SiteScaladocPlugin.autoImport._
-import com.typesafe.sbt.site.preprocess.PreprocessPlugin.autoImport._
 
 object BuildSettings {
 
@@ -92,15 +88,7 @@ object BuildSettings {
     }
   )
 
-  val ghPagesSettings = Seq(
-    ghpagesPushSite := (ghpagesPushSite dependsOn makeSite).value,
-    ghpagesNoJekyll := false,
-    gitRemoteRepo := "git@github.com:snowplow/iglu-scala-client.git",
-    gitBranch := Some("gh-pages"),
+  val docsSettings = Seq(
     SiteScaladoc / siteSubdirName := s"${version.value}",
-    Preprocess / preprocessVars := Map("VERSION" -> version.value),
-    ghpagesCleanSite / excludeFilter := new FileFilter {
-      def accept(f: File) = true
-    }
   )
 }

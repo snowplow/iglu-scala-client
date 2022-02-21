@@ -16,12 +16,12 @@ lazy val core = (project in file("modules/core"))
     name := "iglu-scala-client",
     description := "Scala client and resolver for Iglu schema repositories"
   )
-  .enablePlugins(SiteScaladocPlugin, GhpagesPlugin, PreprocessPlugin)
+  .enablePlugins(SiteScaladocPlugin, PreprocessPlugin)
   .settings(BuildSettings.buildSettings)
   .settings(BuildSettings.publishSettings)
   .settings(BuildSettings.mimaSettings)
   .settings(BuildSettings.scoverageSettings)
-  .settings(BuildSettings.ghPagesSettings)
+  .settings(BuildSettings.docsSettings)
   .settings(
     libraryDependencies ++= Seq(
       // Java
