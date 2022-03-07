@@ -189,7 +189,12 @@ object CirceValidator extends Validator[Json] {
   private val V4SchemaInstance = JsonSchemaFactory.getInstance(SpecVersion.VersionFlag.V4)
 
   private val IgluMetaschemaFactory =
-    JsonSchemaFactory.builder(V4SchemaInstance).addMetaSchema(IgluMetaschema).build()
+    JsonSchemaFactory
+      .builder(V4SchemaInstance)
+      .addMetaSchema(IgluMetaschema)
+      .forceHttps(false)
+      .removeEmptyFragmentSuffix(false)
+      .build()
 
   private val SchemaValidatorsConfig: SchemaValidatorsConfig = {
     val config = new SchemaValidatorsConfig()
