@@ -22,7 +22,15 @@ jobs:
         folder: modules/core/target/site
         clean: false
 
-    - name: Deploy to iglu-scala-client to Maven Central
+    - name: Deploy iglu-scala-client-data to Maven Central
+      run: sbt "project data" ci-release
+      env:
+        PGP_PASSPHRASE: ${{ secrets.SONA_PGP_PASSPHRASE }}
+        PGP_SECRET: ${{ secrets.SONA_PGP_SECRET }}
+        SONATYPE_USERNAME: ${{ secrets.SONA_USER }}
+        SONATYPE_PASSWORD: ${{ secrets.SONA_PASS }}
+
+    - name: Deploy iglu-scala-client to Maven Central
       run: sbt "project core" ci-release
       env:
         PGP_PASSPHRASE: ${{ secrets.SONA_PGP_PASSPHRASE }}
@@ -30,7 +38,7 @@ jobs:
         SONATYPE_USERNAME: ${{ secrets.SONA_USER }}
         SONATYPE_PASSWORD: ${{ secrets.SONA_PASS }}
 
-    - name: Deploy to iglu-scala-client-http4s to Maven Central
+    - name: Deploy iglu-scala-client-http4s to Maven Central
       run: sbt "project http4s" ci-release
       env:
         PGP_PASSPHRASE: ${{ secrets.SONA_PGP_PASSPHRASE }}

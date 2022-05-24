@@ -43,6 +43,7 @@ object Dependencies {
     val igluCoreCirce    = "com.snowplowanalytics"  %% "iglu-core-circe"         % V.igluCore
     val cats             = "org.typelevel"          %% "cats-core"               % V.cats
     val catsEffect       = "org.typelevel"          %% "cats-effect"             % V.catsEffect
+    val circeCore        = "io.circe"               %% "circe-core"              % V.circe       
     val circeParser      = "io.circe"               %% "circe-parser"            % V.circe
     val lruMap           = "com.snowplowanalytics"  %% "scala-lru-map"           % V.lruMap
     val scalaj           = "org.scalaj"             %% "scalaj-http"             % V.scalaj
@@ -51,8 +52,8 @@ object Dependencies {
     val http4sCirce      = "org.http4s"             %% "http4s-circe"            % V.http4s
 
     // Scala (test only)
-    val circeCore        = "io.circe"      %% "circe-core"                 % V.circe            % Test
     val circeLiteral     = "io.circe"      %% "circe-literal"              % V.circe            % Test
+    val circeJawn        = "io.circe"      %% "circe-jawn"                 % V.circe            % Test
     val specs2           = "org.specs2"    %% "specs2-core"                % V.specs2           % Test
     val specs2Cats       = "org.specs2"    %% "specs2-cats"                % V.specs2           % Test
     val specs2CatsEffect = "org.typelevel" %% "cats-effect-testing-specs2" % V.specs2CatsEffect % Test
