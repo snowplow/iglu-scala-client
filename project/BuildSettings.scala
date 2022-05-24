@@ -63,13 +63,18 @@ object BuildSettings {
   // clear-out mimaBinaryIssueFilters and mimaPreviousVersions.
   // Otherwise, add previous version to set without
   // removing other versions.
+  val mimaPreviousVersionsData = Set()
   val mimaPreviousVersionsCore = Set()
-  val mimaPreviousVersionsHttp4s = Set()
+  val mimaPreviousVersionsHttp4s = Set("2.0.0")
 
   lazy val mimaSettings = Seq(
     mimaPreviousArtifacts := {
-      val mimaPreviousVersions = if (name.value.endsWith("http4s")) mimaPreviousVersionsHttp4s else mimaPreviousVersionsCore
-      mimaPreviousVersions.map { organization.value %% name.value % _ },
+      val mimaPreviousVersions = 
+        if (name.value.endsWith("http4s")) mimaPreviousVersionsHttp4s
+        else if (name.value.endsWith("data")) mimaPreviousVersionsData
+        else mimaPreviousVersionsCore
+          
+      mimaPreviousVersions.map { organization.value %% name.value % _ }
     },
     ThisBuild / mimaFailOnNoPrevious := false,
     mimaBinaryIssueFilters ++= Seq(),

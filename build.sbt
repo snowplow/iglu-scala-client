@@ -11,6 +11,26 @@
  * See the Apache License Version 2.0 for the specific language governing permissions and limitations there under.
  */
 
+lazy val data = (project in file("modules/data"))
+  .settings(
+    name := "iglu-scala-client-data",
+    description := "Core iglu data"
+  )
+  .settings(BuildSettings.buildSettings)
+  .settings(BuildSettings.publishSettings)
+  .settings(BuildSettings.mimaSettings)
+  .settings(BuildSettings.scoverageSettings)
+  .settings(
+    libraryDependencies ++= Seq(
+      Dependencies.Libraries.cats,
+      Dependencies.Libraries.circeCore,
+      // Scala (test only)
+      Dependencies.Libraries.circeLiteral,
+      Dependencies.Libraries.circeJawn,
+      Dependencies.Libraries.specs2,
+    )
+  )
+
 lazy val core = (project in file("modules/core"))
   .settings(
     name := "iglu-scala-client",
@@ -30,7 +50,6 @@ lazy val core = (project in file("modules/core"))
       // Scala
       Dependencies.Libraries.igluCore,
       Dependencies.Libraries.igluCoreCirce,
-      Dependencies.Libraries.cats,
       Dependencies.Libraries.catsEffect,
       Dependencies.Libraries.circeParser,
       Dependencies.Libraries.lruMap,
@@ -45,6 +64,8 @@ lazy val core = (project in file("modules/core"))
       Dependencies.Libraries.slf4jNop
     )
   )
+  .dependsOn(data)
+
 
 lazy val http4s = (project in file("modules/http4s"))
   .settings(

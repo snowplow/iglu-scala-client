@@ -20,9 +20,13 @@ import com.snowplowanalytics.iglu.client.resolver.registries.RegistryError
 import com.snowplowanalytics.iglu.client.validator.{ValidatorError, ValidatorReport}
 import org.specs2.Specification
 
+import java.time.Instant
 import scala.collection.immutable.SortedMap
 
 class ClientErrorSpec extends Specification {
+
+  val now: Instant = Instant.ofEpochSecond(1562598285)
+
   def is =
     s2"""
   Encode and decode ResolutionError $e1
@@ -35,12 +39,12 @@ class ClientErrorSpec extends Specification {
         "First repo" -> LookupHistory(
           Set(RegistryError.NotFound, RegistryError.RepoFailure("Server outage")),
           1,
-          SpecHelpers.now
+          now
         ),
         "Second repo" -> LookupHistory(
           Set(RegistryError.ClientFailure("Internal exception")),
           1,
-          SpecHelpers.now.plusMillis(100)
+          now.plusMillis(100)
         )
       )
     )
