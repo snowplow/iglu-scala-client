@@ -19,7 +19,7 @@ object Dependencies {
     val jackson   = "2.13.1"
 
     // Scala
-    val igluCore         = "1.0.1"
+    val igluCore         = "1.1.0"
     val cats             = "2.7.0"
     val catsEffect       = "3.3.5"
     val circe            = "0.14.1"
