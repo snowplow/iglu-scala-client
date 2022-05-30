@@ -53,7 +53,6 @@ lazy val core = (project in file("modules/core"))
       Dependencies.Libraries.catsEffect,
       Dependencies.Libraries.circeParser,
       Dependencies.Libraries.lruMap,
-      Dependencies.Libraries.scalaj,
       Dependencies.Libraries.collectionCompat,
       // Scala (test only)
       Dependencies.Libraries.circeLiteral,

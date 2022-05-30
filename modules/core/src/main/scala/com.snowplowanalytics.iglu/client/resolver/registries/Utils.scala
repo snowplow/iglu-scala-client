@@ -16,6 +16,9 @@ package resolver.registries
 // Java
 import java.io.InputStream
 import java.net.URI
+import java.net.http.HttpResponse.BodyHandlers
+import java.net.http.{HttpClient, HttpRequest, HttpResponse}
+import java.time.Duration
 
 // Scala
 import scala.io.Source
@@ -24,7 +27,6 @@ import scala.util.control.NonFatal
 // Cats
 import cats.effect.Sync
 import cats.syntax.either._
-import cats.syntax.functor._
 import cats.syntax.option._
 import cats.syntax.show._
 
@@ -38,13 +40,14 @@ import org.apache.commons.lang3.exception.ExceptionUtils
 // scalaj
 import com.snowplowanalytics.iglu.core.SchemaList
 import com.snowplowanalytics.iglu.core.circe.CirceIgluCodecs._
-import scalaj.http._
 
 private[registries] object Utils {
+  private val ReadTimeoutMs = 4000L
 
-  val ConnectionTimeoutMs = 1000
-
-  val ReadTimeoutMs = 4000
+  private lazy val httpClient = HttpClient
+    .newBuilder()
+    .connectTimeout(Duration.ofMillis(1000))
+    .build()
 
   /**
    * Read a Json from an URI using optional apikey
@@ -55,18 +58,12 @@ private[registries] object Utils {
    * @return The document at that URL if code is 2xx
    */
   def getFromUri[F[_]: Sync](uri: URI, apikey: Option[String]): F[Option[String]] =
-    Sync[F]
-      .delay(buildLookupRequest(uri, apikey).asString)
-      .map { response =>
-        if (response.is2xx) response.body.some else None
-      }
+    Sync[F].blocking(executeCall(uri, apikey))
 
   /** Non-RT analog of [[getFromUri]] */
   def unsafeGetFromUri(uri: URI, apikey: Option[String]): Either[RegistryError, Json] =
     try {
-      val response = buildLookupRequest(uri, apikey).asString
-      val data     = if (response.is2xx) response.body.some else none
-      data
+      executeCall(uri, apikey)
         .map(parse)
         .map(_.leftMap(e => RegistryError.RepoFailure(e.show)))
         .getOrElse(RegistryError.NotFound.asLeft)
@@ -121,11 +118,24 @@ private[registries] object Utils {
       } yield uri
     }
 
-  private def buildLookupRequest(uri: URI, apikey: Option[String]): HttpRequest =
+  private def executeCall(uri: URI, apikey: Option[String]): Option[String] = {
+    val httpRequest = buildLookupRequest(uri, apikey)
+    val response    = httpClient.send(httpRequest, BodyHandlers.ofString())
+    if (is2xx(response)) response.body.some else None
+  }
+
+  private def buildLookupRequest(uri: URI, apikey: Option[String]): HttpRequest = {
+    val baseRequest = HttpRequest
+      .newBuilder(uri)
+      .timeout(Duration.ofMillis(ReadTimeoutMs))
+
     apikey
-      .map(key => Http(uri.toString).header("apikey", key))
-      .getOrElse(Http(uri.toString))
-      .timeout(ConnectionTimeoutMs, ReadTimeoutMs)
+      .fold(baseRequest)(key => baseRequest.header("apikey", key))
+      .build()
+  }
+
+  private def is2xx(response: HttpResponse[String]) =
+    response.statusCode() >= 200 && response.statusCode() <= 299
 
   private[resolver] def readResource[F[_]: Sync](path: String): F[Option[InputStream]] =
     Sync[F].delay(unsafeReadResource(path))

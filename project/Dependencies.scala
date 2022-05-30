@@ -24,7 +24,6 @@ object Dependencies {
     val catsEffect       = "3.3.5"
     val circe            = "0.14.1"
     val lruMap           = "0.6.0"
-    val scalaj           = "2.4.2"
     val collectionCompat = "2.4.4"
     val http4s           = "0.23.10"
 
@@ -46,7 +45,6 @@ object Dependencies {
     val circeCore        = "io.circe"               %% "circe-core"              % V.circe       
     val circeParser      = "io.circe"               %% "circe-parser"            % V.circe
     val lruMap           = "com.snowplowanalytics"  %% "scala-lru-map"           % V.lruMap
-    val scalaj           = "org.scalaj"             %% "scalaj-http"             % V.scalaj
     val collectionCompat = "org.scala-lang.modules" %% "scala-collection-compat" % V.collectionCompat
     val http4sClient     = "org.http4s"             %% "http4s-client"           % V.http4s
     val http4sCirce      = "org.http4s"             %% "http4s-circe"            % V.http4s
