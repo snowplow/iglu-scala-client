@@ -28,7 +28,7 @@ object Dependencies {
     val http4s           = "0.23.12"
 
     // Scala (test only)
-    val specs2           = "4.13.2"
+    val specs2           = "4.15.0"
     val specs2CatsEffect = "1.4.0"
   }
 
