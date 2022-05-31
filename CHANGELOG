@@ -1,3 +1,16 @@
+Version 2.1.0 (2022-05-31)
+--------------------------
+Bump specs2 to 4.15.0 (#198)
+Bump http4s to 0.23.12 (#197)
+Bump scala-collection-compat to 2.7.0 (#196)
+Bump circe to 0.14.2 (#195)
+Bump cats-effect to 3.3.12 (#194)
+Bump jackson-databind to 2.13.3 (#192)
+Bump json-schema-validator to 1.0.70 (#193)
+Replace deprecated scalaj http client (#190)
+Use jsonschema v4 text from iglu-scala-core (#186)
+Split out a iglu-scala-client-data module (#187)
+
 Version 2.0.0 (2022-03-28)
 --------------------------
 Bump jackson-databind to 2.13.1 (#185)
