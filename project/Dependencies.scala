@@ -25,7 +25,7 @@ object Dependencies {
     val circe            = "0.14.2"
     val lruMap           = "0.6.0"
     val collectionCompat = "2.7.0"
-    val http4s           = "0.23.10"
+    val http4s           = "0.23.12"
 
     // Scala (test only)
     val specs2           = "4.13.2"
