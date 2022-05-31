@@ -24,7 +24,7 @@ object Dependencies {
     val catsEffect       = "3.3.12"
     val circe            = "0.14.2"
     val lruMap           = "0.6.0"
-    val collectionCompat = "2.4.4"
+    val collectionCompat = "2.7.0"
     val http4s           = "0.23.10"
 
     // Scala (test only)
