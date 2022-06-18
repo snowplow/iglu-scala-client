@@ -16,12 +16,13 @@ import cats.Monad
 import cats.data.EitherT
 import cats.effect.{Clock, IO}
 
-import io.circe.Json
+import io.circe.{DecodingFailure, Json}
 
 import com.snowplowanalytics.iglu.core.SelfDescribingData
 
 import resolver.{InitListCache, InitSchemaCache}
 import resolver.registries.{Registry, RegistryLookup}
+import validator.CirceValidator.InitValidatorCache
 
 /**
  * Umbrella entity, able to perform all necessary actions:
@@ -58,4 +59,32 @@ object Client {
     EitherT(Resolver.parse(json)).map { resolver =>
       Client(resolver, CirceValidator)
     }
+}
+
+final case class Client2[F[_], A](resolver: Resolver[F], validator: ValidatorF[F, A]) {
+  def check(
+    instance: SelfDescribingData[A]
+  )(implicit
+    M: Monad[F],
+    L: RegistryLookup[F],
+    C: Clock[F]
+  ): EitherT[F, ClientError, Unit] =
+    for {
+      schema <- EitherT(resolver.lookupSchema(instance.schema))
+      schemaValidation = validator.validateSchemaF(schema)
+      _ <- EitherT(schemaValidation).leftMap(_.toClientError)
+      validation = validator.validateF(instance.data, schema)
+      _ <- EitherT(validation).leftMap(_.toClientError)
+    } yield ()
+}
+
+object Client2 {
+
+  def parseDefault[F[_]: Monad: InitSchemaCache: InitListCache: InitValidatorCache](
+    json: Json
+  ): EitherT[F, DecodingFailure, Client2[F, Json]] =
+    for {
+      resolver  <- EitherT(Resolver.parse(json))
+      validator <- EitherT.liftF(CirceValidator.validatorF)
+    } yield Client2(resolver, validator)
 }
