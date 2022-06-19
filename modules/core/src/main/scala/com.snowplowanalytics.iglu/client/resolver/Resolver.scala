@@ -48,6 +48,27 @@ final case class Resolver[F[_]](repos: List[Registry], cache: Option[ResolverCac
   private[client] val allRepos: NonEmptyList[Registry] =
     NonEmptyList[Registry](Registry.EmbeddedRegistry, repos)
 
+  def lookupSchemaResult(
+    schemaKey: SchemaKey
+  )(implicit
+    F: Monad[F],
+    L: RegistryLookup[F],
+    C: Clock[F]
+  ): F[ResolverResult[Json]] = {
+    val get: Registry => F[Either[RegistryError, Json]] = r => L.lookup(r, schemaKey)
+    val resultAction = getFromCache(schemaKey).flatMap {
+      case Some(lookupResult) =>
+        lookupResult.fold(retryCached[F, Json](get, schemaKey.vendor), finish[F, Json])
+      case None =>
+        traverseRepos[F, Json](get, prioritize(schemaKey.vendor, allRepos.toList), Map.empty)
+    }
+
+    for {
+      result      <- resultAction
+      cacheResult <- cache.traverse(c => c.putSchemaResult(schemaKey, result))
+    } yield cacheResult.map(postProcess2).getOrElse(uncachedResult(result))
+  }
+
   /**
    * Tries to find the given schema in any of the provided repository refs
    * If any of repositories gives non-non-found error, lookup will retried
@@ -63,20 +84,8 @@ final case class Resolver[F[_]](repos: List[Registry], cache: Option[ResolverCac
     F: Monad[F],
     L: RegistryLookup[F],
     C: Clock[F]
-  ): F[Either[ResolutionError, Json]] = {
-    val get: Registry => F[Either[RegistryError, Json]] = r => L.lookup(r, schemaKey)
-    val resultAction = getFromCache(schemaKey).flatMap {
-      case Some(lookupResult) =>
-        lookupResult.fold(retryCached[F, Json](get, schemaKey.vendor), finish[F, Json])
-      case None =>
-        traverseRepos[F, Json](get, prioritize(schemaKey.vendor, allRepos.toList), Map.empty)
-    }
-
-    for {
-      result      <- resultAction
-      cacheResult <- cache.traverse(c => c.putSchema(schemaKey, result))
-    } yield postProcess(cacheResult.getOrElse(result))
-  }
+  ): F[Either[ResolutionError, Json]] =
+    lookupSchemaResult(schemaKey).map(_.toEither.map(_._1))
 
   /**
    * Get list of available schemas for particular vendor and name part
@@ -335,6 +344,18 @@ object Resolver {
       })
     }
 
+  private def postProcess2[A](result: ResolverCache.CacheResult[A]): ResolverResult[A] =
+    result match {
+      case ResolverCache.AlreadyCached(i, t)    => Cached(i, t)
+      case ResolverCache.NewlyCached(i, t)      => Cached(i, t)
+      case ResolverCache.CacheFailures(failure) => lookupError(failure)
+    }
+
+  private def lookupError(failure: LookupFailureMap): LookupError =
+    LookupError(ResolutionError(SortedMap[String, LookupHistory]() ++ failure.map {
+      case (key, value) => (key.config.name, value)
+    }))
+
   private def matchConfig[F[_]: Applicative](datum: SelfDescribingData[Json]) = {
     val failure =
       DecodingFailure(
@@ -359,4 +380,20 @@ object Resolver {
       case _ =>
         MinBackoff + Math.pow(4, retryCount.toDouble).toLong
     }
+
+  sealed trait ResolverResult[+A] { self =>
+    def toEither: Either[ResolutionError, (A, Option[Int])] =
+      self match {
+        case Cached(value, t)   => Right((value, Some(t)))
+        case NotCached(value)   => Right((value, None))
+        case LookupError(value) => Left(value)
+      }
+  }
+
+  case class Cached[A](value: A, timestamp: Int) extends ResolverResult[A]
+  case class NotCached[A](value: A)              extends ResolverResult[A]
+  case class LookupError(value: ResolutionError) extends ResolverResult[Nothing]
+
+  def uncachedResult[A](lookup: Either[LookupFailureMap, A]): ResolverResult[A] =
+    lookup.fold(lookupError, NotCached(_))
 }

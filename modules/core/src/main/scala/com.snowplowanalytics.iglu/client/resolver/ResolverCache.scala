@@ -18,11 +18,14 @@ import cats.data.OptionT
 import cats.effect.Clock
 import cats.implicits._
 
+// circe
+import io.circe.Json
+
 // LruMap
 import com.snowplowanalytics.lrumap.{CreateLruMap, LruMap}
 
 // Iglu core
-import com.snowplowanalytics.iglu.core.SchemaKey
+import com.snowplowanalytics.iglu.core.{SchemaKey, SchemaList}
 
 /**
  * Resolver cache and associated logic to (in)validate entities,
@@ -71,6 +74,15 @@ class ResolverCache[F[_]] private (
   ): F[SchemaLookup] =
     putItem(schemas, schemaKey, freshResult)
 
+  private[resolver] def putSchemaResult(
+    schemaKey: SchemaKey,
+    freshResult: SchemaLookup
+  )(implicit
+    F: Monad[F],
+    C: Clock[F]
+  ): F[CacheResult[Json]] =
+    putItemResult(schemas, schemaKey, freshResult)
+
   /** Lookup a `SchemaList`, no TTL is available */
   def getSchemaList(
     vendor: String,
@@ -93,6 +105,18 @@ class ResolverCache[F[_]] private (
     C: Clock[F]
   ): F[ListLookup] =
     putItem(schemaLists, (vendor, name, model), list)
+
+  /** Put a `SchemaList` result into a cache */
+  private[resolver] def putSchemaListResult(
+    vendor: String,
+    name: String,
+    model: Int,
+    list: ListLookup
+  )(implicit
+    F: Monad[F],
+    C: Clock[F]
+  ): F[CacheResult[SchemaList]] =
+    putItemResult(schemaLists, (vendor, name, model), list)
 }
 
 object ResolverCache {
@@ -150,11 +174,18 @@ object ResolverCache {
     schemaKey: K,
     freshResult: Lookup[A]
   ): F[Lookup[A]] =
+    putItemResult(c, schemaKey, freshResult).map(_.toLookup)
+
+  private def putItemResult[F[_]: Monad: Clock, A, K](
+    c: LruMap[F, K, (Int, Lookup[A])],
+    schemaKey: K,
+    freshResult: Lookup[A]
+  ): F[CacheResult[A]] =
     for {
       seconds <- currentSeconds[F]
       cached  <- c.get(schemaKey) // Ignore TTL invalidation
-      result = chooseResult(cached.map(_._2), freshResult)
-      _ <- c.put(schemaKey, (seconds, result)) // Overwrite or bump TTL
+      result = chooseResult(cached.map(_._2), freshResult, seconds)
+      _ <- c.put(schemaKey, (seconds, result.toLookup)) // Overwrite or bump TTL
     } yield result
 
   /** Get Unix epoch timestamp in seconds */
@@ -175,11 +206,31 @@ object ResolverCache {
     ttl.fold(true)(ttlVal => unixSeconds - storedTstamp < ttlVal)
 
   /** Choose which result is more appropriate for being stored in cache or combine failures */
-  private def chooseResult[A](cachedResult: Option[Lookup[A]], newResult: Lookup[A]): Lookup[A] =
+  private def chooseResult[A](
+    cachedResult: Option[Lookup[A]],
+    newResult: Lookup[A],
+    newSeconds: Int
+  ): CacheResult[A] =
     (cachedResult, newResult) match {
-      case (Some(c), n) if c == n    => c
-      case (Some(Left(c)), Left(n))  => c.combine(n).asLeft
-      case (Some(Right(c)), Left(_)) => c.asRight
-      case _                         => newResult
+      case (Some(Right(c)), Right(n)) if c == n => AlreadyCached(c, newSeconds)
+      case (Some(Right(_)), Right(n))           => NewlyCached(n, newSeconds)
+      case (Some(Left(c)), Left(n))             => CacheFailures(c.combine(n))
+      case (Some(Right(c)), Left(_))            => AlreadyCached(c, newSeconds)
+      case (None, Left(n))                      => CacheFailures(n)
+      case (None, Right(n))                     => NewlyCached(n, newSeconds)
+      case (Some(Left(_)), Right(n))            => NewlyCached(n, newSeconds)
     }
+
+  private[resolver] sealed trait CacheResult[A] { self =>
+    def toLookup: Lookup[A] =
+      self match {
+        case AlreadyCached(value, _) => Right(value)
+        case NewlyCached(value, _)   => Right(value)
+        case CacheFailures(value)    => Left(value)
+      }
+  }
+
+  private[resolver] case class AlreadyCached[A](value: A, timestamp: Int) extends CacheResult[A]
+  private[resolver] case class NewlyCached[A](value: A, timestamp: Int)   extends CacheResult[A]
+  private[resolver] case class CacheFailures[A](value: LookupFailureMap)  extends CacheResult[A]
 }
