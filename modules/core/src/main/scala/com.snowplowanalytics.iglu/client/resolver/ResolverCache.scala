@@ -25,7 +25,7 @@ import io.circe.Json
 import com.snowplowanalytics.lrumap.{CreateLruMap, LruMap}
 
 // Iglu core
-import com.snowplowanalytics.iglu.core.{SchemaKey, SchemaList}
+import com.snowplowanalytics.iglu.core.SchemaKey
 
 /**
  * Resolver cache and associated logic to (in)validate entities,
@@ -74,6 +74,13 @@ class ResolverCache[F[_]] private (
   ): F[SchemaLookup] =
     putItem(schemas, schemaKey, freshResult)
 
+  /**
+   * Much like `putSchema` but carries information about whether the cache was updated as a
+   * consequence, and the timestamp associated with the cached schema.
+   *
+   * Scoped as private because this method is new, somewhat experimental, and currently not needed
+   * beyond the internals of this lib.
+   */
   private[resolver] def putSchemaResult(
     schemaKey: SchemaKey,
     freshResult: SchemaLookup
@@ -105,18 +112,6 @@ class ResolverCache[F[_]] private (
     C: Clock[F]
   ): F[ListLookup] =
     putItem(schemaLists, (vendor, name, model), list)
-
-  /** Put a `SchemaList` result into a cache */
-  private[resolver] def putSchemaListResult(
-    vendor: String,
-    name: String,
-    model: Int,
-    list: ListLookup
-  )(implicit
-    F: Monad[F],
-    C: Clock[F]
-  ): F[CacheResult[SchemaList]] =
-    putItemResult(schemaLists, (vendor, name, model), list)
 }
 
 object ResolverCache {
@@ -176,6 +171,10 @@ object ResolverCache {
   ): F[Lookup[A]] =
     putItemResult(c, schemaKey, freshResult).map(_.toLookup)
 
+  /**
+   * Much like `putItem` but carries information about whether the cache was updated as a
+   * consequence, and the timestamp associated with the cached item.
+   */
   private def putItemResult[F[_]: Monad: Clock, A, K](
     c: LruMap[F, K, (Int, Lookup[A])],
     schemaKey: K,
@@ -221,6 +220,7 @@ object ResolverCache {
       case (Some(Left(_)), Right(n))            => NewlyCached(n, newSeconds)
     }
 
+  /** The result of committing a lookup to the cache, carrying information about whether the cache was updated as a consequence */
   private[resolver] sealed trait CacheResult[A] { self =>
     def toLookup: Lookup[A] =
       self match {
@@ -230,7 +230,26 @@ object ResolverCache {
       }
   }
 
+  /**
+   * The result of committing a lookup to the cache, if the cache was not updated due to this action
+   *
+   * @param value the cached value
+   * @param timestamp the epoch time in seconds for when this value was originally cached
+   */
   private[resolver] case class AlreadyCached[A](value: A, timestamp: Int) extends CacheResult[A]
+
+  /**
+   * The result of committing a lookup to the cache, if the cache is newly updated due to this action
+   *
+   * @param value the cached value
+   * @param timestamp the epoch time in seconds for when this value was originally cached
+   */
   private[resolver] case class NewlyCached[A](value: A, timestamp: Int)   extends CacheResult[A]
+
+  /**
+   * The result of committing a lookup to the cache, if lookup was a failure, and the cache could not find a previous value to compensate for the failure
+   *
+   * @param value details of the failure
+   */
   private[resolver] case class CacheFailures[A](value: LookupFailureMap)  extends CacheResult[A]
 }
