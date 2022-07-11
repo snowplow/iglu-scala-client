@@ -53,6 +53,48 @@ final case class Resolver[F[_]](repos: List[Registry], cache: Option[ResolverCac
    * If any of repositories gives non-non-found error, lookup will retried
    *
    * @param schemaKey The SchemaKey uniquely identifying the schema in Iglu
+   * @return a [[Resolver.ResolverResult]] boxing the schema Json on success, or a ResolutionError on failure
+   */
+  def lookupSchemaResult(
+    schemaKey: SchemaKey
+  )(implicit
+    F: Monad[F],
+    L: RegistryLookup[F],
+    C: Clock[F]
+  ): F[ResolverResult[Json]] = {
+    val get: Registry => F[Either[RegistryError, Json]] = r => L.lookup(r, schemaKey)
+
+    def handleAfterFetch(
+      result: Either[LookupFailureMap, Json]
+    ): F[ResolverResult[Json]] =
+      cache match {
+        case Some(c) =>
+          c.putSchemaResult(schemaKey, result).map {
+            case ResolverCache.AlreadyCached(i, t)    => Cached(i, t)
+            case ResolverCache.NewlyCached(i, t)      => Cached(i, t)
+            case ResolverCache.CacheFailures(failure) => lookupError(failure)
+          }
+        case None =>
+          result.fold[ResolverResult[Json]](lookupError, NotCached(_)).pure[F]
+      }
+
+    getFromCache(schemaKey).flatMap {
+      case Some((Right(schema), timestamp)) =>
+        Monad[F].pure(Cached(schema, timestamp))
+      case Some((Left(failures), _)) =>
+        retryCached[F, Json](get, schemaKey.vendor)(failures)
+          .flatMap(handleAfterFetch)
+      case None =>
+        traverseRepos[F, Json](get, prioritize(schemaKey.vendor, allRepos.toList), Map.empty)
+          .flatMap(handleAfterFetch)
+    }
+  }
+
+  /**
+   * Tries to find the given schema in any of the provided repository refs
+   * If any of repositories gives non-non-found error, lookup will retried
+   *
+   * @param schemaKey The SchemaKey uniquely identifying the schema in Iglu
    * @return a Validation boxing either the Schema's
    *         Json on Success, or an error String
    *         on Failure
@@ -63,20 +105,8 @@ final case class Resolver[F[_]](repos: List[Registry], cache: Option[ResolverCac
     F: Monad[F],
     L: RegistryLookup[F],
     C: Clock[F]
-  ): F[Either[ResolutionError, Json]] = {
-    val get: Registry => F[Either[RegistryError, Json]] = r => L.lookup(r, schemaKey)
-    val resultAction = getFromCache(schemaKey).flatMap {
-      case Some(lookupResult) =>
-        lookupResult.fold(retryCached[F, Json](get, schemaKey.vendor), finish[F, Json])
-      case None =>
-        traverseRepos[F, Json](get, prioritize(schemaKey.vendor, allRepos.toList), Map.empty)
-    }
-
-    for {
-      result      <- resultAction
-      cacheResult <- cache.traverse(c => c.putSchema(schemaKey, result))
-    } yield postProcess(cacheResult.getOrElse(result))
-  }
+  ): F[Either[ResolutionError, Json]] =
+    lookupSchemaResult(schemaKey).map(_.toEither.map(_._1))
 
   /**
    * Get list of available schemas for particular vendor and name part
@@ -90,7 +120,7 @@ final case class Resolver[F[_]](repos: List[Registry], cache: Option[ResolverCac
     F: Monad[F],
     L: RegistryLookup[F],
     C: Clock[F]
-  ) = {
+  ): F[Either[ResolutionError, SchemaList]] = {
     val get: Registry => F[Either[RegistryError, SchemaList]] = r => L.list(r, vendor, name, model)
 
     val resultAction = cache
@@ -117,7 +147,7 @@ final case class Resolver[F[_]](repos: List[Registry], cache: Option[ResolverCac
     F: Monad[F],
     L: RegistryLookup[F],
     C: Clock[F]
-  ) =
+  ): EitherT[F, ResolutionError, List[SelfDescribingSchema[Json]]] =
     for {
       list <- EitherT(listSchemas(vendor, name, model))
       result <- list.schemas.traverse { key =>
@@ -130,15 +160,51 @@ final case class Resolver[F[_]](repos: List[Registry], cache: Option[ResolverCac
   )(implicit
     F: Monad[F],
     C: Clock[F]
-  ): F[Option[SchemaLookup]] =
+  ): F[Option[(SchemaLookup, Int)]] =
     cache match {
-      case Some(c) => c.getSchema(schemaKey)
+      case Some(c) => c.getTimestampedSchema(schemaKey)
       case None    => Monad[F].pure(None)
     }
 }
 
 /** Companion object. Lets us create a Resolver from a Json */
 object Resolver {
+
+  /** The result of doing a lookup with the resolver, carrying information on whether the cache was used */
+  sealed trait ResolverResult[+A] { self =>
+
+    /**
+     * Convert the result to an `Either`
+     *
+     *  @return either the failure (as left) or a tuple of the looked-up item and a timestamp of
+     *  when the item was added to the cache (as right)
+     */
+    def toEither: Either[ResolutionError, (A, Option[Int])] =
+      self match {
+        case Cached(value, t)   => Right((value, Some(t)))
+        case NotCached(value)   => Right((value, None))
+        case LookupError(value) => Left(value)
+      }
+  }
+
+  /**
+   * The result of a lookup when the resolver is configured to use a cache
+   *
+   *  The timestamped value is helpful when the client code needs to perform an expensive
+   *  calculation derived from the looked-up value. If the timestamp has not changed since a
+   *  previous call, then the value is guaranteed to be the same as before, and the client code
+   *  does not need to re-run the expensive calculation.
+   *
+   *  @param value the looked-up value
+   *  @param timestamp epoch time in seconds of when the value was last cached by the resolver
+   */
+  case class Cached[A](value: A, timestamp: Int) extends ResolverResult[A]
+
+  /** The result of a lookup when the resolver is not configured to use a cache */
+  case class NotCached[A](value: A) extends ResolverResult[A]
+
+  /** The result of a lookup that ended in failure */
+  case class LookupError(value: ResolutionError) extends ResolverResult[Nothing]
 
   def retryCached[F[_]: Clock: Monad: RegistryLookup, A](
     get: Get[F, A],
@@ -334,6 +400,11 @@ object Resolver {
         case (key, value) => (key.config.name, value)
       })
     }
+
+  private def lookupError(failure: LookupFailureMap): LookupError =
+    LookupError(ResolutionError(SortedMap[String, LookupHistory]() ++ failure.map {
+      case (key, value) => (key.config.name, value)
+    }))
 
   private def matchConfig[F[_]: Applicative](datum: SelfDescribingData[Json]) = {
     val failure =
