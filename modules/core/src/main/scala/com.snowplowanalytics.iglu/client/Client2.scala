@@ -15,11 +15,10 @@ package com.snowplowanalytics.iglu.client
 import cats.Monad
 import cats.data.EitherT
 import cats.effect.{Clock, IO}
-import cats.implicits._
 
 import io.circe.{DecodingFailure, Json}
 
-import com.snowplowanalytics.iglu.core.{SchemaKey, SelfDescribingData}
+import com.snowplowanalytics.iglu.core.SelfDescribingData
 
 import resolver.{InitListCache, InitSchemaCache}
 import resolver.registries.{Registry, RegistryLookup}
@@ -37,7 +36,7 @@ import validator.CirceValidator.InitValidatorCache
 
 final case class Client2[F[_], A](
   resolver: Resolver[F],
-  validator: ValidatorF[F, (SchemaKey, Int), A]
+  validator: ValidatorF[F, A]
 ) {
   def check(
     instance: SelfDescribingData[A]
@@ -47,11 +46,10 @@ final case class Client2[F[_], A](
     C: Clock[F]
   ): EitherT[F, ClientError, Unit] =
     for {
-      (schema, tstamp) <- EitherT(resolver.lookupSchemaResult(instance.schema).map(_.toEither))
-      key              = tstamp.map((instance.schema, _))
-      schemaValidation = validator.validateSchemaF(key, schema)
+      resolverResult <- EitherT(resolver.lookupSchemaResult(instance.schema))
+      schemaValidation = validator.validateSchemaF(resolverResult)
       _ <- EitherT(schemaValidation).leftMap(_.toClientError)
-      validation = validator.validateF(key, instance.data, schema)
+      validation = validator.validateF(instance.data, resolverResult)
       _ <- EitherT(validation).leftMap(_.toClientError)
     } yield ()
 }

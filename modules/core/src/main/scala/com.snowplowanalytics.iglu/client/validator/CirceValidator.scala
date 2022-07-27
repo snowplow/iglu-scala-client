@@ -35,6 +35,7 @@ import io.circe.jackson.snowplow.circeToJackson
 import com.snowplowanalytics.lrumap.{CreateLruMap, LruMap}
 
 import com.snowplowanalytics.iglu.core.SchemaKey
+import com.snowplowanalytics.iglu.client.resolver.Resolver.{Cached, NotCached, ResolverResult}
 
 object CirceValidator extends Validator[Json] {
 
@@ -249,30 +250,33 @@ object CirceValidator extends Validator[Json] {
 
   type InitValidatorCache[F[_]] =
     CreateLruMap[F, (SchemaKey, Int), Either[ValidatorError.InvalidSchema, JsonSchema]]
-  def validatorF[F[_]: Monad: InitValidatorCache]: F[ValidatorF[F, (SchemaKey, Int), Json]] =
+  def validatorF[F[_]: Monad: InitValidatorCache]: F[ValidatorF[F, Json]] =
     CreateLruMap[F, (SchemaKey, Int), Either[ValidatorError.InvalidSchema, JsonSchema]]
       .create(100)
       .map(validatorFImpl(_))
 
   def validatorFImpl[F[_]: Monad](
     lookupJsonSchema: LruMap[F, (SchemaKey, Int), Either[ValidatorError.InvalidSchema, JsonSchema]]
-  ): ValidatorF[F, (SchemaKey, Int), Json] =
-    new ValidatorF[F, (SchemaKey, Int), Json] {
+  ): ValidatorF[F, Json] =
+    new ValidatorF[F, Json] {
 
       def lookupOrEvaluate(
-        key: Option[(SchemaKey, Int)],
-        schema: Json
+        schema: ResolverResult[Json]
       ): F[Either[ValidatorError.InvalidSchema, JsonSchema]] = {
-        key
-          .fold(Monad[F].pure(none[Either[ValidatorError.InvalidSchema, JsonSchema]]))(
-            lookupJsonSchema.get(_)
-          )
+        val fromCache = schema match {
+          case Cached(key, _, timestamp) =>
+            lookupJsonSchema.get((key, timestamp))
+          case NotCached(_) =>
+            Monad[F].pure(none)
+        }
+        fromCache
           .flatMap {
             case Some(result) => result.pure[F]
             case None =>
               Either
                 .catchNonFatal(
-                  IgluMetaschemaFactory.getSchema(circeToJackson(schema), SchemaValidatorsConfig)
+                  IgluMetaschemaFactory
+                    .getSchema(circeToJackson(schema.value), SchemaValidatorsConfig)
                 )
                 .leftMap(issue =>
                   ValidatorError
@@ -282,26 +286,29 @@ object CirceValidator extends Validator[Json] {
                 )
                 .pure[F]
                 .flatTap { result =>
-                  key.map(lookupJsonSchema.put(_, result)).sequence_
+                  schema match {
+                    case Cached(key, _, timestamp) =>
+                      lookupJsonSchema.put((key, timestamp), result).void
+                    case NotCached(_) =>
+                      Monad[F].pure(())
+                  }
                 }
           }
       }
 
       def validateF(
-        key: Option[(SchemaKey, Int)],
         data: Json,
-        schema: Json
+        schema: ResolverResult[Json]
       ): F[Either[ValidatorError, Unit]] =
-        lookupOrEvaluate(key, schema)
+        lookupOrEvaluate(schema)
           .map(_.flatMap { jsonschema =>
             validateOnReadySchema(jsonschema, data).leftMap(ValidatorError.InvalidData.apply)
           })
 
       def checkSchemaF(
-        key: Option[(SchemaKey, Int)],
-        schema: Json
+        schema: ResolverResult[Json]
       ): F[List[ValidatorError.SchemaIssue]] =
-        lookupOrEvaluate(key, schema)
+        lookupOrEvaluate(schema)
           .map {
             case Right(_)      => Nil
             case Left(invalid) => invalid.issues.toList

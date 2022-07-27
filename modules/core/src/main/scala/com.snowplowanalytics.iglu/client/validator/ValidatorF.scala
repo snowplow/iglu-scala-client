@@ -21,13 +21,15 @@ import cats.implicits._
 // circe
 import io.circe.Json
 
+import com.snowplowanalytics.iglu.client.resolver.Resolver.ResolverResult
+
 /**
  * Validates that Json conforms to a schema
  *
  * Unlike a simple [[Validator]], the results returned by a ValidatorF are wrapped in an effect type `F`.
  * Implementations of ValidatorF are expected to use caches for more efficient validation.
  */
-trait ValidatorF[F[_], K, A] {
+trait ValidatorF[F[_], A] {
 
   /**
    * Main method, validating _non-self-describing_ instance
@@ -36,7 +38,7 @@ trait ValidatorF[F[_], K, A] {
    * @param data the value to be checked against the schema
    * @param schema the jsonschema
    */
-  def validateF(key: Option[K], data: A, schema: Json): F[Either[ValidatorError, Unit]]
+  def validateF(data: A, schema: ResolverResult[Json]): F[Either[ValidatorError, Unit]]
 
   /**
    * Get validation errors for a Json Schema
@@ -48,7 +50,7 @@ trait ValidatorF[F[_], K, A] {
    * @param schema JSON Schema
    * @return list of Processing Messages with log level above warning
    */
-  def checkSchemaF(key: Option[K], schema: Json): F[List[ValidatorError.SchemaIssue]]
+  def checkSchemaF(schema: ResolverResult[Json]): F[List[ValidatorError.SchemaIssue]]
 
   /**
    * Validate a Json Schema
@@ -58,10 +60,10 @@ trait ValidatorF[F[_], K, A] {
    * @param schema JSON Schema
    * @return Either a list of processing Messages with log level above warning (as left) or Unit (as right)
    */
-  def validateSchemaF(key: Option[K], schema: Json)(implicit
+  def validateSchemaF(schema: ResolverResult[Json])(implicit
     F: Functor[F]
   ): F[Either[ValidatorError, Unit]] =
-    checkSchemaF(key, schema).map {
+    checkSchemaF(schema).map {
       case Nil    => ().asRight
       case h :: t => ValidatorError.InvalidSchema(NonEmptyList(h, t)).asLeft
     }
