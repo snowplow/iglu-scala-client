@@ -38,7 +38,7 @@ object ValidatorError {
    */
   final case class SchemaIssue(path: String, message: String)
 
-  private[client] def schemaIssue(issue: Throwable): ValidatorError =
+  private[client] def schemaIssue(issue: Throwable): ValidatorError.InvalidSchema =
     InvalidSchema(NonEmptyList.of(SchemaIssue("$", issue.getMessage)))
 
   implicit val validatorErrorJsonEncoder: Encoder.AsObject[ValidatorError] =

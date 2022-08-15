@@ -17,6 +17,7 @@ import cats.{Applicative, Functor, Monad}
 import cats.data.OptionT
 import cats.effect.Clock
 import cats.implicits._
+import com.snowplowanalytics.iglu.core.SchemaList
 
 // circe
 import io.circe.Json
@@ -106,6 +107,12 @@ class ResolverCache[F[_]] private (
   ): F[Option[ListLookup]] =
     getItem(ttl, schemaLists, (vendor, name, model))
 
+  private[resolver] def getTimestampedSchemaList(vendor: String, name: String, model: Int)(implicit
+    F: Monad[F],
+    C: Clock[F]
+  ): F[Option[TimestampedItem[ListLookup]]] =
+    getTimestampedItem(ttl, schemaLists, (vendor, name, model))
+
   /** Put a `SchemaList` result into a cache */
   def putSchemaList(
     vendor: String,
@@ -117,6 +124,15 @@ class ResolverCache[F[_]] private (
     C: Clock[F]
   ): F[ListLookup] =
     putItem(schemaLists, (vendor, name, model), list)
+
+  private[resolver] def putSchemaListResult(
+    vendor: String,
+    name: String,
+    model: Int,
+    freshResult: ListLookup
+  )(implicit F: Monad[F], C: Clock[F]): F[Either[LookupFailureMap, TimestampedItem[SchemaList]]] =
+    putItemResult(schemaLists, (vendor, name, model), freshResult)
+
 }
 
 object ResolverCache {

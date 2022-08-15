@@ -62,12 +62,12 @@ final case class Resolver[F[_]](repos: List[Registry], cache: Option[ResolverCac
     F: Monad[F],
     L: RegistryLookup[F],
     C: Clock[F]
-  ): F[Either[ResolutionError, ResolverResult[Json]]] = {
+  ): F[Either[ResolutionError, SchemaLookupResult]] = {
     val get: Registry => F[Either[RegistryError, Json]] = r => L.lookup(r, schemaKey)
 
     def handleAfterFetch(
       result: Either[LookupFailureMap, Json]
-    ): F[Either[ResolutionError, ResolverResult[Json]]] =
+    ): F[Either[ResolutionError, SchemaLookupResult]] =
       cache match {
         case Some(c) =>
           c.putSchemaResult(schemaKey, result).map {
@@ -75,7 +75,7 @@ final case class Resolver[F[_]](repos: List[Registry], cache: Option[ResolverCac
             case Left(failure)                              => Left(resolutionError(failure))
           }
         case None =>
-          result.bimap[ResolutionError, ResolverResult[Json]](resolutionError, NotCached(_)).pure[F]
+          result.bimap[ResolutionError, SchemaLookupResult](resolutionError, NotCached(_)).pure[F]
       }
 
     getFromCache(schemaKey).flatMap {
@@ -112,6 +112,47 @@ final case class Resolver[F[_]](repos: List[Registry], cache: Option[ResolverCac
    * Get list of available schemas for particular vendor and name part
    * Server supposed to return them in proper order
    */
+  def listSchemasResult(
+    vendor: String,
+    name: String,
+    model: Int
+  )(implicit
+    F: Monad[F],
+    L: RegistryLookup[F],
+    C: Clock[F]
+  ): F[Either[ResolutionError, ListSchemasResult]] = {
+    val get: Registry => F[Either[RegistryError, SchemaList]] = r => L.list(r, vendor, name, model)
+
+    def handleAfterFetch(
+      result: Either[LookupFailureMap, SchemaList]
+    ): F[Either[ResolutionError, ListSchemasResult]] =
+      cache match {
+        case Some(c) =>
+          c.putSchemaListResult(vendor, name, model, result).map {
+            case Right(ResolverCache.TimestampedItem(i, t)) =>
+              Right(Cached((vendor, name, model), i, t))
+            case Left(failure) => Left(resolutionError(failure))
+          }
+        case None =>
+          result.bimap[ResolutionError, ListSchemasResult](resolutionError, NotCached(_)).pure[F]
+      }
+
+    getFromCacheList(vendor, name, model).flatMap {
+      case Some(TimestampedItem(Right(schemaList), timestamp)) =>
+        Monad[F].pure(Right(Cached((vendor, name, model), schemaList, timestamp)))
+      case Some(TimestampedItem(Left(failures), _)) =>
+        retryCached[F, SchemaList](get, vendor)(failures)
+          .flatMap(handleAfterFetch)
+      case None =>
+        traverseRepos[F, SchemaList](get, prioritize(vendor, allRepos.toList), Map.empty)
+          .flatMap(handleAfterFetch)
+    }
+  }
+
+  /**
+   * Get list of available schemas for particular vendor and name part
+   * Server supposed to return them in proper order
+   */
   def listSchemas(
     vendor: String,
     name: String,
@@ -120,23 +161,8 @@ final case class Resolver[F[_]](repos: List[Registry], cache: Option[ResolverCac
     F: Monad[F],
     L: RegistryLookup[F],
     C: Clock[F]
-  ): F[Either[ResolutionError, SchemaList]] = {
-    val get: Registry => F[Either[RegistryError, SchemaList]] = r => L.list(r, vendor, name, model)
-
-    val resultAction = cache
-      .fold(F.pure(none[ListLookup]))(_.getSchemaList(vendor, name, model))
-      .flatMap {
-        case Some(listResult) =>
-          listResult.fold(retryCached[F, SchemaList](get, vendor), finish[F, SchemaList])
-        case None =>
-          traverseRepos[F, SchemaList](get, prioritize(vendor, allRepos.toList), Map.empty)
-      }
-
-    for {
-      result <- resultAction
-      _      <- cache.traverse(c => c.putSchemaList(vendor, name, model, result))
-    } yield postProcess(result)
-  }
+  ): F[Either[ResolutionError, SchemaList]] =
+    listSchemasResult(vendor, name, model).map(_.map(_.value))
 
   /** Get list of full self-describing schemas available on Iglu Server for particular vendor/name pair */
   def fetchSchemas(
@@ -165,13 +191,30 @@ final case class Resolver[F[_]](repos: List[Registry], cache: Option[ResolverCac
       case Some(c) => c.getTimestampedSchema(schemaKey)
       case None    => Monad[F].pure(None)
     }
+
+  private def getFromCacheList(
+    vendor: String,
+    name: String,
+    model: Int
+  )(implicit
+    F: Monad[F],
+    C: Clock[F]
+  ): F[Option[ResolverCache.TimestampedItem[ListLookup]]] =
+    cache match {
+      case Some(c) => c.getTimestampedSchemaList(vendor, name, model)
+      case None    => Monad[F].pure(None)
+    }
 }
 
 /** Companion object. Lets us create a Resolver from a Json */
 object Resolver {
 
+  type ListSchemasKey     = (String, String, Int) //vendor, name, model
+  type SchemaLookupResult = ResolverResult[SchemaKey, Json]
+  type ListSchemasResult  = ResolverResult[ListSchemasKey, SchemaList]
+
   /** The result of doing a lookup with the resolver, carrying information on whether the cache was used */
-  sealed trait ResolverResult[+A] {
+  sealed trait ResolverResult[+K, +A] {
     def value: A
   }
 
@@ -186,10 +229,10 @@ object Resolver {
    *  @param value the looked-up value
    *  @param timestamp epoch time in seconds of when the value was last cached by the resolver
    */
-  case class Cached[A](key: SchemaKey, value: A, timestamp: Int) extends ResolverResult[A]
+  case class Cached[K, A](key: K, value: A, timestamp: Int) extends ResolverResult[K, A]
 
   /** The result of a lookup when the resolver is not configured to use a cache */
-  case class NotCached[A](value: A) extends ResolverResult[A]
+  case class NotCached[A](value: A) extends ResolverResult[Nothing, A]
 
   def retryCached[F[_]: Clock: Monad: RegistryLookup, A](
     get: Get[F, A],
@@ -378,13 +421,6 @@ object Resolver {
     }
     errorsToRetry.keys.toList
   }
-
-  private def postProcess[F[_], A](result: Either[LookupFailureMap, A]) =
-    result.leftMap { failure =>
-      ResolutionError(SortedMap[String, LookupHistory]() ++ failure.map {
-        case (key, value) => (key.config.name, value)
-      })
-    }
 
   private def resolutionError(failure: LookupFailureMap): ResolutionError =
     ResolutionError(SortedMap[String, LookupHistory]() ++ failure.map {
