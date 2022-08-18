@@ -13,9 +13,8 @@
 package com.snowplowanalytics.iglu
 
 package object client {
-  type Resolver[F[_]]      = resolver.Resolver[F]
-  type Validator[A]        = validator.Validator[A]
-  type ValidatorF[F[_], A] = validator.ValidatorF[F, A]
+  type Resolver[F[_]] = resolver.Resolver[F]
+  type Validator[A]   = validator.Validator[A]
 
   val Resolver       = resolver.Resolver
   val CirceValidator = validator.CirceValidator

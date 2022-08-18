@@ -14,6 +14,7 @@ package com.snowplowanalytics.iglu.client
 package validator
 
 // Scala
+import com.fasterxml.jackson.databind.JsonNode
 import com.snowplowanalytics.iglu.client.resolver.Resolver.SchemaLookupResult
 
 import scala.jdk.CollectionConverters._
@@ -211,15 +212,13 @@ object CirceValidator extends Validator[Json] {
   private lazy val V4Schema =
     V4SchemaInstance.getSchema(new ObjectMapper().readTree(V4SchemaText))
 
-  def validate(data: Json, schema: Json): Either[ValidatorError, Unit] =
-    Either
-      .catchNonFatal(
-        IgluMetaschemaFactory.getSchema(circeToJackson(schema), SchemaValidatorsConfig)
-      )
-      .leftMap[ValidatorError](ValidatorError.schemaIssue) // Should never be reached in Client
+  def validate(data: Json, schema: Json): Either[ValidatorError, Unit] = {
+    val jacksonJson = circeToJackson(schema)
+    evaluateSchema(jacksonJson)
       .flatMap { schema =>
         validateOnReadySchema(schema, data).leftMap(ValidatorError.InvalidData.apply)
       }
+  }
 
   def checkSchema(schema: Json): List[ValidatorError.SchemaIssue] = {
     val jacksonJson = circeToJackson(schema)
@@ -250,64 +249,74 @@ object CirceValidator extends Validator[Json] {
   private def fromValidationMessage(m: ValidationMessage): ValidatorReport =
     ValidatorReport(m.getMessage, m.getPath.some, m.getArguments.toList, m.getType.some)
 
-  type InitValidatorCache[F[_]] =
-    CreateLruMap[F, (SchemaKey, Int), Either[ValidatorError.InvalidSchema, JsonSchema]]
-  def validatorF[F[_]: Monad: InitValidatorCache]: F[ValidatorF[F, Json]] =
-    CreateLruMap[F, (SchemaKey, Int), Either[ValidatorError.InvalidSchema, JsonSchema]]
-      .create(100)
-      .map(validatorFImpl(_))
+  private def evaluateSchema(
+    schemaAsNode: JsonNode
+  ): Either[ValidatorError.InvalidSchema, JsonSchema] = {
+    Either
+      .catchNonFatal(
+        IgluMetaschemaFactory
+          .getSchema(schemaAsNode, SchemaValidatorsConfig)
+      )
+      .leftMap(ValidatorError.schemaIssue)
+  }
 
-  def validatorFImpl[F[_]: Monad](
-    evaluationCache: LruMap[F, (SchemaKey, Int), Either[ValidatorError.InvalidSchema, JsonSchema]]
-  ): ValidatorF[F, Json] =
-    new ValidatorF[F, Json] {
+  private[client] object WithCaching { //TODO extract to different file?
+    type SchemaEvaluationKey         = (SchemaKey, Int)
+    type SchemaEvaluationResult      = Either[ValidatorError.InvalidSchema, JsonSchema]
+    type SchemaEvaluationCache[F[_]] = LruMap[F, SchemaEvaluationKey, SchemaEvaluationResult]
+    type InitValidatorCache[F[_]]    = CreateLruMap[F, SchemaEvaluationKey, SchemaEvaluationResult]
 
-      override def validateF(
-        data: Json,
-        schema: SchemaLookupResult
-      ): F[Either[ValidatorError, Unit]] =
-        lookupOrEvaluate(schema)
-          .map(_.flatMap { jsonschema =>
-            validateOnReadySchema(jsonschema, data).leftMap(ValidatorError.InvalidData.apply)
-          })
-
-      override def checkSchemaF(
-        schema: SchemaLookupResult
-      ): F[List[ValidatorError.SchemaIssue]] =
-        lookupOrEvaluate(schema)
-          .map {
-            case Right(_)      => Nil
-            case Left(invalid) => invalid.issues.toList
+    def validate[F[_]: Monad](
+      schemaEvaluationCache: SchemaEvaluationCache[F]
+    )(data: Json, schema: SchemaLookupResult): F[Either[ValidatorError, Unit]] = {
+      lookupOrEvaluate(schemaEvaluationCache)(schema)
+        .map {
+          _.flatMap { jsonschema =>
+            validateOnReadySchema(jsonschema, data)
+              .leftMap(ValidatorError.InvalidData.apply)
           }
-
-      private def lookupOrEvaluate(
-        result: SchemaLookupResult
-      ): F[Either[ValidatorError.InvalidSchema, JsonSchema]] = {
-        result match {
-          case Cached(key, schema, timestamp) =>
-            evaluationCache.get((key, timestamp)).flatMap {
-              case Some(alreadyEvaluatedSchema) =>
-                alreadyEvaluatedSchema.pure[F]
-              case None =>
-                evaluateSchema(schema)
-                  .flatTap(result => evaluationCache.put((key, timestamp), result))
-            }
-          case NotCached(schema) =>
-            evaluateSchema(schema)
         }
-      }
+    }
 
-      private def evaluateSchema(
-        schema: Json
-      ): F[Either[ValidatorError.InvalidSchema, JsonSchema]] = {
-        Either
-          .catchNonFatal(
-            IgluMetaschemaFactory
-              .getSchema(circeToJackson(schema), SchemaValidatorsConfig)
-          )
-          .leftMap(ValidatorError.schemaIssue)
-          .pure[F]
+    private def lookupOrEvaluate[F[_]: Monad](
+      evaluationCache: SchemaEvaluationCache[F]
+    )(result: SchemaLookupResult): F[Either[ValidatorError.InvalidSchema, JsonSchema]] = {
+      result match {
+        case Cached(key, schema, timestamp) =>
+          evaluationCache.get((key, timestamp)).flatMap {
+            case Some(alreadyEvaluatedSchema) =>
+              alreadyEvaluatedSchema.pure[F]
+            case None =>
+              provideNewJsonSchema(schema)
+                .pure[F]
+                .flatTap(result => evaluationCache.put((key, timestamp), result))
+          }
+        case NotCached(schema) =>
+          provideNewJsonSchema(schema).pure[F]
       }
     }
 
+    private def provideNewJsonSchema(
+      schema: Json
+    ): Either[ValidatorError.InvalidSchema, JsonSchema] = {
+      val schemaAsNode = circeToJackson(schema)
+      for {
+        _         <- validateSchema(schemaAsNode)
+        evaluated <- evaluateSchema(schemaAsNode)
+      } yield evaluated
+    }
+
+    private def validateSchema(schema: JsonNode): Either[ValidatorError.InvalidSchema, Unit] = {
+      val issues = V4Schema
+        .validate(schema)
+        .asScala
+        .toList
+        .map(m => ValidatorError.SchemaIssue(m.getPath, m.getMessage))
+
+      issues match {
+        case Nil          => Right(())
+        case head :: tail => Left(ValidatorError.InvalidSchema(NonEmptyList(head, tail)))
+      }
+    }
+  }
 }
