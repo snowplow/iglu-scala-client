@@ -19,6 +19,7 @@ import cats.implicits._
 import cats.{Applicative, Id, Monad}
 import com.snowplowanalytics.iglu.client.ClientError.ResolutionError
 import com.snowplowanalytics.iglu.client.resolver.registries.Registry.Get
+import com.snowplowanalytics.iglu.client.resolver.ResolverCache.TimestampedItem
 import com.snowplowanalytics.iglu.client.resolver.registries.{
   Registry,
   RegistryError,
@@ -30,7 +31,6 @@ import io.circe.{Decoder, DecodingFailure, HCursor, Json}
 
 import java.time.Instant
 import scala.collection.immutable.SortedMap
-import scala.concurrent.duration.DurationInt
 
 /** Resolves schemas from one or more Iglu schema registries */
 final case class Resolver[F[_]](repos: List[Registry], cache: Option[ResolverCache[F]]) {
@@ -44,25 +44,110 @@ final case class Resolver[F[_]](repos: List[Registry], cache: Option[ResolverCac
    * If any of repositories gives non-non-found error, lookup will retried
    *
    * @param schemaKey The SchemaKey uniquely identifying the schema in Iglu
+   * @return a [[Resolver.ResolverResult]] boxing the schema Json on success, or a ResolutionError on failure
+   */
+  def lookupSchemaResult(
+    schemaKey: SchemaKey
+  )(implicit
+    F: Monad[F],
+    L: RegistryLookup[F],
+    C: Clock[F]
+  ): F[Either[ResolutionError, SchemaLookupResult]] = {
+    val get: Registry => F[Either[RegistryError, Json]] = r => L.lookup(r, schemaKey)
+
+    def handleAfterFetch(
+      result: Either[LookupFailureMap, Json]
+    ): F[Either[ResolutionError, SchemaLookupResult]] =
+      cache match {
+        case Some(c) =>
+          c.putSchemaResult(schemaKey, result).map {
+            case Right(ResolverCache.TimestampedItem(i, t)) =>
+              Right(ResolverResult.Cached(schemaKey, i, t))
+            case Left(failure) => Left(resolutionError(failure))
+          }
+        case None =>
+          result
+            .bimap[ResolutionError, SchemaLookupResult](
+              resolutionError,
+              ResolverResult.NotCached(_)
+            )
+            .pure[F]
+      }
+
+    getSchemaFromCache(schemaKey).flatMap {
+      case Some(TimestampedItem(Right(schema), timestamp)) =>
+        Monad[F].pure(Right(ResolverResult.Cached(schemaKey, schema, timestamp)))
+      case Some(TimestampedItem(Left(failures), _)) =>
+        retryCached[F, Json](get, schemaKey.vendor)(failures)
+          .flatMap(handleAfterFetch)
+      case None =>
+        traverseRepos[F, Json](get, prioritize(schemaKey.vendor, allRepos.toList), Map.empty)
+          .flatMap(handleAfterFetch)
+    }
+  }
+
+  /**
+   * Tries to find the given schema in any of the provided repository refs
+   * If any of repositories gives non-non-found error, lookup will retried
+   *
+   * @param schemaKey The SchemaKey uniquely identifying the schema in Iglu
    * @return a Validation boxing either the Schema's
    *         Json on Success, or an error String
    *         on Failure
    */
   def lookupSchema(
     schemaKey: SchemaKey
-  )(implicit F: Monad[F], L: RegistryLookup[F], C: Clock[F]): F[Either[ResolutionError, Json]] = {
-    val get: Registry => F[Either[RegistryError, Json]] = r => L.lookup(r, schemaKey)
-    val resultAction = getFromCache(schemaKey).flatMap {
-      case Some(lookupResult) =>
-        lookupResult.fold(retryCached[F, Json](get, schemaKey.vendor), finish[F, Json])
-      case None =>
-        traverseRepos[F, Json](get, prioritize(schemaKey.vendor, allRepos.toList), Map.empty)
-    }
+  )(implicit
+    F: Monad[F],
+    L: RegistryLookup[F],
+    C: Clock[F]
+  ): F[Either[ResolutionError, Json]] =
+    lookupSchemaResult(schemaKey).map(_.map(_.value))
 
-    for {
-      result      <- resultAction
-      cacheResult <- cache.traverse(c => c.putSchema(schemaKey, result))
-    } yield postProcess(cacheResult.getOrElse(result))
+  /**
+   * Get list of available schemas for particular vendor and name part
+   * Server supposed to return them in proper order
+   */
+  def listSchemasResult(
+    vendor: Vendor,
+    name: Name,
+    model: Model
+  )(implicit
+    F: Monad[F],
+    L: RegistryLookup[F],
+    C: Clock[F]
+  ): F[Either[ResolutionError, SchemaListLookupResult]] = {
+    val get: Registry => F[Either[RegistryError, SchemaList]] = r => L.list(r, vendor, name, model)
+
+    def handleAfterFetch(
+      result: Either[LookupFailureMap, SchemaList]
+    ): F[Either[ResolutionError, SchemaListLookupResult]] =
+      cache match {
+        case Some(c) =>
+          c.putSchemaListResult(vendor, name, model, result).map {
+            case Right(ResolverCache.TimestampedItem(schemaList, timestamp)) =>
+              Right(ResolverResult.Cached((vendor, name, model), schemaList, timestamp))
+            case Left(failure) => Left(resolutionError(failure))
+          }
+        case None =>
+          result
+            .bimap[ResolutionError, SchemaListLookupResult](
+              resolutionError,
+              ResolverResult.NotCached(_)
+            )
+            .pure[F]
+      }
+
+    getSchemaListFromCache(vendor, name, model).flatMap {
+      case Some(TimestampedItem(Right(schemaList), timestamp)) =>
+        Monad[F].pure(Right(ResolverResult.Cached((vendor, name, model), schemaList, timestamp)))
+      case Some(TimestampedItem(Left(failures), _)) =>
+        retryCached[F, SchemaList](get, vendor)(failures)
+          .flatMap(handleAfterFetch)
+      case None =>
+        traverseRepos[F, SchemaList](get, prioritize(vendor, allRepos.toList), Map.empty)
+          .flatMap(handleAfterFetch)
+    }
   }
 
   /**
@@ -70,33 +155,26 @@ final case class Resolver[F[_]](repos: List[Registry], cache: Option[ResolverCac
    * Server supposed to return them in proper order
    */
   def listSchemas(
-    vendor: Vendor,
-    name: Name,
-    model: Model
-  )(implicit F: Monad[F], L: RegistryLookup[F], C: Clock[F]) = {
-    val get: Registry => F[Either[RegistryError, SchemaList]] = r => L.list(r, vendor, name, model)
-
-    val resultAction = cache
-      .fold(F.pure(none[ListLookup]))(_.getSchemaList(vendor, name, model))
-      .flatMap {
-        case Some(listResult) =>
-          listResult.fold(retryCached[F, SchemaList](get, vendor), finish[F, SchemaList])
-        case None =>
-          traverseRepos[F, SchemaList](get, prioritize(vendor, allRepos.toList), Map.empty)
-      }
-
-    for {
-      result <- resultAction
-      _      <- cache.traverse(c => c.putSchemaList(vendor, name, model, result))
-    } yield postProcess(result)
-  }
+    vendor: String,
+    name: String,
+    model: Int
+  )(implicit
+    F: Monad[F],
+    L: RegistryLookup[F],
+    C: Clock[F]
+  ): F[Either[ResolutionError, SchemaList]] =
+    listSchemasResult(vendor, name, model).map(_.map(_.value))
 
   /** Get list of full self-describing schemas available on Iglu Server for particular vendor/name pair */
   def fetchSchemas(
     vendor: Vendor,
     name: Name,
     model: Model
-  )(implicit F: Monad[F], L: RegistryLookup[F], C: Clock[F]) =
+  )(implicit
+    F: Monad[F],
+    L: RegistryLookup[F],
+    C: Clock[F]
+  ): EitherT[F, ResolutionError, List[SelfDescribingSchema[Json]]] =
     for {
       list <- EitherT(listSchemas(vendor, name, model))
       result <- list.schemas.traverse { key =>
@@ -104,18 +182,59 @@ final case class Resolver[F[_]](repos: List[Registry], cache: Option[ResolverCac
       }
     } yield result
 
-  private def getFromCache(
+  private def getSchemaFromCache(
     schemaKey: SchemaKey
-  )(implicit F: Monad[F], C: Clock[F]): F[Option[SchemaLookup]] =
+  )(implicit F: Monad[F], C: Clock[F]): F[Option[ResolverCache.TimestampedItem[SchemaLookup]]] =
     cache match {
-      case Some(c) => c.getSchema(schemaKey)
+      case Some(c) => c.getTimestampedSchema(schemaKey)
       case None    => Monad[F].pure(None)
     }
+
+  private def getSchemaListFromCache(
+    vendor: String,
+    name: String,
+    model: Int
+  )(implicit
+    F: Monad[F],
+    C: Clock[F]
+  ): F[Option[ResolverCache.TimestampedItem[ListLookup]]] =
+    cache match {
+      case Some(c) => c.getTimestampedSchemaList(vendor, name, model)
+      case None    => Monad[F].pure(None)
+    }
+
 }
 
 /** Companion object. Lets us create a Resolver from a Json */
 object Resolver {
 
+  type SchemaListKey          = (String, String, Int) // vendor, name, model
+  type SchemaLookupResult     = ResolverResult[SchemaKey, Json]
+  type SchemaListLookupResult = ResolverResult[SchemaListKey, SchemaList]
+
+  /** The result of doing a lookup with the resolver, carrying information on whether the cache was used */
+  sealed trait ResolverResult[+K, +A] {
+    def value: A
+  }
+
+  object ResolverResult {
+
+    /**
+     * The result of a lookup when the resolver is configured to use a cache
+     *
+     * The timestamped value is helpful when the client code needs to perform an expensive
+     * calculation derived from the looked-up value. If the timestamp has not changed since a
+     * previous call, then the value is guaranteed to be the same as before, and the client code
+     * does not need to re-run the expensive calculation.
+     *
+     * @param value     the looked-up value
+     * @param timestamp epoch time in seconds of when the value was last cached by the resolver
+     */
+    case class Cached[K, A](key: K, value: A, timestamp: TTL) extends ResolverResult[K, A]
+
+    /** The result of a lookup when the resolver is not configured to use a cache */
+    case class NotCached[A](value: A) extends ResolverResult[Nothing, A]
+  }
   def retryCached[F[_]: Clock: Monad: RegistryLookup, A](
     get: Get[F, A],
     vendor: Vendor
@@ -123,7 +242,7 @@ object Resolver {
     cachedErrors: LookupFailureMap
   ): F[Either[LookupFailureMap, A]] =
     for {
-      now <- Clock[F].realTime.map(_.toMillis).map(Instant.ofEpochMilli)
+      now <- Clock[F].realTimeInstant
       reposForRetry = getReposForRetry(cachedErrors, now)
       result <- traverseRepos[F, A](get, prioritize(vendor, reposForRetry), cachedErrors)
     } yield result
@@ -211,11 +330,12 @@ object Resolver {
   def bootstrap[F[_]: Monad: InitSchemaCache: InitListCache]: F[Resolver[F]] =
     Resolver.init[F](EmbeddedSchemaCount, None, Registry.EmbeddedRegistry)
 
-  private final case class ResolverConfig(
+  final case class ResolverConfig(
     cacheSize: Int,
-    cacheTtl: Option[Int],
+    cacheTtl: Option[TTL],
     repositoryRefs: List[Json]
   )
+  import scala.concurrent.duration._
 
   private implicit val resolverConfigCirceDecoder: Decoder[ResolverConfig] =
     new Decoder[ResolverConfig] {
@@ -224,7 +344,7 @@ object Resolver {
           cacheSize <- c.get[Int]("cacheSize")
           cacheTtl  <- c.get[Option[Int]]("cacheTtl")
           repos     <- c.get[List[Json]]("repositories")
-        } yield ResolverConfig(cacheSize, cacheTtl, repos)
+        } yield ResolverConfig(cacheSize, cacheTtl.map(_.seconds), repos)
     }
 
   /**
@@ -239,16 +359,30 @@ object Resolver {
     config: Json
   ): F[Either[DecodingFailure, Resolver[F]]] = {
     val result: EitherT[F, DecodingFailure, Resolver[F]] = for {
-      datum  <- EitherT.fromEither[F](config.as[SelfDescribingData[Json]])
-      _      <- matchConfig[F](datum)
-      config <- EitherT.fromEither[F](resolverConfigCirceDecoder(datum.data.hcursor))
-      cacheOpt <-
-        EitherT.liftF(ResolverCache.init[F](config.cacheSize, config.cacheTtl.map(_.seconds)))
-      refsE <- EitherT.fromEither[F](config.repositoryRefs.traverse(Registry.parse))
-      _     <- EitherT.fromEither[F](validateRefs(refsE))
-    } yield Resolver(refsE, cacheOpt)
+      config   <- EitherT.fromEither[F](parseConfig(config))
+      resolver <- fromConfig[F](config)
+    } yield resolver
 
     result.value
+  }
+  def parseConfig(
+    config: Json
+  ): Either[DecodingFailure, ResolverConfig] = {
+    for {
+      datum  <- config.as[SelfDescribingData[Json]]
+      _      <- matchConfig(datum)
+      config <- resolverConfigCirceDecoder(datum.data.hcursor)
+    } yield config
+  }
+
+  def fromConfig[F[_]: Monad: InitSchemaCache: InitListCache](
+    config: ResolverConfig
+  ): EitherT[F, DecodingFailure, Resolver[F]] = {
+    for {
+      cacheOpt <- EitherT.liftF(ResolverCache.init[F](config.cacheSize, config.cacheTtl))
+      refsE    <- EitherT.fromEither[F](config.repositoryRefs.traverse(Registry.parse))
+      _        <- EitherT.fromEither[F](validateRefs(refsE))
+    } yield Resolver(refsE, cacheOpt)
   }
 
   private def finish[F[_], A](
@@ -302,22 +436,18 @@ object Resolver {
     }
     errorsToRetry.keys.toList
   }
+  private def resolutionError(failure: LookupFailureMap): ResolutionError =
+    ResolutionError(SortedMap[String, LookupHistory]() ++ failure.map { case (key, value) =>
+      (key.config.name, value)
+    })
 
-  private def postProcess[F[_], A](result: Either[LookupFailureMap, A]) =
-    result.leftMap { failure =>
-      ResolutionError(SortedMap[String, LookupHistory]() ++ failure.map { case (key, value) =>
-        (key.config.name, value)
-      })
-    }
-
-  private def matchConfig[F[_]: Applicative](datum: SelfDescribingData[Json]) = {
+  private def matchConfig(datum: SelfDescribingData[Json]): Either[DecodingFailure, Unit] = {
     val failure =
       DecodingFailure(
         s"Schema ${datum.schema} does not match criterion ${ConfigurationSchema.asString}",
         List.empty
       )
-    val matcher = Either.cond(ConfigurationSchema.matches(datum.schema), (), failure)
-    EitherT.fromEither[F](matcher)
+    Either.cond(ConfigurationSchema.matches(datum.schema), (), failure)
   }
 
   // Minimum backoff period for retry
