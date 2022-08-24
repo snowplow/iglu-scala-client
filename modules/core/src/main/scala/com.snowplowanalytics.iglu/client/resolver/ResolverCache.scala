@@ -17,6 +17,9 @@ import cats.{Applicative, Monad}
 import cats.data.OptionT
 import cats.effect.Clock
 import cats.implicits._
+import com.snowplowanalytics.iglu.core.SchemaList
+// circe
+import io.circe.Json
 
 import scala.concurrent.duration.{DurationInt, FiniteDuration}
 
@@ -52,6 +55,11 @@ class ResolverCache[F[_]] private (
   def getSchema(key: SchemaKey)(implicit F: Monad[F], C: Clock[F]): F[Option[SchemaLookup]] =
     getItem(ttl, schemas, key)
 
+  private[resolver] def getTimestampedSchema(
+    key: SchemaKey
+  )(implicit F: Monad[F], C: Clock[F]): F[Option[TimestampedItem[SchemaLookup]]] =
+    getTimestampedItem(ttl, schemas, key)
+
   /**
    * Caches and returns the given schema.
    * If new value is a failure, but cached is success - return cached value in order
@@ -73,6 +81,22 @@ class ResolverCache[F[_]] private (
   ): F[SchemaLookup] =
     putItem(schemas, schemaKey, freshResult)
 
+  /**
+   * Much like `putSchema` but carries information about whether the cache was updated as a
+   * consequence, and the timestamp associated with the cached schema.
+   *
+   * Scoped as private because this method is new, somewhat experimental, and currently not needed
+   * beyond the internals of this lib.
+   */
+  private[resolver] def putSchemaResult(
+    schemaKey: SchemaKey,
+    freshResult: SchemaLookup
+  )(implicit
+    F: Monad[F],
+    C: Clock[F]
+  ): F[Either[LookupFailureMap, TimestampedItem[Json]]] =
+    putItemResult(schemas, schemaKey, freshResult)
+
   /** Lookup a `SchemaList`, no TTL is available */
   def getSchemaList(
     vendor: Vendor,
@@ -83,6 +107,12 @@ class ResolverCache[F[_]] private (
     C: Clock[F]
   ): F[Option[ListLookup]] =
     getItem(ttl, schemaLists, (vendor, name, model))
+
+  private[resolver] def getTimestampedSchemaList(vendor: String, name: String, model: Int)(implicit
+    F: Monad[F],
+    C: Clock[F]
+  ): F[Option[TimestampedItem[ListLookup]]] =
+    getTimestampedItem(ttl, schemaLists, (vendor, name, model))
 
   /** Put a `SchemaList` result into a cache */
   def putSchemaList(
@@ -95,6 +125,14 @@ class ResolverCache[F[_]] private (
     C: Clock[F]
   ): F[ListLookup] =
     putItem(schemaLists, (vendor, name, model), list)
+
+  private[resolver] def putSchemaListResult(
+    vendor: String,
+    name: String,
+    model: Int,
+    freshResult: ListLookup
+  )(implicit F: Monad[F], C: Clock[F]): F[Either[LookupFailureMap, TimestampedItem[SchemaList]]] =
+    putItemResult(schemaLists, (vendor, name, model), freshResult)
 }
 
 object ResolverCache {
@@ -109,7 +147,7 @@ object ResolverCache {
     C: CreateLruMap[F, SchemaKey, SchemaCacheEntry],
     L: CreateLruMap[F, ListCacheKey, ListCacheEntry]
   ): F[Option[ResolverCache[F]]] = {
-    if (size >= 0 && ttl.forall(_ > 0.seconds)) {
+    if (shouldCreateResolverCache(size, ttl)) {
       for {
         schemas     <- CreateLruMap[F, SchemaKey, SchemaCacheEntry].create(size)
         schemaLists <- CreateLruMap[F, ListCacheKey, ListCacheEntry].create(size)
@@ -118,20 +156,30 @@ object ResolverCache {
       Applicative[F].pure(none)
   }
 
-  def getItem[F[_]: Monad: Clock, A, K](
+  private[resolver] def shouldCreateResolverCache(size: Int, ttl: Option[TTL]): Boolean =
+    size > 0 && ttl.forall(_ > 0.seconds)
+
+  private def getTimestampedItem[F[_]: Monad: Clock, A, K](
     ttl: Option[TTL],
     c: LruMap[F, K, CacheEntry[Lookup[A]]],
     key: K
-  ): F[Option[Lookup[A]]] = {
+  ): F[Option[TimestampedItem[Lookup[A]]]] = {
     val wrapped = for {
-      (storageTime, lookup) <- OptionT(c.get(key))
-      currentTime           <- OptionT.liftF(Clock[F].realTime)
+      (storageTime: StorageTime, lookup) <- OptionT(c.get(key))
+      currentTime                        <- OptionT.liftF(Clock[F].realTime)
       _ = currentTime
       if isViable(ttl, currentTime, storageTime) || lookup.isLeft // isLeft
-    } yield lookup
+    } yield TimestampedItem(lookup, storageTime)
 
     wrapped.value
   }
+
+  def getItem[F[_]: Monad: Clock, A, K](
+    ttl: Option[TTL],
+    c: LruMap[F, K, (TTL, Lookup[A])],
+    key: K
+  ): F[Option[Lookup[A]]] =
+    getTimestampedItem(ttl, c, key).map(_.map(_.value))
 
   /**
    * Caches and returns the given schema.
@@ -149,12 +197,22 @@ object ResolverCache {
     c: LruMap[F, K, (TTL, Lookup[A])],
     schemaKey: K,
     freshResult: Lookup[A]
-  ): F[Lookup[A]] =
+  ): F[Lookup[A]] = putItemResult(c, schemaKey, freshResult).map(_.map(_.value))
+
+  /**
+   * Much like `putItem` but carries information about whether the cache was updated as a
+   * consequence, and the timestamp associated with the cached item.
+   */
+  private def putItemResult[F[_]: Monad: Clock, A, K](
+    c: LruMap[F, K, (TTL, Lookup[A])],
+    schemaKey: K,
+    freshResult: Lookup[A]
+  ): F[Either[LookupFailureMap, TimestampedItem[A]]] =
     for {
-      currentTime <- Clock[F].realTime
-      cached      <- c.get(schemaKey) // Ignore TTL invalidation
-      result = chooseResult(cached.map(_._2), freshResult)
-      _ <- c.put(schemaKey, (currentTime, result)) // Overwrite or bump TTL
+      seconds <- Clock[F].realTime
+      cached  <- c.get(schemaKey) // Ignore TTL invalidation
+      result = chooseResult(cached.map(_._2), freshResult, seconds)
+      _ <- c.put(schemaKey, (seconds, result.map(_.value))) // Overwrite or bump TTL
     } yield result
 
   /**
@@ -174,11 +232,30 @@ object ResolverCache {
     }
 
   /** Choose which result is more appropriate for being stored in cache or combine failures */
-  private def chooseResult[A](cachedResult: Option[Lookup[A]], newResult: Lookup[A]): Lookup[A] =
-    (cachedResult, newResult) match {
-      case (Some(c), n) if c == n    => c
-      case (Some(Left(c)), Left(n))  => c.combine(n).asLeft
-      case (Some(Right(c)), Left(_)) => c.asRight
-      case _                         => newResult
-    }
+  private def chooseResult[A](
+    cachedResult: Option[Lookup[A]],
+    newResult: Lookup[A],
+    newSeconds: TTL
+  ): Either[LookupFailureMap, TimestampedItem[A]] = (cachedResult, newResult) match {
+    case (Some(Right(c)), Right(n)) if c == n =>
+      Right(
+        TimestampedItem(c, newSeconds)
+      ) // if the cached objects are the same, update the timestamp - do we need this case?
+    case (Some(Right(_)), Right(n)) =>
+      Right(TimestampedItem(n, newSeconds)) // update w new item and update the timestamp
+    case (Some(Left(c)), Left(n)) =>
+      Left(c.combine(n)) // if both cache and new item are actually an error
+    case (Some(Right(c)), Left(_)) => Right(TimestampedItem(c, newSeconds))
+    case (None, Left(n))           => Left(n)
+    case (None, Right(n))          => Right(TimestampedItem(n, newSeconds))
+    case (Some(Left(_)), Right(n)) => Right(TimestampedItem(n, newSeconds))
+  }
+
+  /**
+   * The result of committing a lookup to the cache
+   *
+   * @param value the cached value
+   * @param timestamp the epoch time in seconds for when this value was originally cached
+   */
+  private[resolver] case class TimestampedItem[A](value: A, timestamp: StorageTime)
 }

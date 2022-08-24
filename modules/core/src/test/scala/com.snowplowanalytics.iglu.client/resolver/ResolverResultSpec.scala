@@ -12,10 +12,14 @@
  */
 package com.snowplowanalytics.iglu.client.resolver
 
+import cats.effect.testing.specs2.CatsEffect
+import com.snowplowanalytics.iglu.client.resolver.Resolver.{ResolverResult, SchemaLookupResult}
+import io.circe.parser.parse
+
 import java.net.URI
 import java.time.Instant
 import scala.collection.immutable.SortedMap
-import scala.concurrent.duration.DurationInt
+import scala.concurrent.duration._
 
 // Cats
 import cats.Id
@@ -37,24 +41,16 @@ import com.snowplowanalytics.iglu.client.resolver.registries.RegistryLookup._
 import com.snowplowanalytics.iglu.client.resolver.registries.{Registry, RegistryError}
 
 // Specs2
-import cats.effect.testing.specs2.CatsEffect
 import com.snowplowanalytics.iglu.client.SpecHelpers._
 import org.specs2.Specification
+import org.specs2.matcher.{DataTables, ValidatedMatchers}
 
-object ResolverSpec {
-
-  object Repos {
-
-    private val embedRef: (String, Int) => Registry.Embedded = (prefix, priority) =>
-      Registry.Embedded(Registry.Config("An embedded repo", priority, List(prefix)), "/embed-path")
-
-    val one: Registry.Embedded   = embedRef("com.acme", 0)
-    val two: Registry.Embedded   = embedRef("de.acompany.snowplow", 40)
-    val three: Registry.Embedded = embedRef("de.acompany.snowplow", 100)
-  }
-}
-
-class ResolverSpec extends Specification with CatsEffect {
+/** Like 'ResolverSpec' but using lookup methods returning 'ResolverResult' */
+class ResolverResultSpec
+    extends Specification
+    with DataTables
+    with ValidatedMatchers
+    with CatsEffect {
   def is = s2"""
 
   This is a specification to test the Resolver functionality
@@ -69,6 +65,9 @@ class ResolverSpec extends Specification with CatsEffect {
   a Resolver should accumulate errors from all repositories $e8
   we can construct a Resolver from a valid resolver 1-0-2 configuration JSON $e10
   a Resolver should cache SchemaLists with different models separately $e11
+  a Resolver should not cache schema if cache is disabled $e12
+  a Resolver should return cached schema when ttl not exceeded $e13
+  a Resolver should return cached schema when ttl exceeded $e14
   """
 
   import ResolverSpec._
@@ -198,10 +197,10 @@ class ResolverSpec extends Specification with CatsEffect {
       )
     val timeoutError =
       RegistryError.RepoFailure("shouldn't matter").asLeft[Json]
-    val correctSchema =
+    val correctResult =
       Json.Null.asRight[RegistryError]
     val time      = Instant.ofEpochMilli(2L)
-    val responses = List(timeoutError, correctSchema)
+    val responses = List(timeoutError, correctResult)
 
     val httpRep =
       Registry.Http(Registry.Config("Mock Repo", 1, List("com.snowplowanalytics.iglu-test")), null)
@@ -213,10 +212,10 @@ class ResolverSpec extends Specification with CatsEffect {
 
     val result = for {
       resolver  <- Resolver.init[StaticLookup](10, None, httpRep)
-      response1 <- resolver.lookupSchema(schemaKey)
-      response2 <- resolver.lookupSchema(schemaKey)
-      _         <- StaticLookup.addTime(600.millis)
-      response3 <- resolver.lookupSchema(schemaKey)
+      response1 <- resolver.lookupSchemaResult(schemaKey)
+      response2 <- resolver.lookupSchemaResult(schemaKey)
+      _         <- StaticLookup.addTime(600.milliseconds)
+      response3 <- resolver.lookupSchemaResult(schemaKey)
     } yield (response1, response2, response3)
 
     val (state, (response1, response2, response3)) =
@@ -234,7 +233,10 @@ class ResolverSpec extends Specification with CatsEffect {
         )
     }
 
-    val thirdSucceeded = response3 must beEqualTo(correctSchema)
+    val thirdSucceeded = response3 must beRight[SchemaLookupResult].like {
+      case ResolverResult.Cached(key, value, _) =>
+        key must beEqualTo(schemaKey) and (value must beEqualTo(Json.Null))
+    }
     val requestsNumber = state.req must beEqualTo(2)
 
     firstFailed and secondFailed and thirdSucceeded and requestsNumber
@@ -267,20 +269,27 @@ class ResolverSpec extends Specification with CatsEffect {
     val result = for {
       resolver <-
         Resolver
-          .init[StaticLookup](10, Some(1.second), httpRep)
-      _      <- resolver.lookupSchema(schemaKey)
+          .init[StaticLookup](
+            10,
+            Some(1.seconds),
+            httpRep
+          )
+      _      <- resolver.lookupSchemaResult(schemaKey)
       _      <- StaticLookup.addTime(2.seconds)
-      _      <- resolver.lookupSchema(schemaKey)
+      _      <- resolver.lookupSchemaResult(schemaKey)
       _      <- StaticLookup.addTime(2.seconds)
-      _      <- resolver.lookupSchema(schemaKey)
+      _      <- resolver.lookupSchemaResult(schemaKey)
       _      <- StaticLookup.addTime(2.seconds)
-      result <- resolver.lookupSchema(schemaKey) // ... but don't try to overwrite it
+      result <- resolver.lookupSchemaResult(schemaKey) // ... but don't try to overwrite it
     } yield result
 
     val (state, response) = result.run(ResolverSpecHelpers.RegistryState.init).value
 
     // Final response must not overwrite a successful one
-    val finalResult = response must beRight(correctSchema)
+    val finalResult = response must beRight[SchemaLookupResult].like {
+      case ResolverResult.Cached(key, value, _) =>
+        key must beEqualTo(schemaKey) and (value must beEqualTo(Json.Null))
+    }
 
     // Check that it attempted to get fourth schema (500 response)
     val lookupTries = state.req must beEqualTo(4)
@@ -336,9 +345,9 @@ class ResolverSpec extends Specification with CatsEffect {
 
     val result = for {
       resolver <- Resolver.init[StaticLookup](10, Some(100.seconds), httpRep1, httpRep2)
-      _        <- resolver.lookupSchema(schemaKey)
-      _        <- StaticLookup.addTime(2000.millis)
-      result   <- resolver.lookupSchema(schemaKey)
+      _        <- resolver.lookupSchemaResult(schemaKey)
+      _        <- StaticLookup.addTime(2.seconds)
+      result   <- resolver.lookupSchemaResult(schemaKey)
     } yield result
 
     val (state, response) = result.run(ResolverSpecHelpers.RegistryState.init).value
@@ -380,12 +389,10 @@ class ResolverSpec extends Specification with CatsEffect {
 
     Resolver
       .parse[IO](config)
-      .map { parsed =>
-        parsed must beRight[Resolver[IO]].like { case resolver =>
-          resolver.cache.flatMap(_.ttl) must beSome(10.seconds) and
-            (resolver.repos must contain(SpecHelpers.IgluCentral, Repos.three))
-        }
-      }
+      .map(_ must beRight[Resolver[IO]].like { case resolver =>
+        resolver.cache.flatMap(_.ttl) must beSome(10.seconds) and
+          (resolver.repos must contain(SpecHelpers.IgluCentral, Repos.three))
+      })
   }
 
   def e11 = {
@@ -397,11 +404,117 @@ class ResolverSpec extends Specification with CatsEffect {
 
     val resolver = Resolver.init[Id](10, None, IgluCentralServer)
 
-    val resultOne = resolver.listSchemas("com.sendgrid", "bounce", 2)
-    val resultTwo = resolver.listSchemas("com.sendgrid", "bounce", 1)
+    val resultOne = resolver.listSchemasResult("com.sendgrid", "bounce", 2)
+    val resultTwo = resolver.listSchemasResult("com.sendgrid", "bounce", 1)
     (resultOne, resultTwo) match {
       case (Right(one), Right(two)) => one shouldNotEqual two
       case _                        => ko("Unexpected result for two consequent listSchemas")
+    }
+  }
+
+  def e12 = {
+
+    val expectedSchema: Json =
+      parse(
+        scala.io.Source
+          .fromInputStream(
+            getClass.getResourceAsStream(
+              "/iglu-test-embedded/schemas/com.snowplowanalytics.iglu-test/stock-item/jsonschema/1-0-0"
+            )
+          )
+          .mkString
+      )
+        .fold(e => throw new RuntimeException(s"Cannot parse stock-item schema, $e"), identity)
+
+    val schemaKey = SchemaKey(
+      "com.snowplowanalytics.iglu-test",
+      "stock-item",
+      "jsonschema",
+      SchemaVer.Full(1, 0, 0)
+    )
+
+    Resolver
+      .init[IO](cacheSize = 0, cacheTtl = None, refs = EmbeddedTest)
+      .flatMap(resolver => resolver.lookupSchemaResult(schemaKey))
+      .map(_ must beRight(ResolverResult.NotCached(expectedSchema)))
+  }
+
+  def e13 = {
+    val schemaKey =
+      SchemaKey(
+        "com.snowplowanalytics.iglu-test",
+        "mock_schema",
+        "jsonschema",
+        SchemaVer.Full(1, 0, 0)
+      )
+    val schema =
+      Json.Null.asRight[RegistryError]
+    val responses = List(schema, schema)
+
+    val httpRep =
+      Registry.Http(Registry.Config("Mock Repo", 1, List("com.snowplowanalytics.iglu-test")), null)
+
+    implicit val cache          = ResolverSpecHelpers.staticCache
+    implicit val cacheList      = ResolverSpecHelpers.staticCacheForList
+    implicit val clock          = ResolverSpecHelpers.staticClock
+    implicit val registryLookup = ResolverSpecHelpers.getLookup(responses, Nil)
+
+    val result = for {
+      resolver  <- Resolver.init[StaticLookup](10, Some(200.seconds), httpRep)
+      response1 <- resolver.lookupSchemaResult(schemaKey)
+      _         <- StaticLookup.addTime(150.seconds) // ttl 200, delay 150
+      response2 <- resolver.lookupSchemaResult(schemaKey)
+    } yield (response1, response2)
+
+    val (_, (response1, response2)) =
+      result.run(ResolverSpecHelpers.RegistryState.init).value
+
+    response1 must beRight[SchemaLookupResult].like { case _: ResolverResult.Cached[_, _] =>
+      response1 must beEqualTo(
+        response2
+      ) // same cached (including timestamps) item because it didn't expire
+    }
+
+  }
+
+  def e14 = {
+    val schemaKey =
+      SchemaKey(
+        "com.snowplowanalytics.iglu-test",
+        "mock_schema",
+        "jsonschema",
+        SchemaVer.Full(1, 0, 0)
+      )
+    val schema =
+      Json.Null.asRight[RegistryError]
+    val responses = List(schema, schema)
+
+    val httpRep =
+      Registry.Http(Registry.Config("Mock Repo", 1, List("com.snowplowanalytics.iglu-test")), null)
+
+    implicit val cache          = ResolverSpecHelpers.staticCache
+    implicit val cacheList      = ResolverSpecHelpers.staticCacheForList
+    implicit val clock          = ResolverSpecHelpers.staticClock
+    implicit val registryLookup = ResolverSpecHelpers.getLookup(responses, Nil)
+
+    val result = for {
+      resolver  <- Resolver.init[StaticLookup](10, Some(200.seconds), httpRep)
+      response1 <- resolver.lookupSchemaResult(schemaKey)
+      _         <- StaticLookup.addTime(250.seconds) // ttl 200, delay 250
+      response2 <- resolver.lookupSchemaResult(schemaKey)
+    } yield (response1, response2)
+
+    val (_, (response1, response2)) =
+      result.run(ResolverSpecHelpers.RegistryState.init).value
+
+    response1 must beRight[SchemaLookupResult].like {
+      case ResolverResult.Cached(_, value1, timestamp1) =>
+        response2 must beRight[SchemaLookupResult].like {
+          case ResolverResult.Cached(_, value2, timestamp2) =>
+            value1 must beEqualTo(
+              value2
+            ) and (timestamp1 mustNotEqual timestamp2) // same value but different timestamps because original item expired
+        }
     }
   }
 }
