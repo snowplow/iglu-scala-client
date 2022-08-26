@@ -11,7 +11,14 @@
 	"type": "object",
 	"properties": {
 		"id": {
-			"type": "string"
+			"type": [
+        "string",
+        "array",
+        "integer",
+        "boolean",
+        "object",
+        "null"
+      ]
 		},
 		"name": {
 			"type": "string"

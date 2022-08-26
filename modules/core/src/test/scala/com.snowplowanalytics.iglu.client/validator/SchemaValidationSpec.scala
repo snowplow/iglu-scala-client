@@ -38,7 +38,7 @@ class SchemaValidationSpec extends Specification with CatsEffect {
         "jsonschema",
         SchemaVer.Full(1, 0, 0)
       ),
-      json"""{"id": "123-12", "name": "t-shirt", "price": 29.99 }"""
+      json"""{"id": {"value": 12312}, "name": "t-shirt", "price": 29.99 }"""
     )
 
   val validJsonWithInvalidSchema =
