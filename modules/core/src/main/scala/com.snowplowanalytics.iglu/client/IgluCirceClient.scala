@@ -15,6 +15,7 @@ package com.snowplowanalytics.iglu.client
 import cats.Monad
 import cats.data.EitherT
 import cats.effect.Clock
+import cats.implicits._
 import com.snowplowanalytics.iglu.client.resolver.registries.RegistryLookup
 import com.snowplowanalytics.iglu.client.resolver.{InitListCache, InitSchemaCache}
 import com.snowplowanalytics.iglu.client.validator.CirceValidator.WithCaching.{
@@ -58,8 +59,16 @@ object IgluCirceClient {
   ): EitherT[F, DecodingFailure, IgluCirceClient[F]] =
     for {
       resolver <- EitherT(Resolver.parse[F](json))
-      cache    <- EitherT.liftF(schemaEvaluationCache[F])
-    } yield new IgluCirceClient(resolver, cache)
+      client   <- EitherT.liftF(fromResolver(resolver))
+    } yield client
+
+  def fromResolver[F[_]: Monad: InitValidatorCache](
+    resolver: Resolver[F]
+  ): F[IgluCirceClient[F]] = {
+    schemaEvaluationCache[F].map { cache =>
+      new IgluCirceClient(resolver, cache)
+    }
+  }
 
   private def schemaEvaluationCache[F[_]: InitValidatorCache]: F[SchemaEvaluationCache[F]] =
     CreateLruMap[F, SchemaEvaluationKey, SchemaEvaluationResult].create(100)

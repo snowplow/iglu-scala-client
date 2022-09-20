@@ -266,6 +266,8 @@ object CirceValidator extends Validator[Json] {
 
   /** Similar to original validation but with additional caching of `JsonSchema` instances */
   private[client] object WithCaching {
+
+    /** Evaluated schema in cache is identified by a schema key and a timestamp indicating when schema was cached by resolver during lookup */
     type SchemaEvaluationKey         = (SchemaKey, Int)
     type SchemaEvaluationResult      = Either[ValidatorError.InvalidSchema, JsonSchema]
     type SchemaEvaluationCache[F[_]] = LruMap[F, SchemaEvaluationKey, SchemaEvaluationResult]
@@ -274,7 +276,7 @@ object CirceValidator extends Validator[Json] {
     def validate[F[_]: Monad](
       schemaEvaluationCache: SchemaEvaluationCache[F]
     )(data: Json, schema: SchemaLookupResult): F[Either[ValidatorError, Unit]] = {
-      lookupOrEvaluate(schemaEvaluationCache)(schema)
+      getFromCacheOrEvaluate(schemaEvaluationCache)(schema)
         .map {
           _.flatMap { jsonschema =>
             validateOnReadySchema(jsonschema, data)
@@ -283,7 +285,7 @@ object CirceValidator extends Validator[Json] {
         }
     }
 
-    private def lookupOrEvaluate[F[_]: Monad](
+    private def getFromCacheOrEvaluate[F[_]: Monad](
       evaluationCache: SchemaEvaluationCache[F]
     )(result: SchemaLookupResult): F[Either[ValidatorError.InvalidSchema, JsonSchema]] = {
       result match {

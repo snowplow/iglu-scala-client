@@ -63,6 +63,7 @@ object SpecHelpers {
       IO.delay(unit.convert(System.nanoTime(), TimeUnit.NANOSECONDS))
   }
 
-  val TestResolver = Resolver.init[IO](10, None, EmbeddedTest)
-  val TestClient   = for { resolver <- TestResolver } yield Client(resolver, CirceValidator)
+  val TestResolver      = Resolver.init[IO](10, None, EmbeddedTest)
+  val TestClient        = for { resolver <- TestResolver } yield Client(resolver, CirceValidator)
+  val CachingTestClient = TestResolver.flatMap(IgluCirceClient.fromResolver[IO])
 }
