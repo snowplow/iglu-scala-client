@@ -222,11 +222,7 @@ object CirceValidator extends Validator[Json] {
 
   def checkSchema(schema: Json): List[ValidatorError.SchemaIssue] = {
     val jacksonJson = circeToJackson(schema)
-    V4Schema
-      .validate(jacksonJson)
-      .asScala
-      .toList
-      .map(m => ValidatorError.SchemaIssue(m.getPath, m.getMessage))
+    validateSchemaAgainstV4(jacksonJson)
   }
 
   /** Validate instance against schema and return same instance */
@@ -260,7 +256,16 @@ object CirceValidator extends Validator[Json] {
       .leftMap(ValidatorError.schemaIssue)
   }
 
-  private[client] object WithCaching { //TODO extract to different file?
+  private def validateSchemaAgainstV4(schema: JsonNode): List[ValidatorError.SchemaIssue] = {
+    V4Schema
+      .validate(schema)
+      .asScala
+      .toList
+      .map(m => ValidatorError.SchemaIssue(m.getPath, m.getMessage))
+  }
+
+  /** Similar to original validation but with additional caching of `JsonSchema` instances */
+  private[client] object WithCaching {
     type SchemaEvaluationKey         = (SchemaKey, Int)
     type SchemaEvaluationResult      = Either[ValidatorError.InvalidSchema, JsonSchema]
     type SchemaEvaluationCache[F[_]] = LruMap[F, SchemaEvaluationKey, SchemaEvaluationResult]
@@ -307,11 +312,7 @@ object CirceValidator extends Validator[Json] {
     }
 
     private def validateSchema(schema: JsonNode): Either[ValidatorError.InvalidSchema, Unit] = {
-      val issues = V4Schema
-        .validate(schema)
-        .asScala
-        .toList
-        .map(m => ValidatorError.SchemaIssue(m.getPath, m.getMessage))
+      val issues = validateSchemaAgainstV4(schema)
 
       issues match {
         case Nil          => Right(())

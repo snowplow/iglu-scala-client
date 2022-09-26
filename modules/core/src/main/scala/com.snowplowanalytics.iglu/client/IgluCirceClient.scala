@@ -27,14 +27,19 @@ import com.snowplowanalytics.iglu.core.SelfDescribingData
 import com.snowplowanalytics.lrumap.CreateLruMap
 import io.circe.{DecodingFailure, Json}
 
-final class CirceClient[F[_]] private (
+/**
+ * Client using 'lookupSchemaResult' resolver method (as opposed to old client relying on plain `lookupSchema` method)
+ * which enables validator taking advantage of caching.
+ * Should provide significant performance boost for the 'check' operation when called frequently.
+ */
+final class IgluCirceClient[F[_]] private (
   resolver: Resolver[F],
   schemaEvaluationCache: SchemaEvaluationCache[F]
 ) {
   def check(
-    instance: SelfDescribingData[Json] //TODO can we commit to Json here and get rid of type param?
+    instance: SelfDescribingData[Json]
   )(implicit
-    M: Monad[F], //TODO can we move those to client constructor?
+    M: Monad[F],
     L: RegistryLookup[F],
     C: Clock[F]
   ): EitherT[F, ClientError, Unit] =
@@ -46,15 +51,15 @@ final class CirceClient[F[_]] private (
     } yield ()
 }
 
-object CirceClient {
+object IgluCirceClient {
 
   def parseDefault[F[_]: Monad: InitSchemaCache: InitListCache: InitValidatorCache](
     json: Json
-  ): EitherT[F, DecodingFailure, CirceClient[F]] =
+  ): EitherT[F, DecodingFailure, IgluCirceClient[F]] =
     for {
       resolver <- EitherT(Resolver.parse[F](json))
       cache    <- EitherT.liftF(schemaEvaluationCache[F])
-    } yield new CirceClient(resolver, cache)
+    } yield new IgluCirceClient(resolver, cache)
 
   private def schemaEvaluationCache[F[_]: InitValidatorCache]: F[SchemaEvaluationCache[F]] =
     CreateLruMap[F, SchemaEvaluationKey, SchemaEvaluationResult].create(100)
