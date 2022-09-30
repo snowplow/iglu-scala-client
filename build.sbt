@@ -79,6 +79,7 @@ lazy val http4s = (project in file("modules/http4s"))
     libraryDependencies ++= Seq(
       Dependencies.Libraries.http4sClient,
       Dependencies.Libraries.http4sCirce,
+      Dependencies.Libraries.catsEffect,
       // Scala (test only)
       Dependencies.Libraries.circeCore,
       Dependencies.Libraries.specs2,

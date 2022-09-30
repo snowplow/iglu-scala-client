@@ -113,7 +113,7 @@ class Http4sRegistryLookupSpec extends Specification with CatsEffect {
       )
 
       Http4sRegistryLookup(client).list(registry, "com.myvendor", "myname", 42).map { result =>
-        result should beRight(SchemaList(expected))
+        result should beRight(SchemaList.parseUnsafe(expected))
       }
     }
 

@@ -45,7 +45,16 @@ package object snowplow {
           number match {
             case _: JsonBiggerDecimal | _: JsonBigDecimal =>
               number.toBigDecimal
-                .map(bigDecimal => DecimalNode.valueOf(bigDecimal.underlying))
+                .map(bigDecimal => {
+                  if (bigDecimal.isValidInt)
+                    IntNode.valueOf(bigDecimal.intValue)
+                  else if (bigDecimal.isValidLong) {
+                    LongNode.valueOf(bigDecimal.longValue)
+                  } else if (bigDecimal.isWhole) {
+                    BigIntegerNode.valueOf(bigDecimal.toBigInt.underlying)
+                  } else
+                    DecimalNode.valueOf(bigDecimal.underlying)
+                })
                 .getOrElse(TextNode.valueOf(number.toString))
             case JsonLong(x)   => LongNode.valueOf(x)
             case JsonDouble(x) => DoubleNode.valueOf(x)

@@ -13,7 +13,7 @@ Iglu Scala Client is used extensively in **[Snowplow][snowplow-repo]** to valida
 
 ## Installation
 
-The latest version of Iglu Scala Client is 2.2.0, which currently works with Scala 2.12 and 2.13.
+The latest version of Iglu Scala Client is 2.2.0, which works with Scala 2.12, 2.13, and 3.
 
 If you're using SBT, add the following lines to your build file:
 

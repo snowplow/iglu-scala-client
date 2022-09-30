@@ -32,14 +32,19 @@ object BuildSettings {
 
   lazy val buildSettings = Seq[Setting[_]](
     organization := "com.snowplowanalytics",
-    scalaVersion := "2.13.8",
-    crossScalaVersions := Seq("2.13.8", "2.12.15"),
+    scalaVersion := "2.13.9",
+    crossScalaVersions := Seq("3.2.0", "2.13.9", "2.12.17"),
     licenses += ("Apache-2.0", url("http://www.apache.org/licenses/LICENSE-2.0.html")),
     Test / parallelExecution := false, // possible race bugs
-
-    addCompilerPlugin("org.typelevel" %% "kind-projector" % "0.13.2" cross CrossVersion.full),
-    addCompilerPlugin("com.olegpy" %% "better-monadic-for" % "0.3.1")
-  )
+    libraryDependencies ++= {
+      if (scalaBinaryVersion.value.startsWith("2")) {
+        List(
+          compilerPlugin("org.typelevel" %% "kind-projector" % "0.13.2" cross CrossVersion.full),
+          compilerPlugin("com.olegpy" %% "better-monadic-for" % "0.3.1")
+        )
+      } else Nil
+    }
+ )
 
 
   // Bintray publishing settings
@@ -63,16 +68,24 @@ object BuildSettings {
   // clear-out mimaBinaryIssueFilters and mimaPreviousVersions.
   // Otherwise, add previous version to set without
   // removing other versions.
-  val mimaPreviousVersionsData = Set()
-  val mimaPreviousVersionsCore = Set()
-  val mimaPreviousVersionsHttp4s = Set("2.0.0")
+  val mimaPreviousVersionsData = Set("2.1.0", "2.2.0")
+  val mimaPreviousVersionsCore = Set("2.1.0", "2.2.0")
+  val mimaPreviousVersionsHttp4s = Set("2.0.0", "2.1.0", "2.2.0")
+  val mimaPreviousVersionsScala3 = Set()
 
   lazy val mimaSettings = Seq(
     mimaPreviousArtifacts := {
       val mimaPreviousVersions = 
-        if (name.value.endsWith("http4s")) mimaPreviousVersionsHttp4s
-        else if (name.value.endsWith("data")) mimaPreviousVersionsData
-        else mimaPreviousVersionsCore
+        (name.value, CrossVersion.partialVersion(scalaVersion.value)) match {
+          case (_, Some((3, _))) =>
+            mimaPreviousVersionsScala3
+          case (name, _) if name.endsWith("http4s") =>
+            mimaPreviousVersionsHttp4s
+          case (name, _) if name.endsWith("data") =>
+            mimaPreviousVersionsData
+          case _ =>
+            mimaPreviousVersionsCore
+        }
           
       mimaPreviousVersions.map { organization.value %% name.value % _ }
     },

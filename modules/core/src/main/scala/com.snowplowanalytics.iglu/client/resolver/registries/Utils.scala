@@ -122,7 +122,7 @@ private[registries] object Utils {
           else
             s.asRight
         )
-        .map(SchemaList.apply)
+        .map(SchemaList.parseUnsafe)
     } catch {
       case NonFatal(e) =>
         e match {

@@ -23,7 +23,7 @@ sealed trait RegistryError extends Product with Serializable
 object RegistryError {
 
   /** Schema certainly does not exist on this registry */
-  final case object NotFound extends RegistryError
+  case object NotFound extends RegistryError
 
   /** Other error, e.g. 500 HTTP status or invalid schema. Usually, non fatal */
   final case class RepoFailure(message: String) extends RegistryError
