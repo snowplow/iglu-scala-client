@@ -12,7 +12,8 @@
  */
 package com.snowplowanalytics.iglu.client.resolver
 
-import com.snowplowanalytics.iglu.client.resolver.Resolver.{Cached, NotCached, SchemaLookupResult}
+import com.snowplowanalytics.iglu.client.resolver.Resolver.{ResolverResult, SchemaLookupResult}
+import io.circe.parser.parse
 
 import java.net.URI
 import java.time.Instant
@@ -230,7 +231,7 @@ class ResolverResultSpec extends Specification with DataTables with ValidatedMat
     }
 
     val thirdSucceeded = response3 must beRight[SchemaLookupResult].like {
-      case Cached(key, value, _) =>
+      case ResolverResult.Cached(key, value, _) =>
         key must beEqualTo(schemaKey) and (value must beEqualTo(Json.Null))
     }
     val requestsNumber = state.req must beEqualTo(2)
@@ -279,7 +280,7 @@ class ResolverResultSpec extends Specification with DataTables with ValidatedMat
 
     // Final response must not overwrite a successful one
     val finalResult = response must beRight[SchemaLookupResult].like {
-      case Cached(key, value, _) =>
+      case ResolverResult.Cached(key, value, _) =>
         key must beEqualTo(schemaKey) and (value must beEqualTo(Json.Null))
     }
 
@@ -408,35 +409,18 @@ class ResolverResultSpec extends Specification with DataTables with ValidatedMat
 
   def e12 = {
 
-    val schema =
-      json"""
-        {
-	"$$schema": "http://iglucentral.com/schemas/com.snowplowanalytics.self-desc/schema/jsonschema/1-0-0#",
-	"description": "Test schema",
-	"self": {
-		"vendor": "com.snowplowanalytics.iglu-test",
-		"name": "stock-item",
-		"format": "jsonschema",
-		"version": "1-0-0"
-	},
+    val expectedSchema: Json =
+      parse(
+        scala.io.Source
+          .fromInputStream(
+            getClass.getResourceAsStream(
+              "/iglu-test-embedded/schemas/com.snowplowanalytics.iglu-test/stock-item/jsonschema/1-0-0"
+            )
+          )
+          .mkString
+      )
+        .fold(e => throw new RuntimeException(s"Cannot parse stock-item schema, $e"), identity)
 
-	"type": "object",
-	"properties": {
-		"id": {
-			"type": "string"
-		},
-		"name": {
-			"type": "string"
-		},
-		"price": {
-			"type": "number"
-		}
-	},
-
-	"required": ["id", "name", "price"],
-	"additionalProperties": false
-}
-          """
     val schemaKey = SchemaKey(
       "com.snowplowanalytics.iglu-test",
       "stock-item",
@@ -449,7 +433,7 @@ class ResolverResultSpec extends Specification with DataTables with ValidatedMat
       .flatMap(resolver => resolver.lookupSchemaResult(schemaKey))
       .unsafeRunSync()
 
-    result must beRight(NotCached(schema))
+    result must beRight(ResolverResult.NotCached(expectedSchema))
   }
 
   def e13 = {
@@ -483,7 +467,7 @@ class ResolverResultSpec extends Specification with DataTables with ValidatedMat
       result.run(ResolverSpecHelpers.RegistryState.init).value
 
     response1 must beRight.like {
-      case _: Cached[_, _] =>
+      case _: ResolverResult.Cached[_, _] =>
         response1 must beEqualTo(
           response2
         ) //same cached (including timestamps) item because it didn't expire
@@ -522,9 +506,9 @@ class ResolverResultSpec extends Specification with DataTables with ValidatedMat
       result.run(ResolverSpecHelpers.RegistryState.init).value
 
     response1 must beRight.like {
-      case Cached(_, value1, timestamp1) =>
+      case ResolverResult.Cached(_, value1, timestamp1) =>
         response2 must beRight.like {
-          case Cached(_, value2, timestamp2) =>
+          case ResolverResult.Cached(_, value2, timestamp2) =>
             value1 must beEqualTo(
               value2
             ) and (timestamp1 mustNotEqual timestamp2) // same value but different timestamps because original item expired

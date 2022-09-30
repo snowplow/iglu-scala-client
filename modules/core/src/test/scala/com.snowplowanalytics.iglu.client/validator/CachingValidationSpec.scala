@@ -15,7 +15,7 @@ package com.snowplowanalytics.iglu.client.validator
 // Cats
 import cats.Id
 import cats.data.NonEmptyList
-import com.snowplowanalytics.iglu.client.resolver.Resolver.{Cached, NotCached}
+import com.snowplowanalytics.iglu.client.resolver.Resolver.ResolverResult
 import com.snowplowanalytics.iglu.client.validator.CirceValidator.WithCaching.{
   SchemaEvaluationKey,
   SchemaEvaluationResult
@@ -83,7 +83,8 @@ class CachingValidationSpec extends Specification with DataTables {
       )
     ) { json =>
       val result =
-        CirceValidator.WithCaching.validate(createCache())(json, NotCached(simpleSchemaResult))
+        CirceValidator.WithCaching
+          .validate(createCache())(json, ResolverResult.NotCached(simpleSchemaResult))
 
       result must beRight
     }
@@ -143,22 +144,34 @@ class CachingValidationSpec extends Specification with DataTables {
 
     val nonString =
       CirceValidator.WithCaching
-        .validate(createCache())(nonStringInput, NotCached(simpleSchemaResult)) must beLeft(
+        .validate(createCache())(
+          nonStringInput,
+          ResolverResult.NotCached(simpleSchemaResult)
+        ) must beLeft(
         nonStringExpected
       )
     val missingKey =
       CirceValidator.WithCaching
-        .validate(createCache())(missingKeyInput, NotCached(simpleSchemaResult)) must beLeft(
+        .validate(createCache())(
+          missingKeyInput,
+          ResolverResult.NotCached(simpleSchemaResult)
+        ) must beLeft(
         missingKeyExpected
       )
     val heterogeneusArray =
       CirceValidator.WithCaching
-        .validate(createCache())(heterogeneusArrayInput, NotCached(simpleSchemaResult)) must beLeft(
+        .validate(createCache())(
+          heterogeneusArrayInput,
+          ResolverResult.NotCached(simpleSchemaResult)
+        ) must beLeft(
         heterogeneusArrayExpected
       )
     val doubleError =
       CirceValidator.WithCaching
-        .validate(createCache())(doubleErrorInput, NotCached(simpleSchemaResult)) must beLeft(
+        .validate(createCache())(
+          doubleErrorInput,
+          ResolverResult.NotCached(simpleSchemaResult)
+        ) must beLeft(
         doubleErrorExpected
       )
 
@@ -185,7 +198,8 @@ class CachingValidationSpec extends Specification with DataTables {
       )
     )
 
-    CirceValidator.WithCaching.validate(createCache())(input, NotCached(schema)) must beLeft(
+    CirceValidator.WithCaching
+      .validate(createCache())(input, ResolverResult.NotCached(schema)) must beLeft(
       expected
     )
   }
@@ -200,7 +214,8 @@ class CachingValidationSpec extends Specification with DataTables {
       """
     val input  = json"""{"shortKey": 5 }"""
 
-    CirceValidator.WithCaching.validate(createCache())(input, NotCached(schema)) must beRight
+    CirceValidator.WithCaching
+      .validate(createCache())(input, ResolverResult.NotCached(schema)) must beRight
   }
 
   def e5 = {
@@ -229,7 +244,8 @@ class CachingValidationSpec extends Specification with DataTables {
       )
     )
 
-    CirceValidator.WithCaching.validate(createCache())(input, NotCached(schema)) must beLeft(
+    CirceValidator.WithCaching
+      .validate(createCache())(input, ResolverResult.NotCached(schema)) must beLeft(
       expected
     )
   }
@@ -257,7 +273,8 @@ class CachingValidationSpec extends Specification with DataTables {
       )
     )
 
-    CirceValidator.WithCaching.validate(createCache())(input, NotCached(schema)) must beLeft(
+    CirceValidator.WithCaching
+      .validate(createCache())(input, ResolverResult.NotCached(schema)) must beLeft(
       expected
     )
   }
@@ -265,25 +282,29 @@ class CachingValidationSpec extends Specification with DataTables {
   def e7 = {
     val schema = json"""{ "type": "integer" }"""
     val input  = json"""9223372036854775809"""
-    CirceValidator.WithCaching.validate(createCache())(input, NotCached(schema)) must beRight
+    CirceValidator.WithCaching
+      .validate(createCache())(input, ResolverResult.NotCached(schema)) must beRight
   }
 
   def e8 = {
     val schema = json"""{ "type": ["array", "null"], "items": {"type": "object"} }"""
     val input  = json"""null"""
-    CirceValidator.WithCaching.validate(createCache())(input, NotCached(schema)) must beRight
+    CirceValidator.WithCaching
+      .validate(createCache())(input, ResolverResult.NotCached(schema)) must beRight
   }
 
   def e9 = {
     val schema = json"""{ "type": "integer" }"""
     val input  = json""""5""""
-    CirceValidator.WithCaching.validate(createCache())(input, NotCached(schema)) must beLeft
+    CirceValidator.WithCaching
+      .validate(createCache())(input, ResolverResult.NotCached(schema)) must beLeft
   }
 
   def e10 = {
     val schema = json"""{ "type": "number" }"""
     val input  = json"""5"""
-    CirceValidator.WithCaching.validate(createCache())(input, NotCached(schema)) must beRight
+    CirceValidator.WithCaching
+      .validate(createCache())(input, ResolverResult.NotCached(schema)) must beRight
 
   }
 
@@ -300,7 +321,8 @@ class CachingValidationSpec extends Specification with DataTables {
       )
     )
 
-    CirceValidator.WithCaching.validate(createCache())(input, NotCached(schema)) must beLeft(
+    CirceValidator.WithCaching
+      .validate(createCache())(input, ResolverResult.NotCached(schema)) must beLeft(
       expected
     )
 
@@ -313,7 +335,8 @@ class CachingValidationSpec extends Specification with DataTables {
     val schema = json"""{ "type": "number" }"""
     val input  = json"""5"""
     val result =
-      CirceValidator.WithCaching.validate(cache)(input, Cached(schemaKey, schema, timestamp = 1))
+      CirceValidator.WithCaching
+        .validate(cache)(input, ResolverResult.Cached(schemaKey, schema, timestamp = 1))
 
     result must beRight(()) and
       (cache.get((schemaKey, 1)) must beSome)
@@ -325,7 +348,7 @@ class CachingValidationSpec extends Specification with DataTables {
 
     val schema = json"""{ "type": "number" }"""
     val input  = json"""5"""
-    val result = CirceValidator.WithCaching.validate(cache)(input, NotCached(schema))
+    val result = CirceValidator.WithCaching.validate(cache)(input, ResolverResult.NotCached(schema))
 
     result must beRight(()) and
       (cache.get((schemaKey, 1)) must beNone)

@@ -28,7 +28,7 @@ class CachingClientSpec extends Specification {
 
   validating a correct self-desc JSON should return the JSON in a Success $e1
   validating a correct self-desc JSON with JSON Schema with incorrect $$schema property should return Failure $e2
-    validating an incorrect self-desc JSON should return the validation errors in a Failure  $e3
+  validating an incorrect self-desc JSON should return the validation errors in a Failure  $e3
 
   """
 

@@ -71,16 +71,22 @@ final case class Resolver[F[_]](repos: List[Registry], cache: Option[ResolverCac
       cache match {
         case Some(c) =>
           c.putSchemaResult(schemaKey, result).map {
-            case Right(ResolverCache.TimestampedItem(i, t)) => Right(Cached(schemaKey, i, t))
-            case Left(failure)                              => Left(resolutionError(failure))
+            case Right(ResolverCache.TimestampedItem(schema, timestamp)) =>
+              Right(ResolverResult.Cached(schemaKey, schema, timestamp))
+            case Left(failure) => Left(resolutionError(failure))
           }
         case None =>
-          result.bimap[ResolutionError, SchemaLookupResult](resolutionError, NotCached(_)).pure[F]
+          result
+            .bimap[ResolutionError, SchemaLookupResult](
+              resolutionError,
+              ResolverResult.NotCached(_)
+            )
+            .pure[F]
       }
 
-    getFromCache(schemaKey).flatMap {
+    getSchemaFromCache(schemaKey).flatMap {
       case Some(TimestampedItem(Right(schema), timestamp)) =>
-        Monad[F].pure(Right(Cached(schemaKey, schema, timestamp)))
+        Monad[F].pure(Right(ResolverResult.Cached(schemaKey, schema, timestamp)))
       case Some(TimestampedItem(Left(failures), _)) =>
         retryCached[F, Json](get, schemaKey.vendor)(failures)
           .flatMap(handleAfterFetch)
@@ -120,26 +126,31 @@ final case class Resolver[F[_]](repos: List[Registry], cache: Option[ResolverCac
     F: Monad[F],
     L: RegistryLookup[F],
     C: Clock[F]
-  ): F[Either[ResolutionError, ListSchemasResult]] = {
+  ): F[Either[ResolutionError, SchemaListLookupResult]] = {
     val get: Registry => F[Either[RegistryError, SchemaList]] = r => L.list(r, vendor, name, model)
 
     def handleAfterFetch(
       result: Either[LookupFailureMap, SchemaList]
-    ): F[Either[ResolutionError, ListSchemasResult]] =
+    ): F[Either[ResolutionError, SchemaListLookupResult]] =
       cache match {
         case Some(c) =>
           c.putSchemaListResult(vendor, name, model, result).map {
-            case Right(ResolverCache.TimestampedItem(i, t)) =>
-              Right(Cached((vendor, name, model), i, t))
+            case Right(ResolverCache.TimestampedItem(schemaList, timestamp)) =>
+              Right(ResolverResult.Cached((vendor, name, model), schemaList, timestamp))
             case Left(failure) => Left(resolutionError(failure))
           }
         case None =>
-          result.bimap[ResolutionError, ListSchemasResult](resolutionError, NotCached(_)).pure[F]
+          result
+            .bimap[ResolutionError, SchemaListLookupResult](
+              resolutionError,
+              ResolverResult.NotCached(_)
+            )
+            .pure[F]
       }
 
-    getFromCacheList(vendor, name, model).flatMap {
+    getSchemaListFromCache(vendor, name, model).flatMap {
       case Some(TimestampedItem(Right(schemaList), timestamp)) =>
-        Monad[F].pure(Right(Cached((vendor, name, model), schemaList, timestamp)))
+        Monad[F].pure(Right(ResolverResult.Cached((vendor, name, model), schemaList, timestamp)))
       case Some(TimestampedItem(Left(failures), _)) =>
         retryCached[F, SchemaList](get, vendor)(failures)
           .flatMap(handleAfterFetch)
@@ -181,7 +192,7 @@ final case class Resolver[F[_]](repos: List[Registry], cache: Option[ResolverCac
       }
     } yield result
 
-  private def getFromCache(
+  private def getSchemaFromCache(
     schemaKey: SchemaKey
   )(implicit
     F: Monad[F],
@@ -192,7 +203,7 @@ final case class Resolver[F[_]](repos: List[Registry], cache: Option[ResolverCac
       case None    => Monad[F].pure(None)
     }
 
-  private def getFromCacheList(
+  private def getSchemaListFromCache(
     vendor: String,
     name: String,
     model: Int
@@ -209,30 +220,33 @@ final case class Resolver[F[_]](repos: List[Registry], cache: Option[ResolverCac
 /** Companion object. Lets us create a Resolver from a Json */
 object Resolver {
 
-  type ListSchemasKey     = (String, String, Int) //vendor, name, model
-  type SchemaLookupResult = ResolverResult[SchemaKey, Json]
-  type ListSchemasResult  = ResolverResult[ListSchemasKey, SchemaList]
+  type SchemaListKey          = (String, String, Int) //vendor, name, model
+  type SchemaLookupResult     = ResolverResult[SchemaKey, Json]
+  type SchemaListLookupResult = ResolverResult[SchemaListKey, SchemaList]
 
   /** The result of doing a lookup with the resolver, carrying information on whether the cache was used */
   sealed trait ResolverResult[+K, +A] {
     def value: A
   }
 
-  /**
-   * The result of a lookup when the resolver is configured to use a cache
-   *
-   *  The timestamped value is helpful when the client code needs to perform an expensive
-   *  calculation derived from the looked-up value. If the timestamp has not changed since a
-   *  previous call, then the value is guaranteed to be the same as before, and the client code
-   *  does not need to re-run the expensive calculation.
-   *
-   *  @param value the looked-up value
-   *  @param timestamp epoch time in seconds of when the value was last cached by the resolver
-   */
-  case class Cached[K, A](key: K, value: A, timestamp: Int) extends ResolverResult[K, A]
+  object ResolverResult {
 
-  /** The result of a lookup when the resolver is not configured to use a cache */
-  case class NotCached[A](value: A) extends ResolverResult[Nothing, A]
+    /**
+     * The result of a lookup when the resolver is configured to use a cache
+     *
+     *  The timestamped value is helpful when the client code needs to perform an expensive
+     *  calculation derived from the looked-up value. If the timestamp has not changed since a
+     *  previous call, then the value is guaranteed to be the same as before, and the client code
+     *  does not need to re-run the expensive calculation.
+     *
+     *  @param value the looked-up value
+     *  @param timestamp epoch time in seconds of when the value was last cached by the resolver
+     */
+    case class Cached[K, A](key: K, value: A, timestamp: Int) extends ResolverResult[K, A]
+
+    /** The result of a lookup when the resolver is not configured to use a cache */
+    case class NotCached[A](value: A) extends ResolverResult[Nothing, A]
+  }
 
   def retryCached[F[_]: Clock: Monad: RegistryLookup, A](
     get: Get[F, A],
