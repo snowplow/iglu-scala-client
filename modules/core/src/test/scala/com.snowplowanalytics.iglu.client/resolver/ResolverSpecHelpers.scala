@@ -147,7 +147,7 @@ object ResolverSpecHelpers {
             key.vendor == vendor && key.name == name && model == key.version.model
           ) match {
             case Nil  => (x, Left(RegistryError.NotFound))
-            case keys => (x, Right(SchemaList(keys)))
+            case keys => (x, Right(SchemaList.parseUnsafe(keys)))
           }
         }
     }
@@ -180,7 +180,7 @@ object ResolverSpecHelpers {
             key.vendor == vendor && key.name == name && model == key.version.model
           ) match {
             case Nil  => (x, Left(RegistryError.NotFound))
-            case keys => (x, Right(SchemaList(keys)))
+            case keys => (x, Right(SchemaList.parseUnsafe(keys)))
           }
         }
     }

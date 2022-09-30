@@ -14,22 +14,22 @@ import sbt._
 object Dependencies {
   object V {
     // Java
-    val validator = "1.0.70"
+    val validator = "1.0.76"
     val slf4j     = "1.7.30"
-    val jackson   = "2.13.3"
+    val jackson   = "2.14.1"
 
     // Scala
-    val igluCore         = "1.1.0"
-    val cats             = "2.7.0"
-    val catsEffect       = "3.3.12"
-    val circe            = "0.14.2"
-    val lruMap           = "0.6.0"
-    val collectionCompat = "2.7.0"
-    val http4s           = "0.23.12"
+    val igluCore         = "1.1.3"
+    val cats             = "2.9.0"
+    val catsEffect       = "3.4.5"
+    val circe            = "0.14.3"
+    val lruMap           = "0.6.1"
+    val collectionCompat = "2.8.1"
+    val http4s           = "0.23.17"
 
     // Scala (test only)
-    val specs2           = "4.15.0"
-    val specs2CatsEffect = "1.4.0"
+    val specs2           = "4.17.0"
+    val specs2CatsEffect = "1.5.0"
   }
 
   object Libraries {
