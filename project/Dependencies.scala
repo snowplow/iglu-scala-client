@@ -19,16 +19,16 @@ object Dependencies {
     val jackson   = "2.13.3"
 
     // Scala
-    val igluCore         = "1.1.0"
-    val cats             = "2.7.0"
-    val catsEffect       = "3.3.12"
-    val circe            = "0.14.2"
-    val lruMap           = "0.6.0"
-    val collectionCompat = "2.7.0"
-    val http4s           = "0.23.12"
+    val igluCore         = "1.1.1+2-3fae7d32-SNAPSHOT"
+    val cats             = "2.8.0"
+    val catsEffect       = "3.3.14"
+    val circe            = "0.14.3"
+    val lruMap           = "0.6.0+2-5efdbca0-SNAPSHOT"
+    val collectionCompat = "2.8.1"
+    val http4s           = "0.23.16"
 
     // Scala (test only)
-    val specs2           = "4.15.0"
+    val specs2           = "4.17.0"
     val specs2CatsEffect = "1.4.0"
   }
 
@@ -54,7 +54,7 @@ object Dependencies {
     val circeJawn        = "io.circe"      %% "circe-jawn"                 % V.circe            % Test
     val specs2           = "org.specs2"    %% "specs2-core"                % V.specs2           % Test
     val specs2Cats       = "org.specs2"    %% "specs2-cats"                % V.specs2           % Test
-    val specs2CatsEffect = "org.typelevel" %% "cats-effect-testing-specs2" % V.specs2CatsEffect % Test
+    val specs2CatsEffect = "org.typelevel" %% "cats-effect-testing-specs2" % V.specs2CatsEffect % Test exclude("org.specs2", "specs2-core_2.13")
     val http4sDsl        = "org.http4s"    %% "http4s-dsl"                 % V.http4s           % Test
 
     // Java (exists to suppress NOP log message, must not be included in compile-time)

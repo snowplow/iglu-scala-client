@@ -122,7 +122,7 @@ class EmbeddedSpec extends Specification with CatsEffect {
   }
 
   def e6 = {
-    val schemaList = SchemaList(
+    val schemaList = SchemaList.parseUnsafe(
       List(
         SchemaKey(
           "com.snowplowanalytics.iglu-test",

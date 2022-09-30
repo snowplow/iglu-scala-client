@@ -19,6 +19,7 @@ import com.snowplowanalytics.iglu.client.resolver.registries.{Registry, Registry
 import com.snowplowanalytics.iglu.core.{SchemaKey, SchemaVer}
 import io.circe.Json
 import org.specs2.Specification
+import org.specs2.matcher.MatchResult
 
 import java.time.Instant
 import scala.concurrent.duration.DurationInt
@@ -29,7 +30,8 @@ class ResolverCacheSpec extends Specification {
   Combine failures during putSchema $e2
   Should create a resolver cache if cache size > 0 and TTL is none or more than 0 $e3
   """
-  def e1 = {
+
+  def e1: MatchResult[Product] = {
     import ResolverCacheSpec._
 
     val key          = SchemaKey("com.acme", "schema", "jsonschema", SchemaVer.Full(1, 0, 0))
@@ -53,7 +55,7 @@ class ResolverCacheSpec extends Specification {
     schemaResult and stateResult
   }
 
-  def e2 = {
+  def e2: MatchResult[Any] = {
     import ResolverCacheSpec._
 
     val key = SchemaKey("com.acme", "schema", "jsonschema", SchemaVer.Full(1, 0, 0))
@@ -77,7 +79,7 @@ class ResolverCacheSpec extends Specification {
       )
     )
 
-    val expectedLookup = Map(
+    val expectedLookup: LookupFailureMap = Map(
       Registry.Http(Registry.Config("one", 1, List()), null) -> LookupHistory(
         Set(RegistryError.NotFound, RegistryError.RepoFailure("Doesn't matter")),
         4,
@@ -97,8 +99,9 @@ class ResolverCacheSpec extends Specification {
       result <- cacheUnsafe.putSchema(key, failure2.asLeft[Json])
     } yield result
 
-    val (_, result) = test.run(RegistryState.init).value
-    result must beLeft(expectedLookup)
+    val (_, result: SchemaLookup) = test.run(RegistryState.init).value
+    //something odd happens with implicit conversions on scala3
+    result must_== Left(expectedLookup)
   }
 
   def e3 = {

@@ -32,14 +32,19 @@ object BuildSettings {
 
   lazy val buildSettings = Seq[Setting[_]](
     organization := "com.snowplowanalytics",
-    scalaVersion := "2.13.8",
-    crossScalaVersions := Seq("2.13.8", "2.12.15"),
+    scalaVersion := "2.13.9",
+    crossScalaVersions := Seq("3.1.3", "2.13.9", "2.12.17"),
     licenses += ("Apache-2.0", url("http://www.apache.org/licenses/LICENSE-2.0.html")),
     Test / parallelExecution := false, // possible race bugs
-
-    addCompilerPlugin("org.typelevel" %% "kind-projector" % "0.13.2" cross CrossVersion.full),
-    addCompilerPlugin("com.olegpy" %% "better-monadic-for" % "0.3.1")
-  )
+    libraryDependencies ++= {
+      if (scalaBinaryVersion.value.startsWith("2")) {
+        List(
+          compilerPlugin("org.typelevel" %% "kind-projector" % "0.13.2" cross CrossVersion.full),
+          compilerPlugin("com.olegpy" %% "better-monadic-for" % "0.3.1")
+        )
+      } else Nil
+    }
+ )
 
 
   // Bintray publishing settings
@@ -78,10 +83,10 @@ object BuildSettings {
     },
     ThisBuild / mimaFailOnNoPrevious := false,
     mimaBinaryIssueFilters ++= Seq(),
-    Test / test := {
+    /*Test / test := {
       mimaReportBinaryIssues.value
       (Test / test).value
-    }
+    }*/
   )
 
   val scoverageSettings = Seq(

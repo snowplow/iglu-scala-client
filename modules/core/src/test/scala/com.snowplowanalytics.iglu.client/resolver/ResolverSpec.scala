@@ -14,14 +14,16 @@ package com.snowplowanalytics.iglu.client.resolver
 
 import com.snowplowanalytics.iglu.core.SchemaList
 
-import java.time.Instant
+
 import java.net.URI
+import java.time.Instant
 import scala.collection.immutable.SortedMap
 import scala.concurrent.duration.DurationInt
 
 // Cats
 import cats.Id
 import cats.effect.IO
+import cats.effect.Clock
 import cats.syntax.all._
 
 // circe
@@ -37,11 +39,13 @@ import com.snowplowanalytics.iglu.client.SpecHelpers
 import com.snowplowanalytics.iglu.client.resolver.ResolverSpecHelpers.StaticLookup
 import com.snowplowanalytics.iglu.client.resolver.registries.RegistryLookup._
 import com.snowplowanalytics.iglu.client.resolver.registries.{Registry, RegistryError}
+import com.snowplowanalytics.iglu.client.resolver.registries.RegistryLookup
 
 // Specs2
 import cats.effect.testing.specs2.CatsEffect
 import com.snowplowanalytics.iglu.client.SpecHelpers._
 import org.specs2.Specification
+import org.specs2.matcher.MatchResult
 
 object ResolverSpec {
 
@@ -186,12 +190,11 @@ class ResolverSpec extends Specification with CatsEffect {
         result.leftMap {
           case ResolutionError(errors) =>
             errors.foldLeft(0) { case (acc, (_, LookupHistory(e, _, _))) => acc + e.size }
-          case _ => 0
         } must beLeft(2)
       }
   }
 
-  def e6 = {
+  def e6: MatchResult[Any] = {
     val schemaKey =
       SchemaKey(
         "com.snowplowanalytics.iglu-test",
@@ -209,10 +212,10 @@ class ResolverSpec extends Specification with CatsEffect {
     val httpRep =
       Registry.Http(Registry.Config("Mock Repo", 1, List("com.snowplowanalytics.iglu-test")), null)
 
-    implicit val cache          = ResolverSpecHelpers.staticCache
-    implicit val cacheList      = ResolverSpecHelpers.staticCacheForList
-    implicit val clock          = ResolverSpecHelpers.staticClock
-    implicit val registryLookup = ResolverSpecHelpers.getLookup(responses, Nil)
+    implicit val cache: InitSchemaCache[StaticLookup] = ResolverSpecHelpers.staticCache
+    implicit val cacheList: InitListCache[StaticLookup] = ResolverSpecHelpers.staticCacheForList
+    implicit val clock: Clock[StaticLookup] = ResolverSpecHelpers.staticClock
+    implicit val registryLookup: RegistryLookup[StaticLookup] = ResolverSpecHelpers.getLookup(responses, Nil)
 
     val result = for {
       resolver  <- Resolver.init[StaticLookup](10, None, httpRep)
@@ -243,7 +246,7 @@ class ResolverSpec extends Specification with CatsEffect {
     firstFailed and secondFailed and thirdSucceeded and requestsNumber
   }
 
-  def e7 = {
+  def e7: MatchResult[Any] = {
     val schemaKey =
       SchemaKey(
         "com.snowplowanalytics.iglu-test",
@@ -262,10 +265,10 @@ class ResolverSpec extends Specification with CatsEffect {
     val httpRep =
       Registry.Http(Registry.Config("Mock Repo", 1, List("com.snowplowanalytics.iglu-test")), null)
 
-    implicit val cache          = ResolverSpecHelpers.staticCache
-    implicit val cacheList      = ResolverSpecHelpers.staticCacheForList
-    implicit val clock          = ResolverSpecHelpers.staticClock
-    implicit val registryLookup = ResolverSpecHelpers.getLookup(responses, Nil)
+    implicit val cache: InitSchemaCache[StaticLookup] = ResolverSpecHelpers.staticCache
+    implicit val cacheList: InitListCache[StaticLookup] = ResolverSpecHelpers.staticCacheForList
+    implicit val clock: Clock[StaticLookup] = ResolverSpecHelpers.staticClock
+    implicit val registryLookup: RegistryLookup[StaticLookup] = ResolverSpecHelpers.getLookup(responses, Nil)
 
     val result = for {
       resolver <-
@@ -291,7 +294,7 @@ class ResolverSpec extends Specification with CatsEffect {
     finalResult and lookupTries
   }
 
-  def e8 = {
+  def e8: MatchResult[Any] = {
     val schemaKey =
       SchemaKey(
         "com.snowplowanalytics.iglu-test",
@@ -314,10 +317,10 @@ class ResolverSpec extends Specification with CatsEffect {
       null
     )
 
-    implicit val cache     = ResolverSpecHelpers.staticCache
-    implicit val cacheList = ResolverSpecHelpers.staticCacheForList
-    implicit val clock     = ResolverSpecHelpers.staticClock
-    implicit val registryLookup = ResolverSpecHelpers.getLookupByRepo(
+    implicit val cache: InitSchemaCache[StaticLookup] = ResolverSpecHelpers.staticCache
+    implicit val cacheList: InitListCache[StaticLookup] = ResolverSpecHelpers.staticCacheForList
+    implicit val clock: Clock[StaticLookup] = ResolverSpecHelpers.staticClock
+    implicit val registryLookup: RegistryLookup[StaticLookup] = ResolverSpecHelpers.getLookupByRepo(
       Map(
         "Mock Repo 1" -> List(error1.asLeft, error2.asLeft),
         "Mock Repo 2" -> List(error3.asLeft, error4.asLeft)
@@ -428,28 +431,28 @@ class ResolverSpec extends Specification with CatsEffect {
       SchemaVer.Full(1, 0, 1)
     )
 
-    val resolverRef = Resolver.init[Id](10, None, IgluCentralServer)
-    val resolver = resolverRef.map(res =>
+    val resolverRef: Resolver[Id] = Resolver.init[Id](10, None, IgluCentralServer)
+    val resolver = //resolverRef.map(res =>
       new Resolver(
-        res.repos,
-        res.cache.flatMap { c =>
+        resolverRef.repos,
+        resolverRef.cache.flatMap { c =>
           c.putSchemaList(
             "com.snowplowanalytics.snowplow",
             "link_click",
             1,
-            SchemaList(List(schema100)).asRight
+            SchemaList.parseUnsafe(List(schema100)).asRight
           )
           c.some
         }
       )
-    )
+    //)
 
     val resultOne = resolver.listSchemasLike(schema100)
     val resultTwo = resolver.listSchemasLike(schema101)
 
-    resultOne must beRight(SchemaList(List(schema100)))
-    resultTwo.map(s => s.copy(schemas = s.schemas.take(2))) must beRight(
-      SchemaList(List(schema100, schema101))
+    resultOne must beRight(SchemaList.parseUnsafe(List(schema100)))
+    resultTwo.map(s => SchemaList.parseUnsafe(s.schemas.take(2))) must beRight(
+      SchemaList.parseUnsafe(List(schema100, schema101))
     )
   }
 }
