@@ -1,3 +1,7 @@
+Version 1.2.0 (2022-10-03)
+--------------------------
+Allow building caches based on the resolver's content (#207)
+
 Version 1.1.1 (2021-08-05)
 --------------------------
 Fix ScalaDoc publishing (#168)
