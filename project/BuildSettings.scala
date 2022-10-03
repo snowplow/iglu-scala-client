@@ -69,7 +69,7 @@ object BuildSettings {
   // clear-out mimaBinaryIssueFilters and mimaPreviousVersions.
   // Otherwise, add previous version to set without
   // removing other versions.
-  val mimaPreviousVersionsCore = Set("1.0.2")
+  val mimaPreviousVersionsCore = Set("1.1.1")
   val mimaPreviousVersionsHttp4s = Set()
 
   lazy val mimaSettings = Seq(
