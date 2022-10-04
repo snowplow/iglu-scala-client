@@ -267,7 +267,11 @@ object CirceValidator extends Validator[Json] {
   /** Similar to original validation but with additional caching of `JsonSchema` instances */
   private[client] object WithCaching {
 
-    /** Evaluated schema in cache is identified by a schema key and a timestamp indicating when schema was cached by resolver during lookup */
+    /**
+     * Evaluated schema in cache is identified by a schema key and a timestamp indicating when schema was cached by resolver during lookup.
+     * Compound key with timestamps allows keeping validator's schema evaluation and resolver's lookup cache in sync.
+     * See more in https://github.com/snowplow/iglu-scala-client/issues/207
+     */
     type SchemaEvaluationKey         = (SchemaKey, Int)
     type SchemaEvaluationResult      = Either[ValidatorError.InvalidSchema, JsonSchema]
     type SchemaEvaluationCache[F[_]] = LruMap[F, SchemaEvaluationKey, SchemaEvaluationResult]

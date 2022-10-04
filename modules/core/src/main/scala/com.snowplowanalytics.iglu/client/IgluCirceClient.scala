@@ -58,19 +58,23 @@ object IgluCirceClient {
     json: Json
   ): EitherT[F, DecodingFailure, IgluCirceClient[F]] =
     for {
-      resolver <- EitherT(Resolver.parse[F](json))
-      client   <- EitherT.liftF(fromResolver(resolver))
+      config   <- EitherT.fromEither[F](Resolver.parseConfig(json))
+      resolver <- Resolver.fromConfig[F](config)
+      client   <- EitherT.liftF(fromResolver(resolver, config.cacheSize))
     } yield client
 
   def fromResolver[F[_]: Monad: InitValidatorCache](
-    resolver: Resolver[F]
+    resolver: Resolver[F],
+    cacheSize: Int
   ): F[IgluCirceClient[F]] = {
-    schemaEvaluationCache[F].map { cache =>
+    schemaEvaluationCache[F](cacheSize).map { cache =>
       new IgluCirceClient(resolver, cache)
     }
   }
 
-  private def schemaEvaluationCache[F[_]: InitValidatorCache]: F[SchemaEvaluationCache[F]] =
-    CreateLruMap[F, SchemaEvaluationKey, SchemaEvaluationResult].create(100)
+  private def schemaEvaluationCache[F[_]: InitValidatorCache](
+    cacheSize: Int
+  ): F[SchemaEvaluationCache[F]] =
+    CreateLruMap[F, SchemaEvaluationKey, SchemaEvaluationResult].create(cacheSize)
 
 }

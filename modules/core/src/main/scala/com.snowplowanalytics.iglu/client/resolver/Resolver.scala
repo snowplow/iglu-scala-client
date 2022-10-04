@@ -100,6 +100,7 @@ final case class Resolver[F[_]](repos: List[Registry], cache: Option[ResolverCac
    * Tries to find the given schema in any of the provided repository refs
    * If any of repositories gives non-non-found error, lookup will retried
    *
+   * Similar to [[lookupSchemaResult]] but returns pure Json instead of full [[Resolver.ResolverResult]]
    * @param schemaKey The SchemaKey uniquely identifying the schema in Iglu
    * @return a Validation boxing either the Schema's
    *         Json on Success, or an error String
@@ -163,6 +164,7 @@ final case class Resolver[F[_]](repos: List[Registry], cache: Option[ResolverCac
   /**
    * Get list of available schemas for particular vendor and name part
    * Server supposed to return them in proper order
+   * Similar to [[listSchemasResult]] but return pure SchemaList instead of full [[Resolver.ResolverResult]]
    */
   def listSchemas(
     vendor: String,
@@ -343,7 +345,7 @@ object Resolver {
   def bootstrap[F[_]: Monad: InitSchemaCache: InitListCache]: F[Resolver[F]] =
     Resolver.init[F](EmbeddedSchemaCount, None, Registry.EmbeddedRegistry)
 
-  private final case class ResolverConfig(
+  final case class ResolverConfig(
     cacheSize: Int,
     cacheTtl: Option[Int],
     repositoryRefs: List[Json]
@@ -371,15 +373,31 @@ object Resolver {
     config: Json
   ): F[Either[DecodingFailure, Resolver[F]]] = {
     val result: EitherT[F, DecodingFailure, Resolver[F]] = for {
-      datum    <- EitherT.fromEither[F](config.as[SelfDescribingData[Json]])
-      _        <- matchConfig[F](datum)
-      config   <- EitherT.fromEither[F](resolverConfigCirceDecoder(datum.data.hcursor))
+      config   <- EitherT.fromEither[F](parseConfig(config))
+      resolver <- fromConfig[F](config)
+    } yield resolver
+
+    result.value
+  }
+
+  def parseConfig(
+    config: Json
+  ): Either[DecodingFailure, ResolverConfig] = {
+    for {
+      datum  <- config.as[SelfDescribingData[Json]]
+      _      <- matchConfig(datum)
+      config <- resolverConfigCirceDecoder(datum.data.hcursor)
+    } yield config
+  }
+
+  def fromConfig[F[_]: Monad: InitSchemaCache: InitListCache](
+    config: ResolverConfig
+  ): EitherT[F, DecodingFailure, Resolver[F]] = {
+    for {
       cacheOpt <- EitherT.liftF(ResolverCache.init[F](config.cacheSize, config.cacheTtl))
       refsE    <- EitherT.fromEither[F](config.repositoryRefs.traverse(Registry.parse))
       _        <- EitherT.fromEither[F](validateRefs(refsE))
     } yield Resolver(refsE, cacheOpt)
-
-    result.value
   }
 
   private def finish[F[_], A](
@@ -441,14 +459,13 @@ object Resolver {
       case (key, value) => (key.config.name, value)
     })
 
-  private def matchConfig[F[_]: Applicative](datum: SelfDescribingData[Json]) = {
+  private def matchConfig(datum: SelfDescribingData[Json]): Either[DecodingFailure, Unit] = {
     val failure =
       DecodingFailure(
         s"Schema ${datum.schema} does not match criterion ${ConfigurationSchema.asString}",
         List.empty
       )
-    val matcher = Either.cond(ConfigurationSchema.matches(datum.schema), (), failure)
-    EitherT.fromEither[F](matcher)
+    Either.cond(ConfigurationSchema.matches(datum.schema), (), failure)
   }
 
   // Minimum backoff period for retry
