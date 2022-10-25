@@ -1,3 +1,7 @@
+Version 2.2.0 (2022-10-26)
+--------------------------
+Allow building caches based on the resolver's content (#207)
+
 Version 2.1.0 (2022-05-31)
 --------------------------
 Bump specs2 to 4.15.0 (#198)
