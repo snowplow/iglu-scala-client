@@ -14,11 +14,14 @@ package com.snowplowanalytics.iglu.client
 package resolver.registries
 
 // Java
-import java.io.InputStream
+import com.snowplowanalytics.iglu.core.{SchemaKey, SchemaVer}
+
+import java.io.{File, InputStream}
 import java.net.URI
 import java.net.http.HttpResponse.BodyHandlers
 import java.net.http.{HttpClient, HttpRequest, HttpResponse}
 import java.time.Duration
+import scala.util.matching.Regex
 
 // Scala
 import scala.io.Source
@@ -29,6 +32,7 @@ import cats.effect.Sync
 import cats.syntax.either._
 import cats.syntax.option._
 import cats.syntax.show._
+import cats.syntax.traverse._
 
 // circe
 import io.circe.parser.parse
@@ -67,6 +71,40 @@ private[registries] object Utils {
         .map(parse)
         .map(_.leftMap(e => RegistryError.RepoFailure(e.show)))
         .getOrElse(RegistryError.NotFound.asLeft)
+    } catch {
+      case NonFatal(e) =>
+        repoFailure(e).asLeft
+    }
+
+  def unsafeEmbeddedList(path: String, modelMatch: Int): Either[RegistryError, SchemaList] =
+    try {
+      val d = new File(getClass.getResource(path).getPath)
+      val schemaFileRegex: Regex = (".*?" + // path to file
+        "([a-zA-Z0-9-_.]+)/" +           // Vendor
+        "([a-zA-Z0-9-_]+)/" +            // Name
+        "([a-zA-Z0-9-_]+)/" +            // Format
+        "([1-9][0-9]*)-(\\d+)-(\\d+)$").r // MODEL, REVISION and ADDITION
+      if (d.exists && d.isDirectory) {
+          d.listFiles
+            .filter(_.isFile)
+            .toList
+            .filter(_.getName.startsWith(modelMatch.toString))
+            .traverse(_.getAbsolutePath match {
+              case schemaFileRegex(vendor, name, format, model, revision, addition) =>
+                SchemaKey(
+                  vendor = vendor,
+                  name = name,
+                  format = format,
+                  version = SchemaVer
+                    .Full(model = model.toInt, revision = revision.toInt, addition = addition.toInt)
+                ).asRight
+              case f => RegistryError.RepoFailure(s"Corrupted schema file name at $f").asLeft
+            })
+            .map(_.sortBy(_.version))
+            .map(SchemaList.apply)
+      } else {
+        RegistryError.NotFound.asLeft
+      }
     } catch {
       case NonFatal(e) =>
         repoFailure(e).asLeft
@@ -158,4 +196,17 @@ private[registries] object Utils {
   private[resolver] def repoFailure(failure: Throwable): RegistryError =
     RegistryError.RepoFailure(failure.getMessage)
 
+  implicit val orderingSchemaKey: Ordering[SchemaKey] = new Ordering[SchemaKey] {
+    override def compare(x: SchemaKey, y: SchemaKey): Int =
+      if (x == y)
+        0
+      else if (x.version.model <  y.version.model)
+        -1
+      else if (x.version.revision < y.version.revision)
+        -1
+      else if (x.version.addition < y.version.addition)
+        -1
+      else
+        1
+  }
 }
