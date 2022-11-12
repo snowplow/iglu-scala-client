@@ -14,11 +14,14 @@ package com.snowplowanalytics.iglu.client
 package resolver.registries
 
 // Java
-import java.io.InputStream
+import com.snowplowanalytics.iglu.core.{SchemaKey, SchemaVer}
+
+import java.io.{File, InputStream}
 import java.net.URI
 import java.net.http.HttpResponse.BodyHandlers
 import java.net.http.{HttpClient, HttpRequest, HttpResponse}
 import java.time.Duration
+import scala.util.matching.Regex
 
 // Scala
 import scala.io.Source
@@ -29,6 +32,7 @@ import cats.effect.Sync
 import cats.syntax.either._
 import cats.syntax.option._
 import cats.syntax.show._
+import cats.syntax.traverse._
 
 // circe
 import io.circe.parser.parse
@@ -72,6 +76,61 @@ private[registries] object Utils {
         repoFailure(e).asLeft
     }
 
+  def unsafeEmbeddedList(path: String, modelMatch: Int): Either[RegistryError, SchemaList] =
+    try {
+      val d =
+        new File(
+          getClass.getResource(path).getPath
+        ) // this will throw NPE for missing entry in embedded repos
+      val schemaFileRegex: Regex = (".*/schemas/?" + // path to file
+        "([a-zA-Z0-9-_.]+)/" +            // Vendor
+        "([a-zA-Z0-9-_]+)/" +             // Name
+        "([a-zA-Z0-9-_]+)/" +             // Format
+        "([1-9][0-9]*)-(\\d+)-(\\d+)$").r // MODEL, REVISION and ADDITION
+
+      def getFolderContent(d: File): List[String] = {
+        d.listFiles
+          .filter(_.isFile)
+          .toList
+          .filter(_.getName.startsWith(s"${modelMatch.toString}-"))
+          .map(_.getAbsolutePath)
+      }
+
+      val content =
+        if (d.exists & d.isDirectory)
+          getFolderContent(d)
+        else
+          List.empty[String]
+
+      content
+        .traverse {
+          case schemaFileRegex(vendor, name, format, model, revision, addition)
+              if model == modelMatch.toString =>
+            SchemaKey(
+              vendor = vendor,
+              name = name,
+              format = format,
+              version = SchemaVer
+                .Full(model = model.toInt, revision = revision.toInt, addition = addition.toInt)
+            ).asRight
+          case f => RegistryError.RepoFailure(s"Corrupted schema file name at $f").asLeft
+        }
+        .map(_.sortBy(_.version))
+        .flatMap(s =>
+          if (s.isEmpty)
+            RegistryError.NotFound.asLeft
+          else
+            s.asRight
+        )
+        .map(SchemaList.apply)
+    } catch {
+      case NonFatal(e) =>
+        e match {
+          case _: NullPointerException => RegistryError.NotFound.asLeft
+          case _                       => repoFailure(e).asLeft
+        }
+    }
+
   /** Not-RT analog of [[RegistryLookup.embeddedLookup]] */
   def unsafeEmbeddedLookup(path: String): Either[RegistryError, Json] =
     try {
@@ -84,7 +143,10 @@ private[registries] object Utils {
       result
     } catch {
       case NonFatal(e) =>
-        repoFailure(e).asLeft
+        e match {
+          case _: NullPointerException => RegistryError.NotFound.asLeft
+          case _                       => repoFailure(e).asLeft
+        }
     }
 
   /** Non-RT analog of [[RegistryLookup.httpList]] */
@@ -156,6 +218,7 @@ private[registries] object Utils {
     RegistryError.RepoFailure(failure.show)
 
   private[resolver] def repoFailure(failure: Throwable): RegistryError =
-    RegistryError.RepoFailure(failure.getMessage)
-
+    RegistryError.RepoFailure(
+      if (failure.getMessage != null) failure.getMessage else "Unhandled error"
+    )
 }
