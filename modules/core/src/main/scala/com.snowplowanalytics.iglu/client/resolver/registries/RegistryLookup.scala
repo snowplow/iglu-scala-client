@@ -78,6 +78,13 @@ object RegistryLookup {
   implicit class LookupOps(val repositoryRef: Registry) extends AnyVal with Serializable {
     def lookupSchema[F[_]: RegistryLookup](schemaKey: SchemaKey): F[Either[RegistryError, Json]] =
       RegistryLookup[F].lookup(repositoryRef, schemaKey)
+
+    def list[F[_]: RegistryLookup](
+      vendor: String,
+      name: String,
+      model: Int
+    ): F[Either[RegistryError, SchemaList]] =
+      RegistryLookup[F].list(repositoryRef, vendor: String, name: String, model: Int)
   }
 
   implicit def ioLookupInstance[F[_]](implicit F: Sync[F]): RegistryLookup[F] =
@@ -97,7 +104,10 @@ object RegistryLookup {
       ): F[Either[RegistryError, SchemaList]] =
         registry match {
           case Registry.Http(_, connection) => httpList(connection, vendor, name, model)
-          case _                            => F.pure(RegistryError.NotFound.asLeft)
+          case Registry.Embedded(_, base) =>
+            val path = toSubpath(base, vendor, name)
+            Utils.unsafeEmbeddedList(path, model).pure[F]
+          case _ => F.pure(RegistryError.NotFound.asLeft)
         }
     }
 
@@ -142,6 +152,9 @@ object RegistryLookup {
           case Registry.Http(_, connection) =>
             val subpath = toSubpath(connection.uri.toString, vendor, name, model)
             Utils.stringToUri(subpath).flatMap(Utils.unsafeHttpList(_, connection.apikey))
+          case Registry.Embedded(_, base) =>
+            val path = toSubpath(base, vendor, name)
+            Utils.unsafeEmbeddedList(path, model)
           case _ =>
             RegistryError.NotFound.asLeft
         }
@@ -164,6 +177,14 @@ object RegistryLookup {
     model: Int
   ): String =
     s"${prefix.stripSuffix("/")}/schemas/$vendor/$name/jsonschema/$model"
+
+  private def toSubpath(
+                         prefix: String,
+                         vendor: String,
+                         name: String
+                       ): String =
+    s"${prefix.stripSuffix("/")}/schemas/$vendor/$name/jsonschema"
+
 
   /**
    * Retrieves an Iglu Schema from the Embedded Iglu Repo as a JSON

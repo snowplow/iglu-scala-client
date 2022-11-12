@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014-2021 Snowplow Analytics Ltd. All rights reserved.
+ * Copyright (c) 2014-2022 Snowplow Analytics Ltd. All rights reserved.
  *
  * This program is licensed to you under the Apache License Version 2.0,
  * and you may not use this file except in compliance with the Apache License Version 2.0.
@@ -14,6 +14,7 @@ package com.snowplowanalytics.iglu.client.resolver.registries
 
 // Cats
 import cats.effect.IO
+import com.snowplowanalytics.iglu.core.SchemaList
 
 // circe
 import io.circe.literal._
@@ -39,6 +40,7 @@ class EmbeddedSpec extends Specification with DataTables with ValidatedMatchers 
   retrieving an existent JSON Schema from an embedded RepositoryRef should work  $e3
   requesting a non-existent JSON Schema from an embedded RepositoryRef should return None  $e4
   requesting a corrupted JSON Schema from an embedded RepositoryRef should return an appropriate Failure  $e5
+  Schema list should work for embedded repo  $e6
   """
 
   val AcmeConfig =
@@ -120,4 +122,15 @@ class EmbeddedSpec extends Specification with DataTables with ValidatedMatchers 
       .unsafeRunSync() must beLeft
   }
 
+  def e6 = {
+    val schemaList = SchemaList(List(
+      SchemaKey("com.snowplowanalytics.iglu-test", "test-embedded-list", "jsonschema", SchemaVer.Full(1, 0, 0)),
+      SchemaKey("com.snowplowanalytics.iglu-test", "test-embedded-list", "jsonschema", SchemaVer.Full(1, 0, 1)),
+      SchemaKey("com.snowplowanalytics.iglu-test", "test-embedded-list", "jsonschema", SchemaVer.Full(1, 2, 0)),
+      SchemaKey("com.snowplowanalytics.iglu-test", "test-embedded-list", "jsonschema", SchemaVer.Full(1, 2, 11)),
+    ))
+    SpecHelpers.EmbeddedTest
+      .list[IO]("com.snowplowanalytics.iglu-test", "test-embedded-list", 1)
+      .unsafeRunSync()  must beRight(schemaList)
+  }
 }
