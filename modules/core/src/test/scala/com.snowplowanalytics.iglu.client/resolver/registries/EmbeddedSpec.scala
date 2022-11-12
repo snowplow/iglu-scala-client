@@ -15,6 +15,7 @@ package com.snowplowanalytics.iglu.client.resolver.registries
 // Cats
 import cats.effect.IO
 import cats.effect.testing.specs2.CatsEffect
+import com.snowplowanalytics.iglu.core.SchemaList
 
 // circe
 import io.circe.literal._
@@ -38,6 +39,7 @@ class EmbeddedSpec extends Specification with CatsEffect {
   retrieving an existent JSON Schema from an embedded RepositoryRef should work  $e3
   requesting a non-existent JSON Schema from an embedded RepositoryRef should return None  $e4
   requesting a corrupted JSON Schema from an embedded RepositoryRef should return an appropriate Failure  $e5
+  Schema list should work for embedded repo  $e6
   """
 
   val AcmeConfig =
@@ -119,4 +121,37 @@ class EmbeddedSpec extends Specification with CatsEffect {
       .map(result => result must beLeft)
   }
 
+  def e6 = {
+    val schemaList = SchemaList(
+      List(
+        SchemaKey(
+          "com.snowplowanalytics.iglu-test",
+          "test-embedded-list",
+          "jsonschema",
+          SchemaVer.Full(1, 0, 0)
+        ),
+        SchemaKey(
+          "com.snowplowanalytics.iglu-test",
+          "test-embedded-list",
+          "jsonschema",
+          SchemaVer.Full(1, 0, 1)
+        ),
+        SchemaKey(
+          "com.snowplowanalytics.iglu-test",
+          "test-embedded-list",
+          "jsonschema",
+          SchemaVer.Full(1, 2, 0)
+        ),
+        SchemaKey(
+          "com.snowplowanalytics.iglu-test",
+          "test-embedded-list",
+          "jsonschema",
+          SchemaVer.Full(1, 2, 11)
+        )
+      )
+    )
+    SpecHelpers.EmbeddedTest
+      .list[IO]("com.snowplowanalytics.iglu-test", "test-embedded-list", 1)
+      .map(result => result must beRight(schemaList))
+  }
 }
