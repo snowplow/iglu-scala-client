@@ -187,17 +187,5 @@ private[registries] object Utils {
   private[resolver] def repoFailure(failure: Throwable): RegistryError =
     RegistryError.RepoFailure(failure.getMessage)
 
-  implicit val orderingSchemaKey: Ordering[SchemaKey] = new Ordering[SchemaKey] {
-    override def compare(x: SchemaKey, y: SchemaKey): Int =
-      if (x == y)
-        0
-      else if (x.version.model < y.version.model)
-        -1
-      else if (x.version.revision < y.version.revision)
-        -1
-      else if (x.version.addition < y.version.addition)
-        -1
-      else
-        1
-  }
+  implicit val orderingSchemaKey: Ordering[SchemaKey] = SchemaKey.ordering
 }
