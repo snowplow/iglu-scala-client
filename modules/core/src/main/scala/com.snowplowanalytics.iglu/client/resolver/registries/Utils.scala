@@ -82,36 +82,57 @@ private[registries] object Utils {
 
   def unsafeEmbeddedList(path: String, modelMatch: Int): Either[RegistryError, SchemaList] =
     try {
-      val d = new File(getClass.getResource(path).getPath)
-      val schemaFileRegex: Regex = (".*?" + // path to file
+      val d =
+        new File(
+          getClass.getResource(path).getPath
+        ) // this will throw NPE for missing entry in embedded repos
+      val schemaFileRegex: Regex = (".*/schemas/?" + // path to file
         "([a-zA-Z0-9-_.]+)/" +            // Vendor
         "([a-zA-Z0-9-_]+)/" +             // Name
         "([a-zA-Z0-9-_]+)/" +             // Format
         "([1-9][0-9]*)-(\\d+)-(\\d+)$").r // MODEL, REVISION and ADDITION
 
-      if (d.exists && d.isDirectory) {
+      def getFolderContent(d: File): List[String] = {
         d.listFiles
           .filter(_.isFile)
           .toList
-          .filter(_.getName.startsWith(modelMatch.toString))
-          .traverse(_.getAbsolutePath match {
-            case schemaFileRegex(vendor, name, format, model, revision, addition) =>
-              SchemaKey(
-                vendor = vendor,
-                name = name,
-                format = format,
-                version = SchemaVer
-                  .Full(model = model.toInt, revision = revision.toInt, addition = addition.toInt)
-              ).asRight
-            case f => RegistryError.RepoFailure(s"Corrupted schema file name at $f").asLeft
-          })
-          .map(_.sortBy(_.version))
-          .map(SchemaList.apply)
-      } else
-        RegistryError.NotFound.asLeft
+          .filter(_.getName.startsWith(s"${modelMatch.toString}-"))
+          .map(_.getAbsolutePath)
+      }
+
+      val content =
+        if (d.exists & d.isDirectory)
+          getFolderContent(d)
+        else
+          List.empty[String]
+
+      content
+        .traverse {
+          case schemaFileRegex(vendor, name, format, model, revision, addition)
+              if model == modelMatch.toString =>
+            SchemaKey(
+              vendor = vendor,
+              name = name,
+              format = format,
+              version = SchemaVer
+                .Full(model = model.toInt, revision = revision.toInt, addition = addition.toInt)
+            ).asRight
+          case f => RegistryError.RepoFailure(s"Corrupted schema file name at $f").asLeft
+        }
+        .map(_.sortBy(_.version))
+        .flatMap(s =>
+          if (s.isEmpty)
+            RegistryError.NotFound.asLeft
+          else
+            s.asRight
+        )
+        .map(SchemaList.apply)
     } catch {
       case NonFatal(e) =>
-        repoFailure(e).asLeft
+        e match {
+          case NullPointerException => RegistryError.NotFound.asLeft
+          case _                    => repoFailure(e).asLeft
+        }
     }
 
   /** Not-RT analog of [[RegistryLookup.embeddedLookup]] */
@@ -185,7 +206,8 @@ private[registries] object Utils {
     RegistryError.RepoFailure(failure.show)
 
   private[resolver] def repoFailure(failure: Throwable): RegistryError =
-    RegistryError.RepoFailure(failure.getMessage)
+    RegistryError.RepoFailure(
+      if (failure.getMessage != null) failure.getMessage else "Unhandled error"
+    )
 
-  implicit val orderingSchemaKey: Ordering[SchemaKey] = SchemaKey.ordering
 }
