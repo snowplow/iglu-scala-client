@@ -122,12 +122,34 @@ class EmbeddedSpec extends Specification with CatsEffect {
   }
 
   def e6 = {
-    val schemaList = SchemaList(List(
-      SchemaKey("com.snowplowanalytics.iglu-test", "test-embedded-list", "jsonschema", SchemaVer.Full(1, 0, 0)),
-      SchemaKey("com.snowplowanalytics.iglu-test", "test-embedded-list", "jsonschema", SchemaVer.Full(1, 0, 1)),
-      SchemaKey("com.snowplowanalytics.iglu-test", "test-embedded-list", "jsonschema", SchemaVer.Full(1, 2, 0)),
-      SchemaKey("com.snowplowanalytics.iglu-test", "test-embedded-list", "jsonschema", SchemaVer.Full(1, 2, 11)),
-    ))
+    val schemaList = SchemaList(
+      List(
+        SchemaKey(
+          "com.snowplowanalytics.iglu-test",
+          "test-embedded-list",
+          "jsonschema",
+          SchemaVer.Full(1, 0, 0)
+        ),
+        SchemaKey(
+          "com.snowplowanalytics.iglu-test",
+          "test-embedded-list",
+          "jsonschema",
+          SchemaVer.Full(1, 0, 1)
+        ),
+        SchemaKey(
+          "com.snowplowanalytics.iglu-test",
+          "test-embedded-list",
+          "jsonschema",
+          SchemaVer.Full(1, 2, 0)
+        ),
+        SchemaKey(
+          "com.snowplowanalytics.iglu-test",
+          "test-embedded-list",
+          "jsonschema",
+          SchemaVer.Full(1, 2, 11)
+        )
+      )
+    )
     SpecHelpers.EmbeddedTest
       .list[IO]("com.snowplowanalytics.iglu-test", "test-embedded-list", 1)
       .map(result => result must beRight(schemaList))

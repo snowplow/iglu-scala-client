@@ -107,7 +107,7 @@ object RegistryLookup {
           case Registry.Http(_, connection) => httpList(connection, vendor, name, model)
           case Registry.Embedded(_, base) =>
             val path = toSubpath(base, vendor, name)
-            Utils.unsafeEmbeddedList(path, model).pure[F]
+            Sync[F].delay(Utils.unsafeEmbeddedList(path, model))
           case _ => F.pure(RegistryError.NotFound.asLeft)
         }
     }
