@@ -82,7 +82,7 @@ private[registries] object Utils {
 
   def unsafeEmbeddedList(path: String, modelMatch: Int): Either[RegistryError, SchemaList] =
     try {
-      val d = new File(getClass.getResource(path).getPath)
+      val d = new File(getClass.getResource(path).getPath) // this will throw NPE for missing entry in embedded repos
       val schemaFileRegex: Regex = (".*/schemas/?" + // path to file
         "([a-zA-Z0-9-_.]+)/" +            // Vendor
         "([a-zA-Z0-9-_]+)/" +             // Name
@@ -125,8 +125,10 @@ private[registries] object Utils {
         )
         .map(SchemaList.apply)
     } catch {
-      case NonFatal(e) =>
-        repoFailure(e).asLeft
+      case NonFatal(e) => e match {
+        case NullPointerException => RegistryError.NotFound.asLeft
+        case _ => repoFailure(e).asLeft
+      }
     }
 
   /** Not-RT analog of [[RegistryLookup.embeddedLookup]] */
