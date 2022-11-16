@@ -126,8 +126,8 @@ private[registries] object Utils {
     } catch {
       case NonFatal(e) =>
         e match {
-          case NullPointerException => RegistryError.NotFound.asLeft
-          case _                    => repoFailure(e).asLeft
+          case _: NullPointerException => RegistryError.NotFound.asLeft
+          case _                       => repoFailure(e).asLeft
         }
     }
 
