@@ -12,15 +12,17 @@
  */
 package com.snowplowanalytics.iglu.client.resolver
 
-import java.net.URI
+import com.snowplowanalytics.iglu.core.SchemaList
+
 import java.time.Instant
+import java.net.URI
 import scala.collection.immutable.SortedMap
 import scala.concurrent.duration.DurationInt
 
 // Cats
 import cats.Id
 import cats.effect.IO
-import cats.implicits._
+import cats.syntax.all._
 
 // circe
 import io.circe.Json
@@ -69,6 +71,7 @@ class ResolverSpec extends Specification with CatsEffect {
   a Resolver should accumulate errors from all repositories $e8
   we can construct a Resolver from a valid resolver 1-0-2 configuration JSON $e10
   a Resolver should cache SchemaLists with different models separately $e11
+  a Resolver should use schemaKey provided in SchemaListLike for result validation $e12
   """
 
   import ResolverSpec._
@@ -403,5 +406,50 @@ class ResolverSpec extends Specification with CatsEffect {
       case (Right(one), Right(two)) => one shouldNotEqual two
       case _                        => ko("Unexpected result for two consequent listSchemas")
     }
+  }
+
+  def e12 = {
+    val IgluCentralServer = Registry.Http(
+      Registry.Config("Iglu Central  EU1", 0, List("com.snowplowanalytics")),
+      Registry
+        .HttpConnection(URI.create("https://com-iglucentral-eu1-prod.iglu.snplow.net/api"), None)
+    )
+
+    val schema100 = SchemaKey(
+      "com.snowplowanalytics.snowplow",
+      "link_click",
+      "jsonschema",
+      SchemaVer.Full(1, 0, 0)
+    )
+    val schema101 = SchemaKey(
+      "com.snowplowanalytics.snowplow",
+      "link_click",
+      "jsonschema",
+      SchemaVer.Full(1, 0, 1)
+    )
+
+    val resolverRef = Resolver.init[Id](10, None, IgluCentralServer)
+    val resolver = resolverRef.map(res =>
+      new Resolver(
+        res.repos,
+        res.cache.flatMap { c =>
+          c.putSchemaList(
+            "com.snowplowanalytics.snowplow",
+            "link_click",
+            1,
+            SchemaList(List(schema100)).asRight
+          )
+          c.some
+        }
+      )
+    )
+
+    val resultOne = resolver.listSchemasLike(schema100)
+    val resultTwo = resolver.listSchemasLike(schema101)
+
+    resultOne must beRight(SchemaList(List(schema100)))
+    resultTwo.map(s => s.copy(schemas = s.schemas.take(2))) must beRight(
+      SchemaList(List(schema100, schema101))
+    )
   }
 }
