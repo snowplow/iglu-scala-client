@@ -1,3 +1,9 @@
+Version 2.2.0 (2022-11-21)
+--------------------------
+Add invalidation for the schema-list cache (#215)
+Allow building caches based on the resolver's content (#207)
+Add list-schemas for the embedded repo (#212)
+
 Version 2.1.0 (2022-05-31)
 --------------------------
 Bump specs2 to 4.15.0 (#198)
