@@ -116,13 +116,39 @@ final case class Resolver[F[_]](repos: List[Registry], cache: Option[ResolverCac
     lookupSchemaResult(schemaKey).map(_.map(_.value))
 
   /**
+   * Vendor, name, model are extracted from supplied schema key to call on the `listSchemas`. The important difference
+   * from `listSchemas` is that it would invalidate cache, if returned list did not contain SchemaKey supplied in
+   * argument. Making it a safer option is latest schema bound is known.
+   */
+  def listSchemasLikeResult(schemaKey: SchemaKey)(implicit
+    F: Monad[F],
+    L: RegistryLookup[F],
+    C: Clock[F]
+  ): F[Either[ResolutionError, SchemaListLookupResult]] =
+    listSchemasResult(schemaKey.vendor, schemaKey.name, schemaKey.version.model, Some(schemaKey))
+
+  /**
    * Get list of available schemas for particular vendor and name part
+   * Server supposed to return them in proper order
+   */
+  def listSchemasResult(vendor: String, name: String, model: Int)(implicit
+    F: Monad[F],
+    L: RegistryLookup[F],
+    C: Clock[F]
+  ): F[Either[ResolutionError, SchemaListLookupResult]] =
+    listSchemasResult(vendor, name, model, None)
+
+  /**
+   * Get list of available schemas for particular vendor and name part
+   * Has an extra argument `mustIncludeKey` which is used to invalidate cache if SchemaKey supplied in it is not in the
+   * list.
    * Server supposed to return them in proper order
    */
   def listSchemasResult(
     vendor: String,
     name: String,
-    model: Int
+    model: Int,
+    mustIncludeKey: Option[SchemaKey]
   )(implicit
     F: Monad[F],
     L: RegistryLookup[F],
@@ -151,7 +177,11 @@ final case class Resolver[F[_]](repos: List[Registry], cache: Option[ResolverCac
 
     getSchemaListFromCache(vendor, name, model).flatMap {
       case Some(TimestampedItem(Right(schemaList), timestamp)) =>
-        Monad[F].pure(Right(ResolverResult.Cached((vendor, name, model), schemaList, timestamp)))
+        if (mustIncludeKey.forall(schemaList.schemas.contains))
+          Monad[F].pure(Right(ResolverResult.Cached((vendor, name, model), schemaList, timestamp)))
+        else
+          traverseRepos[F, SchemaList](get, prioritize(vendor, allRepos.toList), Map.empty)
+            .flatMap(handleAfterFetch)
       case Some(TimestampedItem(Left(failures), _)) =>
         retryCached[F, SchemaList](get, vendor)(failures)
           .flatMap(handleAfterFetch)
@@ -164,7 +194,7 @@ final case class Resolver[F[_]](repos: List[Registry], cache: Option[ResolverCac
   /**
    * Get list of available schemas for particular vendor and name part
    * Server supposed to return them in proper order
-   * Similar to [[listSchemasResult]] but return pure SchemaList instead of full [[Resolver.ResolverResult]]
+   * Similar to `listSchemasResult` but return pure SchemaList instead of full [[Resolver.ResolverResult]]
    */
   def listSchemas(
     vendor: String,
@@ -176,6 +206,19 @@ final case class Resolver[F[_]](repos: List[Registry], cache: Option[ResolverCac
     C: Clock[F]
   ): F[Either[ResolutionError, SchemaList]] =
     listSchemasResult(vendor, name, model).map(_.map(_.value))
+
+  /**
+   * Vendor, name, model are extracted from supplied schema key to call on the `listSchemas`. The important difference
+   * from `listSchemas` is that it would invalidate cache, if returned list did not contain SchemaKey supplied in
+   * argument. Making it a safer option is latest schema bound is known.
+   */
+  def listSchemasLike(schemaKey: SchemaKey)(implicit
+    F: Monad[F],
+    L: RegistryLookup[F],
+    C: Clock[F]
+  ): F[Either[ResolutionError, SchemaList]] =
+    listSchemasResult(schemaKey.vendor, schemaKey.name, schemaKey.version.model, Some(schemaKey))
+      .map(_.map(_.value))
 
   /** Get list of full self-describing schemas available on Iglu Server for particular vendor/name pair */
   def fetchSchemas(
