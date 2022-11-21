@@ -159,7 +159,7 @@ class ResolverSpec extends Specification with DataTables with ValidatedMatchers 
       SortedMap(
         "Iglu Client Embedded" -> LookupHistory(Set(RegistryError.NotFound), 1, SpecHelpers.now),
         "Iglu Test Embedded" -> LookupHistory(
-          Set(RegistryError.NotFound),
+          Set(RegistryError.RepoFailure("ParsingFailure: exhausted input")),
           1,
           SpecHelpers.now
         )
@@ -451,6 +451,6 @@ class ResolverSpec extends Specification with DataTables with ValidatedMatchers 
     val resultTwo = resolver.listSchemasLike(schema101)
 
     resultOne must beRight(SchemaList(List(schema100)))
-    resultTwo must beRight(SchemaList(List(schema100, schema101)))
+    resultTwo.map(_.schemas.take(2)) must beRight(List(schema100, schema101))
   }
 }
