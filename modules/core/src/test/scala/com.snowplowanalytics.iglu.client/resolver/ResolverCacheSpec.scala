@@ -27,8 +27,8 @@ class ResolverCacheSpec extends Specification {
   def is = s2"""
   Disallow overwriting successful request with failed one $e1
   Combine failures during putSchema $e2
+  Should create a resolver cache if cache size > 0 and TTL is none or more than 0 $e3
   """
-
   def e1 = {
     import ResolverCacheSpec._
 
@@ -100,6 +100,15 @@ class ResolverCacheSpec extends Specification {
     val (_, result) = test.run(RegistryState.init).value
     result must beLeft(expectedLookup)
   }
+
+  def e3 = {
+    ResolverCache.shouldCreateResolverCache(10, Some(10.seconds)) mustEqual true
+    ResolverCache.shouldCreateResolverCache(10, None) mustEqual true
+    ResolverCache.shouldCreateResolverCache(0, Some(10.seconds)) mustEqual false
+    ResolverCache.shouldCreateResolverCache(0, None) mustEqual false
+    ResolverCache.shouldCreateResolverCache(10, Some(-10.seconds)) mustEqual false
+  }
+
 }
 
 object ResolverCacheSpec {
