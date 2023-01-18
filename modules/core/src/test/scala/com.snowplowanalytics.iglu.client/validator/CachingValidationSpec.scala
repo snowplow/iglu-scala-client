@@ -318,10 +318,9 @@ class CachingValidationSpec extends Specification {
           "$.type",
           "$.type: does not have a value in the enumeration [array, boolean, integer, null, number, object, string]"
         ),
-        SchemaIssue("$.type", "$.type: should be valid to any of the schemas array")
+        SchemaIssue("$.type", "$.type: string found, array expected")
       )
     )
-
     CirceValidator.WithCaching
       .validate(createCache())(input, ResolverResult.NotCached(schema)) must beLeft(
       expected
