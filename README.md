@@ -5,11 +5,9 @@
 [![License][license-image]][license]
 [![Coverage Status][coveralls-image]][coveralls]
 
-A Scala client and resolver for **[Iglu schema repositories][iglu-wiki]** from the team at **[Snowplow Analytics][snowplow-website]**.
+A Scala client and resolver for **[Iglu schema repositories][iglu-docs]** from the team at **[Snowplow Analytics][snowplow-website]**.
 
 Iglu Scala Client is used extensively in **[Snowplow][snowplow-repo]** to validate self-describing JSONs. For a presentation on how we came to build Iglu, see **[this blog post][snowplow-schema-post]**.
-
-![scala-client-img][scala-client-img]
 
 ## Installation
 
@@ -115,24 +113,22 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 
-[scala-client-img]: https://github.com/snowplow/iglu/wiki/technical-documentation/images/iglu-clients.png
-
-[iglu-wiki]: https://github.com/snowplow/iglu/wiki
-[snowplow-schema-post]: http://snowplowanalytics.com/blog/2014/06/06/making-snowplow-schemas-flexible-a-technical-approach/
-[resolver-config]: https://github.com/snowplow/iglu/wiki/Iglu-client-configuration
+[iglu-docs]: https://docs.snowplow.io/docs/pipeline-components-and-applications/iglu/
+[snowplow-schema-post]: https://snowplow.io/blog/making-snowplow-schemas-flexible-a-technical-approach/
+[resolver-config]: https://docs.snowplow.io/docs/pipeline-components-and-applications/iglu/iglu-resolver/
 
 [snowplow-repo]: https://github.com/snowplow/snowplow
-[snowplow-website]: http://snowplowanalytics.com
+[snowplow-website]: http://snowplow.io
 
 [techdocs-image]: https://d3i6fms1cm1j0i.cloudfront.net/github/images/techdocs.png
 [setup-image]: https://d3i6fms1cm1j0i.cloudfront.net/github/images/setup.png
 [roadmap-image]: https://d3i6fms1cm1j0i.cloudfront.net/github/images/roadmap.png
 [contributing-image]: https://d3i6fms1cm1j0i.cloudfront.net/github/images/contributing.png
 
-[techdocs]: https://docs.snowplowanalytics.com/docs/pipeline-components-and-applications/iglu/iglu-clients/
-[setup]: https://docs.snowplowanalytics.com/docs/pipeline-components-and-applications/iglu/iglu-clients/scala-client-setup/
+[techdocs]: https://docs.snowplow.io/docs/pipeline-components-and-applications/iglu/iglu-clients/
+[setup]: https://docs.snowplow.io/docs/pipeline-components-and-applications/iglu/iglu-clients/scala-client-setup/
 [roadmap]: https://github.com/snowplow/snowplow/projects/7
-[contributing]: https://docs.snowplowanalytics.com/docs/contributing/
+[contributing]: https://docs.snowplow.io/docs/contributing/
 
 [ci]: https://github.com/snowplow/iglu-scala-client/actions?query=workflow%3ACI
 [ci-image]: https://github.com/snowplow/iglu-scala-client/workflows/CI/badge.svg
