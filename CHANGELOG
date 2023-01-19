@@ -1,3 +1,10 @@
+Version 2.2.1 (2023-01-24)
+--------------------------
+Update links in Readme (#205)
+Rename license file for GitHub (#204)
+Update copyright notice to 2023 (#225)
+Build and publish for Scala3 (#224)
+
 Version 2.2.0 (2022-11-21)
 --------------------------
 Add invalidation for the schema-list cache (#215)
