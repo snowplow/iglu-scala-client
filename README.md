@@ -5,11 +5,9 @@
 [![License][license-image]][license]
 [![Coverage Status][coveralls-image]][coveralls]
 
-A Scala client and resolver for **[Iglu schema repositories][iglu-wiki]** from the team at **[Snowplow Analytics][snowplow-website]**.
+A Scala client and resolver for **[Iglu schema repositories][iglu-docs]** from the team at **[Snowplow Analytics][snowplow-website]**.
 
 Iglu Scala Client is used extensively in **[Snowplow][snowplow-repo]** to validate self-describing JSONs. For a presentation on how we came to build Iglu, see **[this blog post][snowplow-schema-post]**.
-
-![scala-client-img][scala-client-img]
 
 ## Installation
 
@@ -115,11 +113,9 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 
-[scala-client-img]: https://github.com/snowplow/iglu/wiki/technical-documentation/images/iglu-clients.png
-
-[iglu-wiki]: https://github.com/snowplow/iglu/wiki
+[iglu-docs]: https://docs.snowplow.io/docs/pipeline-components-and-applications/iglu/
 [snowplow-schema-post]: http://snowplowanalytics.com/blog/2014/06/06/making-snowplow-schemas-flexible-a-technical-approach/
-[resolver-config]: https://github.com/snowplow/iglu/wiki/Iglu-client-configuration
+[resolver-config]: https://docs.snowplow.io/docs/pipeline-components-and-applications/iglu/iglu-resolver/
 
 [snowplow-repo]: https://github.com/snowplow/snowplow
 [snowplow-website]: http://snowplowanalytics.com
