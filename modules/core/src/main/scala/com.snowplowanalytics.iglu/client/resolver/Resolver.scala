@@ -20,7 +20,7 @@ import scala.concurrent.duration.MILLISECONDS
 import cats.data._
 import cats.effect.Clock
 import cats.implicits._
-import io.circe.{Decoder, DecodingFailure, HCursor, Json}
+import io.circe.{Decoder, DecodingFailure, FailedCursor, HCursor, Json}
 import com.snowplowanalytics.iglu.core.{
   SchemaCriterion,
   SchemaKey,
@@ -63,10 +63,53 @@ final case class Resolver[F[_]](repos: List[Registry], cache: Option[ResolverCac
     L: RegistryLookup[F],
     C: Clock[F]
   ): F[Either[ResolutionError, SchemaLookupResult]] = {
-    val get: Registry => F[Either[RegistryError, Json]] = r => L.lookup(r, schemaKey)
+    def extractSupersededBy(schema: Json): Either[RegistryError, SupersededBy] =
+      schema.hcursor.downField("self").downField("supersededBy") match {
+        case _: FailedCursor => None.asRight
+        case c =>
+          c.as[SchemaVer.Full]
+            .bimap(
+              e =>
+                RegistryError.ClientFailure(
+                  s"Error while trying to decode superseding version: ${e.toString()}"
+                ),
+              _.some
+            )
+      }
+
+    def checkSupersedingVersion(
+      schemaKey: SchemaKey,
+      supersededBy: SupersededBy
+    ): Either[RegistryError, Unit] =
+      supersededBy match {
+        case None => ().asRight
+        case Some(superseding) =>
+          if (Ordering[SchemaVer.Full].gt(superseding, schemaKey.version)) ().asRight
+          else
+            RegistryError
+              .ClientFailure(
+                s"Superseding version ${superseding.asString} isn't greater than the version of schema ${schemaKey.toPath}"
+              )
+              .asLeft
+      }
+
+    val get: Registry => F[Either[RegistryError, SchemaItem]] = r =>
+      (for {
+        schema          <- EitherT(L.lookup(r, schemaKey))
+        supersededByOpt <- EitherT.fromEither[F](extractSupersededBy(schema))
+        _               <- EitherT.fromEither[F](checkSupersedingVersion(schemaKey, supersededByOpt))
+        res <- supersededByOpt match {
+          case None =>
+            EitherT.rightT[F, RegistryError](SchemaItem(schema, Option.empty[SchemaVer.Full]))
+          case Some(supersededBy) =>
+            val supersedingSchemaKey = schemaKey.copy(version = supersededBy)
+            EitherT(L.lookup(r, supersedingSchemaKey))
+              .map(supersedingSchema => SchemaItem(supersedingSchema, supersededBy.some))
+        }
+      } yield res).value
 
     def handleAfterFetch(
-      result: Either[LookupFailureMap, Json]
+      result: Either[LookupFailureMap, SchemaItem]
     ): F[Either[ResolutionError, SchemaLookupResult]] =
       cache match {
         case Some(c) =>
@@ -88,10 +131,14 @@ final case class Resolver[F[_]](repos: List[Registry], cache: Option[ResolverCac
       case Some(TimestampedItem(Right(schema), timestamp)) =>
         Monad[F].pure(Right(ResolverResult.Cached(schemaKey, schema, timestamp)))
       case Some(TimestampedItem(Left(failures), _)) =>
-        retryCached[F, Json](get, schemaKey.vendor)(failures)
+        retryCached[F, SchemaItem](get, schemaKey.vendor)(failures)
           .flatMap(handleAfterFetch)
       case None =>
-        traverseRepos[F, Json](get, prioritize(schemaKey.vendor, allRepos.toList), Map.empty)
+        traverseRepos[F, SchemaItem](
+          get,
+          prioritize(schemaKey.vendor, allRepos.toList),
+          Map.empty
+        )
           .flatMap(handleAfterFetch)
     }
   }
@@ -113,7 +160,7 @@ final case class Resolver[F[_]](repos: List[Registry], cache: Option[ResolverCac
     L: RegistryLookup[F],
     C: Clock[F]
   ): F[Either[ResolutionError, Json]] =
-    lookupSchemaResult(schemaKey).map(_.map(_.value))
+    lookupSchemaResult(schemaKey).map(_.map(_.value.schema))
 
   /**
    * Vendor, name, model are extracted from supplied schema key to call on the `listSchemas`. The important difference
@@ -266,8 +313,17 @@ final case class Resolver[F[_]](repos: List[Registry], cache: Option[ResolverCac
 object Resolver {
 
   type SchemaListKey          = (String, String, Int) //vendor, name, model
-  type SchemaLookupResult     = ResolverResult[SchemaKey, Json]
+  type SchemaLookupResult     = ResolverResult[SchemaKey, SchemaItem]
   type SchemaListLookupResult = ResolverResult[SchemaListKey, SchemaList]
+  type SupersededBy           = Option[SchemaVer.Full]
+
+  /**
+   * The result of doing schema lookup
+   * @param schema Schema json
+   * @param supersededBy Superseding schema version if the schema is superseded by another schema.
+   *                     Otherwise, it is None.
+   */
+  case class SchemaItem(schema: Json, supersededBy: SupersededBy)
 
   /** The result of doing a lookup with the resolver, carrying information on whether the cache was used */
   sealed trait ResolverResult[+K, +A] {

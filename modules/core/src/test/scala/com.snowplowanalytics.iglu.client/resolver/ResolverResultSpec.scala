@@ -42,6 +42,7 @@ import com.snowplowanalytics.iglu.client.resolver.registries.{Registry, Registry
 import com.snowplowanalytics.iglu.client.SpecHelpers._
 import org.specs2.Specification
 import org.specs2.matcher.{DataTables, ValidatedMatchers}
+import Resolver.SchemaItem
 
 /** Like 'ResolverSpec' but using lookup methods returning 'ResolverResult' */
 class ResolverResultSpec extends Specification with DataTables with ValidatedMatchers {
@@ -62,6 +63,7 @@ class ResolverResultSpec extends Specification with DataTables with ValidatedMat
   a Resolver should not cache schema if cache is disabled $e12
   a Resolver should return cached schema when ttl not exceeded $e13
   a Resolver should return cached schema when ttl exceeded $e14
+  a Resolver should return superseded schema $e15
   """
 
   import ResolverSpec._
@@ -231,7 +233,7 @@ class ResolverResultSpec extends Specification with DataTables with ValidatedMat
     }
 
     val thirdSucceeded = response3 must beRight[SchemaLookupResult].like {
-      case ResolverResult.Cached(key, value, _) =>
+      case ResolverResult.Cached(key, SchemaItem(value, _), _) =>
         key must beEqualTo(schemaKey) and (value must beEqualTo(Json.Null))
     }
     val requestsNumber = state.req must beEqualTo(2)
@@ -280,7 +282,7 @@ class ResolverResultSpec extends Specification with DataTables with ValidatedMat
 
     // Final response must not overwrite a successful one
     val finalResult = response must beRight[SchemaLookupResult].like {
-      case ResolverResult.Cached(key, value, _) =>
+      case ResolverResult.Cached(key, SchemaItem(value, _), _) =>
         key must beEqualTo(schemaKey) and (value must beEqualTo(Json.Null))
     }
 
@@ -433,7 +435,7 @@ class ResolverResultSpec extends Specification with DataTables with ValidatedMat
       .flatMap(resolver => resolver.lookupSchemaResult(schemaKey))
       .unsafeRunSync()
 
-    result must beRight(ResolverResult.NotCached(expectedSchema))
+    result must beRight(ResolverResult.NotCached(SchemaItem(expectedSchema, None)))
   }
 
   def e13 = {
@@ -514,5 +516,36 @@ class ResolverResultSpec extends Specification with DataTables with ValidatedMat
             ) and (timestamp1 mustNotEqual timestamp2) // same value but different timestamps because original item expired
         }
     }
+  }
+
+  def e15 = {
+
+    val expectedSchema: Json =
+      parse(
+        scala.io.Source
+          .fromInputStream(
+            getClass.getResourceAsStream(
+              "/iglu-test-embedded/schemas/com.snowplowanalytics.iglu-test/superseded-schema/jsonschema/1-0-2"
+            )
+          )
+          .mkString
+      )
+        .fold(e => throw new RuntimeException(s"Cannot parse superseded schema, $e"), identity)
+
+    val schemaKey = SchemaKey(
+      "com.snowplowanalytics.iglu-test",
+      "superseded-schema",
+      "jsonschema",
+      SchemaVer.Full(1, 0, 0)
+    )
+
+    val result = Resolver
+      .init[IO](cacheSize = 0, cacheTtl = None, refs = EmbeddedTest)
+      .flatMap(resolver => resolver.lookupSchemaResult(schemaKey))
+      .unsafeRunSync()
+
+    result must beRight(
+      ResolverResult.NotCached(SchemaItem(expectedSchema, Some(SchemaVer.Full(1, 0, 2))))
+    )
   }
 }

@@ -12,9 +12,6 @@
  */
 package com.snowplowanalytics.iglu.client
 
-// circe
-import io.circe.Json
-
 // LRU
 import com.snowplowanalytics.lrumap.CreateLruMap
 
@@ -23,6 +20,7 @@ import com.snowplowanalytics.iglu.core.{SchemaKey, SchemaList}
 
 // This project
 import resolver.registries.Registry
+import resolver.Resolver.SchemaItem
 
 package object resolver {
 
@@ -38,7 +36,7 @@ package object resolver {
    * Json in case of success or Map of all currently failed repositories
    * in case of failure
    */
-  type SchemaLookup = Either[LookupFailureMap, Json]
+  type SchemaLookup = Either[LookupFailureMap, SchemaItem]
 
   type ListLookup = Either[LookupFailureMap, SchemaList]
 
