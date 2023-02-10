@@ -24,7 +24,7 @@ import com.snowplowanalytics.iglu.client.validator.CirceValidator.WithCaching.{
   SchemaEvaluationKey,
   SchemaEvaluationResult
 }
-import com.snowplowanalytics.iglu.core.SelfDescribingData
+import com.snowplowanalytics.iglu.core.{SchemaVer, SelfDescribingData}
 import com.snowplowanalytics.lrumap.CreateLruMap
 import io.circe.{DecodingFailure, Json}
 
@@ -43,13 +43,16 @@ final class IgluCirceClient[F[_]] private (
     M: Monad[F],
     L: RegistryLookup[F],
     C: Clock[F]
-  ): EitherT[F, ClientError, Unit] =
+  ): EitherT[F, (ClientError, Option[SchemaVer.Full]), Option[SchemaVer.Full]] =
     for {
-      resolverResult <- EitherT(resolver.lookupSchemaResult(instance.schema))
+      resolverResult <- EitherT(resolver.lookupSchemaResult(instance.schema)).leftMap(e =>
+        (e, Option.empty[SchemaVer.Full])
+      )
+      (_, supersedingSchema) = resolverResult.value
       validation =
         CirceValidator.WithCaching.validate(schemaEvaluationCache)(instance.data, resolverResult)
-      _ <- EitherT(validation).leftMap(_.toClientError)
-    } yield ()
+      _ <- EitherT(validation).leftMap(e => (e.toClientError, supersedingSchema))
+    } yield supersedingSchema
 }
 
 object IgluCirceClient {

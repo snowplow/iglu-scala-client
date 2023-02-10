@@ -63,10 +63,23 @@ final case class Resolver[F[_]](repos: List[Registry], cache: Option[ResolverCac
     L: RegistryLookup[F],
     C: Clock[F]
   ): F[Either[ResolutionError, SchemaLookupResult]] = {
-    val get: Registry => F[Either[RegistryError, Json]] = r => L.lookup(r, schemaKey)
+    val get: Registry => F[Either[RegistryError, (Json, Option[SchemaVer.Full])]] = r =>
+      EitherT(L.lookup(r, schemaKey)).semiflatMap { schema =>
+        schema.hcursor.downField("$supersededBy").as[SchemaVer.Full] match {
+          case Right(supersededBy) =>
+            val supersedingSchemaKey = schemaKey.copy(version = supersededBy)
+            L.lookup(r, supersedingSchemaKey)
+              .map { supersedingSchema =>
+                supersedingSchema.toOption
+                  .map(s => (s, Some(supersededBy)))
+                  .getOrElse((schema, Option.empty[SchemaVer.Full]))
+              }
+          case Left(_) => Monad[F].pure((schema, Option.empty[SchemaVer.Full]))
+        }
+      }.value
 
     def handleAfterFetch(
-      result: Either[LookupFailureMap, Json]
+      result: Either[LookupFailureMap, (Json, Option[SchemaVer.Full])]
     ): F[Either[ResolutionError, SchemaLookupResult]] =
       cache match {
         case Some(c) =>
@@ -88,10 +101,14 @@ final case class Resolver[F[_]](repos: List[Registry], cache: Option[ResolverCac
       case Some(TimestampedItem(Right(schema), timestamp)) =>
         Monad[F].pure(Right(ResolverResult.Cached(schemaKey, schema, timestamp)))
       case Some(TimestampedItem(Left(failures), _)) =>
-        retryCached[F, Json](get, schemaKey.vendor)(failures)
+        retryCached[F, (Json, Option[SchemaVer.Full])](get, schemaKey.vendor)(failures)
           .flatMap(handleAfterFetch)
       case None =>
-        traverseRepos[F, Json](get, prioritize(schemaKey.vendor, allRepos.toList), Map.empty)
+        traverseRepos[F, (Json, Option[SchemaVer.Full])](
+          get,
+          prioritize(schemaKey.vendor, allRepos.toList),
+          Map.empty
+        )
           .flatMap(handleAfterFetch)
     }
   }
@@ -113,7 +130,7 @@ final case class Resolver[F[_]](repos: List[Registry], cache: Option[ResolverCac
     L: RegistryLookup[F],
     C: Clock[F]
   ): F[Either[ResolutionError, Json]] =
-    lookupSchemaResult(schemaKey).map(_.map(_.value))
+    lookupSchemaResult(schemaKey).map(_.map(_.value._1))
 
   /**
    * Vendor, name, model are extracted from supplied schema key to call on the `listSchemas`. The important difference
@@ -266,7 +283,7 @@ final case class Resolver[F[_]](repos: List[Registry], cache: Option[ResolverCac
 object Resolver {
 
   type SchemaListKey          = (String, String, Int) //vendor, name, model
-  type SchemaLookupResult     = ResolverResult[SchemaKey, Json]
+  type SchemaLookupResult     = ResolverResult[SchemaKey, (Json, Option[SchemaVer.Full])]
   type SchemaListLookupResult = ResolverResult[SchemaListKey, SchemaList]
 
   /** The result of doing a lookup with the resolver, carrying information on whether the cache was used */

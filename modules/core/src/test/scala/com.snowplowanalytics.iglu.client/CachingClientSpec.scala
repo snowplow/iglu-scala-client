@@ -29,6 +29,8 @@ class CachingClientSpec extends Specification {
   validating a correct self-desc JSON should return the JSON in a Success $e1
   validating a correct self-desc JSON with JSON Schema with incorrect $$schema property should return Failure $e2
   validating an incorrect self-desc JSON should return the validation errors in a Failure  $e3
+  validating a correct self-desc JSON with superseded schema should return the JSON in a Success $e4
+  validating an incorrect self-desc JSON with superseded schema should return the validation errors in a Failure  $e5
 
   """
 
@@ -65,6 +67,39 @@ class CachingClientSpec extends Specification {
       json"""{"schema": "iglu://jsonschema/1-0-0", "data": { "id": 0 } }"""
     )
 
+  val validJsonWithSupersededSchema1 =
+    SelfDescribingData(
+      SchemaKey(
+        "com.snowplowanalytics.iglu-test",
+        "superseded-schema",
+        "jsonschema",
+        SchemaVer.Full(1, 0, 0)
+      ),
+      json"""{ "id": "test-id" }"""
+    )
+
+  val validJsonWithSupersededSchema2 =
+    SelfDescribingData(
+      SchemaKey(
+        "com.snowplowanalytics.iglu-test",
+        "superseded-schema",
+        "jsonschema",
+        SchemaVer.Full(1, 0, 0)
+      ),
+      json"""{ "id": "test-id", "name": "test-name" }"""
+    )
+
+  val invalidJsonWithSupersededSchema =
+    SelfDescribingData(
+      SchemaKey(
+        "com.snowplowanalytics.iglu-test",
+        "superseded-schema",
+        "jsonschema",
+        SchemaVer.Full(1, 0, 0)
+      ),
+      json"""{ "id": "test-id", "name": "test-name", "field_a": "value_a" }"""
+    )
+
   def e1 = {
     val action = for {
       client <- SpecHelpers.CachingTestClient
@@ -90,6 +125,41 @@ class CachingClientSpec extends Specification {
     } yield result must beLeft
 
     action.unsafeRunSync()
+  }
+
+  def e4 = {
+    val supersedingSchema = SchemaVer.Full(1, 0, 2)
+
+    val res1 = (
+      for {
+        client <- SpecHelpers.CachingTestClient
+        result <- client.check(validJsonWithSupersededSchema1).value
+      } yield result
+    ).unsafeRunSync()
+
+    val res2 = (
+      for {
+        client <- SpecHelpers.CachingTestClient
+        result <- client.check(validJsonWithSupersededSchema2).value
+      } yield result
+    ).unsafeRunSync()
+
+    (res1 must beRight(Some(supersedingSchema))) and
+      (res2 must beRight(Some(supersedingSchema)))
+  }
+
+  def e5 = {
+    val res = (
+      for {
+        client <- SpecHelpers.CachingTestClient
+        result <- client.check(invalidJsonWithSupersededSchema).value
+      } yield result
+    ).unsafeRunSync()
+
+    res must beLeft.like {
+      case (_, Some(v: SchemaVer.Full)) if v == SchemaVer.Full(1, 0, 2) => ok
+      case _                                                            => ko
+    }
   }
 
 }
