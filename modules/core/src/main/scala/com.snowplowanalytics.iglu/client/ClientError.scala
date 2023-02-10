@@ -17,7 +17,7 @@ import java.time.Instant
 import cats.Show
 import cats.syntax.show._
 import cats.syntax.either._
-import io.circe.{Decoder, DecodingFailure, Encoder, Json}
+import io.circe.{Decoder, DecodingFailure, Encoder, Json, JsonObject}
 import io.circe.syntax._
 import validator.ValidatorError
 import resolver.LookupHistory
@@ -33,6 +33,8 @@ sealed trait ClientError extends Product with Serializable {
 
 object ClientError {
 
+  val SupersededByField = "supersededBy"
+
   /** Error happened during schema resolution step */
   final case class ResolutionError(value: SortedMap[String, LookupHistory]) extends ClientError {
     def isNotFound: Boolean =
@@ -40,7 +42,8 @@ object ClientError {
   }
 
   /** Error happened during schema/instance validation step */
-  final case class ValidationError(error: ValidatorError) extends ClientError
+  final case class ValidationError(error: ValidatorError, supersededBy: Option[String])
+      extends ClientError
 
   implicit val igluClientResolutionErrorCirceEncoder: Encoder[ClientError] =
     Encoder.instance {
@@ -53,8 +56,16 @@ object ClientError {
                 lookups.asJson.deepMerge(Json.obj("repository" := repo.asJson))
             }
         )
-      case ValidationError(error) =>
-        error.asJson.deepMerge(Json.obj("error" := Json.fromString("ValidationError")))
+      case ValidationError(error, supersededBy) =>
+        val errorTypeJson = Json.obj("error" := Json.fromString("ValidationError"))
+        val supersededByJson = supersededBy
+          .map { v =>
+            Json.obj(SupersededByField -> v.asJson)
+          }
+          .getOrElse(JsonObject.empty.asJson)
+        error.asJson
+          .deepMerge(errorTypeJson)
+          .deepMerge(supersededByJson)
     }
 
   implicit val igluClientResolutionErrorCirceDecoder: Decoder[ClientError] =
@@ -70,10 +81,11 @@ object ClientError {
                 ResolutionError(SortedMap[String, LookupHistory]() ++ history.map(_.toField).toMap)
               }
           case "ValidationError" =>
+            val supersededBy = cursor.downField(SupersededByField).as[String].toOption
             cursor
               .as[ValidatorError]
               .map { error =>
-                ValidationError(error)
+                ValidationError(error, supersededBy)
               }
           case _ =>
             DecodingFailure(
@@ -88,7 +100,7 @@ object ClientError {
 
   implicit val igluClientShowInstance: Show[ClientError] =
     Show.show {
-      case ClientError.ValidationError(ValidatorError.InvalidData(reports)) =>
+      case ClientError.ValidationError(ValidatorError.InvalidData(reports), _) =>
         val issues = reports.toList
           .groupBy(_.path)
           .map {
@@ -99,7 +111,7 @@ object ClientError {
                 .mkString("\n")
           }
         s"Instance is not valid against its schema:\n${issues.mkString("\n")}"
-      case ClientError.ValidationError(ValidatorError.InvalidSchema(reports)) =>
+      case ClientError.ValidationError(ValidatorError.InvalidSchema(reports), _) =>
         val r = reports.toList.map(i => s"* [${i.message}] (at ${i.path})").mkString(",\n")
         s"Resolved schema cannot be used to validate an instance. Following issues found:\n$r"
       case ClientError.ResolutionError(lookup) =>

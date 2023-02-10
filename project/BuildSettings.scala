@@ -21,6 +21,7 @@ import sbtdynver.DynVerPlugin.autoImport._
 // Mima plugin
 import com.typesafe.tools.mima.plugin.MimaKeys._
 import com.typesafe.tools.mima.plugin.MimaPlugin
+import com.typesafe.tools.mima.core.{ProblemFilters, MissingTypesProblem}
 
 // Scoverage plugin
 import scoverage.ScoverageKeys._
@@ -69,7 +70,7 @@ object BuildSettings {
   // clear-out mimaBinaryIssueFilters and mimaPreviousVersions.
   // Otherwise, add previous version to set without
   // removing other versions.
-  val mimaPreviousVersionsCore = Set("1.1.1")
+  val mimaPreviousVersionsCore = Set()
   val mimaPreviousVersionsHttp4s = Set()
 
   lazy val mimaSettings = Seq(
@@ -78,7 +79,8 @@ object BuildSettings {
       mimaPreviousVersions.map { organization.value %% name.value % _ },
     },
     ThisBuild / mimaFailOnNoPrevious := false,
-    mimaBinaryIssueFilters ++= Seq(),
+    mimaBinaryIssueFilters ++= Seq(
+    ),
     Test / test := {
       mimaReportBinaryIssues.value
       (Test / test).value

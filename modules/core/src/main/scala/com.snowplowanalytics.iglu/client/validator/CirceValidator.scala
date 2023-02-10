@@ -42,7 +42,7 @@ import io.circe.jackson.snowplow.circeToJackson
 import com.snowplowanalytics.lrumap.{CreateLruMap, LruMap}
 
 import com.snowplowanalytics.iglu.core.SchemaKey
-import com.snowplowanalytics.iglu.client.resolver.Resolver.ResolverResult
+import com.snowplowanalytics.iglu.client.resolver.Resolver.{ResolverResult, SchemaItem}
 
 object CirceValidator extends Validator[Json] {
 
@@ -311,7 +311,7 @@ object CirceValidator extends Validator[Json] {
       evaluationCache: SchemaEvaluationCache[F]
     )(result: SchemaLookupResult): F[Either[ValidatorError.InvalidSchema, JsonSchema]] = {
       result match {
-        case ResolverResult.Cached(key, schema, timestamp) =>
+        case ResolverResult.Cached(key, SchemaItem(schema, _), timestamp) =>
           evaluationCache.get((key, timestamp)).flatMap {
             case Some(alreadyEvaluatedSchema) =>
               alreadyEvaluatedSchema.pure[F]
@@ -320,7 +320,7 @@ object CirceValidator extends Validator[Json] {
                 .pure[F]
                 .flatTap(result => evaluationCache.put((key, timestamp), result))
           }
-        case ResolverResult.NotCached(schema) =>
+        case ResolverResult.NotCached(SchemaItem(schema, _)) =>
           provideNewJsonSchema(schema).pure[F]
       }
     }
