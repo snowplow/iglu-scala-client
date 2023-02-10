@@ -19,14 +19,13 @@ import cats.effect.Clock
 import cats.implicits._
 import com.snowplowanalytics.iglu.core.SchemaList
 
-// circe
-import io.circe.Json
-
 // LruMap
 import com.snowplowanalytics.lrumap.{CreateLruMap, LruMap}
 
 // Iglu core
 import com.snowplowanalytics.iglu.core.SchemaKey
+
+import Resolver.SchemaItem
 
 /**
  * Resolver cache and associated logic to (in)validate entities,
@@ -93,7 +92,7 @@ class ResolverCache[F[_]] private (
   )(implicit
     F: Monad[F],
     C: Clock[F]
-  ): F[Either[LookupFailureMap, TimestampedItem[Json]]] =
+  ): F[Either[LookupFailureMap, TimestampedItem[SchemaItem]]] =
     putItemResult(schemas, schemaKey, freshResult)
 
   /** Lookup a `SchemaList`, no TTL is available */
