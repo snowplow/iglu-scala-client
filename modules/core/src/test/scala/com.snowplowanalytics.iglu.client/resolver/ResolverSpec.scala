@@ -204,15 +204,14 @@ class ResolverSpec extends Specification with CatsEffect {
       RegistryError.RepoFailure("shouldn't matter").asLeft[Json]
     val correctSchema =
       Json.Null.asRight[RegistryError]
-    val time      = Instant.ofEpochMilli(2L)
+    val time      = Instant.ofEpochMilli(3L)
     val responses = List(timeoutError, correctSchema)
 
     val httpRep =
       Registry.Http(Registry.Config("Mock Repo", 1, List("com.snowplowanalytics.iglu-test")), null)
 
-    implicit val cache: InitSchemaCache[StaticLookup]   = ResolverSpecHelpers.staticCache
-    implicit val cacheList: InitListCache[StaticLookup] = ResolverSpecHelpers.staticCacheForList
-    implicit val clock: Clock[StaticLookup]             = ResolverSpecHelpers.staticClock
+    implicit val cache: CreateResolverCache[StaticLookup] = ResolverSpecHelpers.staticResolverCache
+    implicit val clock: Clock[StaticLookup]               = ResolverSpecHelpers.staticClock
     implicit val registryLookup: RegistryLookup[StaticLookup] =
       ResolverSpecHelpers.getLookup(responses, Nil)
 
@@ -264,9 +263,8 @@ class ResolverSpec extends Specification with CatsEffect {
     val httpRep =
       Registry.Http(Registry.Config("Mock Repo", 1, List("com.snowplowanalytics.iglu-test")), null)
 
-    implicit val cache: InitSchemaCache[StaticLookup]   = ResolverSpecHelpers.staticCache
-    implicit val cacheList: InitListCache[StaticLookup] = ResolverSpecHelpers.staticCacheForList
-    implicit val clock: Clock[StaticLookup]             = ResolverSpecHelpers.staticClock
+    implicit val cache: CreateResolverCache[StaticLookup] = ResolverSpecHelpers.staticResolverCache
+    implicit val clock: Clock[StaticLookup]               = ResolverSpecHelpers.staticClock
     implicit val registryLookup: RegistryLookup[StaticLookup] =
       ResolverSpecHelpers.getLookup(responses, Nil)
 
@@ -317,9 +315,8 @@ class ResolverSpec extends Specification with CatsEffect {
       null
     )
 
-    implicit val cache: InitSchemaCache[StaticLookup]   = ResolverSpecHelpers.staticCache
-    implicit val cacheList: InitListCache[StaticLookup] = ResolverSpecHelpers.staticCacheForList
-    implicit val clock: Clock[StaticLookup]             = ResolverSpecHelpers.staticClock
+    implicit val cache: CreateResolverCache[StaticLookup] = ResolverSpecHelpers.staticResolverCache
+    implicit val clock: Clock[StaticLookup]               = ResolverSpecHelpers.staticClock
     implicit val registryLookup: RegistryLookup[StaticLookup] = ResolverSpecHelpers.getLookupByRepo(
       Map(
         "Mock Repo 1" -> List(error1.asLeft, error2.asLeft),
@@ -330,12 +327,12 @@ class ResolverSpec extends Specification with CatsEffect {
 
     val expected = ResolutionError(
       SortedMap(
-        "Mock Repo 1" -> LookupHistory(Set(error1, error2), 2, Instant.ofEpochMilli(2008L)),
-        "Mock Repo 2" -> LookupHistory(Set(error3, error4), 2, Instant.ofEpochMilli(2009L)),
+        "Mock Repo 1" -> LookupHistory(Set(error1, error2), 2, Instant.ofEpochMilli(2010L)),
+        "Mock Repo 2" -> LookupHistory(Set(error3, error4), 2, Instant.ofEpochMilli(2011L)),
         "Iglu Client Embedded" -> LookupHistory(
           Set(RegistryError.NotFound),
           1,
-          Instant.ofEpochMilli(4L)
+          Instant.ofEpochMilli(5L)
         )
       )
     )

@@ -24,6 +24,7 @@ import scala.concurrent.duration._
 // Cats
 import cats.Id
 import cats.effect.IO
+import cats.effect.implicits._
 import cats.implicits._
 
 // circe
@@ -37,7 +38,6 @@ import com.snowplowanalytics.iglu.core.{SchemaKey, SchemaVer}
 import com.snowplowanalytics.iglu.client.ClientError._
 import com.snowplowanalytics.iglu.client.SpecHelpers
 import com.snowplowanalytics.iglu.client.resolver.ResolverSpecHelpers.StaticLookup
-import com.snowplowanalytics.iglu.client.resolver.registries.RegistryLookup._
 import com.snowplowanalytics.iglu.client.resolver.registries.{Registry, RegistryError}
 import com.snowplowanalytics.iglu.client.resolver.registries.RegistryLookup
 
@@ -66,6 +66,7 @@ class ResolverResultSpec extends Specification with ValidatedMatchers with CatsE
   a Resolver should not cache schema if cache is disabled $e12
   a Resolver should return cached schema when ttl not exceeded $e13
   a Resolver should return cached schema when ttl exceeded $e14
+  a Resolver should not spam the registry with similar requests $e15
   """
 
   import ResolverSpec._
@@ -195,15 +196,14 @@ class ResolverResultSpec extends Specification with ValidatedMatchers with CatsE
       RegistryError.RepoFailure("shouldn't matter").asLeft[Json]
     val correctResult =
       Json.Null.asRight[RegistryError]
-    val time      = Instant.ofEpochMilli(2L)
+    val time      = Instant.ofEpochMilli(3L)
     val responses = List(timeoutError, correctResult)
 
     val httpRep =
       Registry.Http(Registry.Config("Mock Repo", 1, List("com.snowplowanalytics.iglu-test")), null)
 
-    implicit val cache     = ResolverSpecHelpers.staticCache
-    implicit val cacheList = ResolverSpecHelpers.staticCacheForList
-    implicit val clock     = ResolverSpecHelpers.staticClock
+    implicit val cache = ResolverSpecHelpers.staticResolverCache
+    implicit val clock = ResolverSpecHelpers.staticClock
     implicit val registryLookup: RegistryLookup[StaticLookup] =
       ResolverSpecHelpers.getLookup(responses, Nil)
 
@@ -258,9 +258,8 @@ class ResolverResultSpec extends Specification with ValidatedMatchers with CatsE
     val httpRep =
       Registry.Http(Registry.Config("Mock Repo", 1, List("com.snowplowanalytics.iglu-test")), null)
 
-    implicit val cache     = ResolverSpecHelpers.staticCache
-    implicit val cacheList = ResolverSpecHelpers.staticCacheForList
-    implicit val clock     = ResolverSpecHelpers.staticClock
+    implicit val cache = ResolverSpecHelpers.staticResolverCache
+    implicit val clock = ResolverSpecHelpers.staticClock
     implicit val registryLookup: RegistryLookup[StaticLookup] =
       ResolverSpecHelpers.getLookup(responses, Nil)
 
@@ -318,9 +317,8 @@ class ResolverResultSpec extends Specification with ValidatedMatchers with CatsE
       null
     )
 
-    implicit val cache     = ResolverSpecHelpers.staticCache
-    implicit val cacheList = ResolverSpecHelpers.staticCacheForList
-    implicit val clock     = ResolverSpecHelpers.staticClock
+    implicit val cache = ResolverSpecHelpers.staticResolverCache
+    implicit val clock = ResolverSpecHelpers.staticClock
     implicit val registryLookup: RegistryLookup[StaticLookup] = ResolverSpecHelpers.getLookupByRepo(
       Map(
         "Mock Repo 1" -> List(error1.asLeft, error2.asLeft),
@@ -331,12 +329,12 @@ class ResolverResultSpec extends Specification with ValidatedMatchers with CatsE
 
     val expected = ResolutionError(
       SortedMap(
-        "Mock Repo 1" -> LookupHistory(Set(error1, error2), 2, Instant.ofEpochMilli(2008L)),
-        "Mock Repo 2" -> LookupHistory(Set(error3, error4), 2, Instant.ofEpochMilli(2009L)),
+        "Mock Repo 1" -> LookupHistory(Set(error1, error2), 2, Instant.ofEpochMilli(2010L)),
+        "Mock Repo 2" -> LookupHistory(Set(error3, error4), 2, Instant.ofEpochMilli(2011L)),
         "Iglu Client Embedded" -> LookupHistory(
           Set(RegistryError.NotFound),
           1,
-          Instant.ofEpochMilli(4L)
+          Instant.ofEpochMilli(5L)
         )
       )
     )
@@ -452,9 +450,8 @@ class ResolverResultSpec extends Specification with ValidatedMatchers with CatsE
     val httpRep =
       Registry.Http(Registry.Config("Mock Repo", 1, List("com.snowplowanalytics.iglu-test")), null)
 
-    implicit val cache     = ResolverSpecHelpers.staticCache
-    implicit val cacheList = ResolverSpecHelpers.staticCacheForList
-    implicit val clock     = ResolverSpecHelpers.staticClock
+    implicit val cache = ResolverSpecHelpers.staticResolverCache
+    implicit val clock = ResolverSpecHelpers.staticClock
     implicit val registryLookup: RegistryLookup[StaticLookup] =
       ResolverSpecHelpers.getLookup(responses, Nil)
 
@@ -491,9 +488,8 @@ class ResolverResultSpec extends Specification with ValidatedMatchers with CatsE
     val httpRep =
       Registry.Http(Registry.Config("Mock Repo", 1, List("com.snowplowanalytics.iglu-test")), null)
 
-    implicit val cache     = ResolverSpecHelpers.staticCache
-    implicit val cacheList = ResolverSpecHelpers.staticCacheForList
-    implicit val clock     = ResolverSpecHelpers.staticClock
+    implicit val cache = ResolverSpecHelpers.staticResolverCache
+    implicit val clock = ResolverSpecHelpers.staticClock
     implicit val registryLookup: RegistryLookup[StaticLookup] =
       ResolverSpecHelpers.getLookup(responses, Nil)
 
@@ -516,5 +512,49 @@ class ResolverResultSpec extends Specification with ValidatedMatchers with CatsE
             ) and (timestamp1 mustNotEqual timestamp2) // same value but different timestamps because original item expired
         }
     }
+  }
+
+  def e15 = {
+
+    import cats.effect.unsafe.IORuntime.global
+    import com.snowplowanalytics.iglu.client.resolver.registries.RegistryLookup.{
+      ioLookupInstance => _
+    }
+    implicit val runtime = global
+
+    val schemaKey =
+      SchemaKey(
+        "com.sendgrid",
+        "bounce",
+        "jsonschema",
+        SchemaVer.Full(1, 0, 0)
+      )
+
+    val IgluCentralServer = Registry.Http(
+      Registry.Config("Iglu Central  EU1", 0, List("com.snowplowanalytics")),
+      Registry
+        .HttpConnection(URI.create("https://com-iglucentral-eu1-prod.iglu.snplow.net/api"), None)
+    )
+
+    val trackingRegistry: TrackingRegistry = mkTrackingRegistry
+    implicit val reg: RegistryLookup[IO]   = trackingRegistry.asInstanceOf[RegistryLookup[IO]]
+    val resolver = Resolver.init[IO](10, None, IgluCentralServer).unsafeRunSync()
+
+    def listWorker   = () => resolver.listSchemas("com.sendgrid", "bounce", 1)
+    def lookupWorker = () => resolver.lookupSchema(schemaKey)
+    (List.fill(200)(listWorker) zip List.fill(200)(lookupWorker))
+      .flatMap(t => List(t._1, t._2))
+      .parTraverseN(100)(f => f())
+      .unsafeRunSync()
+
+    (
+      trackingRegistry.listState.get().mkString(", "),
+      trackingRegistry.lookupState.get().mkString(", ")
+    ) must equalTo(
+      (
+        "Iglu Central  EU1-com.sendgrid-bounce-1, Iglu Client Embedded-com.sendgrid-bounce-1",
+        "Iglu Central  EU1-iglu:com.sendgrid/bounce/jsonschema/1-0-0, Iglu Client Embedded-iglu:com.sendgrid/bounce/jsonschema/1-0-0"
+      )
+    )
   }
 }
