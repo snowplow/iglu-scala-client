@@ -37,8 +37,6 @@ sealed trait Registry extends Product with Serializable {
 object Registry {
   import Utils._
 
-  type Get[F[_], A] = Registry => F[Either[RegistryError, A]]
-
   /**
    * An embedded repository is one which is embedded inside the calling code,
    * e.g. inside the jar's resources folder

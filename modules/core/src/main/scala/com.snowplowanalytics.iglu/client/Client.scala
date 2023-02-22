@@ -17,7 +17,7 @@ import cats.data.EitherT
 import cats.effect.{Clock, IO}
 import io.circe.{DecodingFailure, Json}
 import com.snowplowanalytics.iglu.core.SelfDescribingData
-import resolver.{InitListCache, InitSchemaCache}
+import resolver.CreateResolverCache
 import resolver.registries.{Registry, RegistryLookup}
 
 /**
@@ -51,7 +51,7 @@ object Client {
   val IgluCentral: Client[IO, Json] =
     Client[IO, Json](Resolver(List(Registry.IgluCentral), None), CirceValidator)
 
-  def parseDefault[F[_]: Monad: InitSchemaCache: InitListCache](
+  def parseDefault[F[_]: Monad: CreateResolverCache](
     json: Json
   ): EitherT[F, DecodingFailure, Client[F, Json]] =
     EitherT(Resolver.parse[F](json)).map { resolver =>
