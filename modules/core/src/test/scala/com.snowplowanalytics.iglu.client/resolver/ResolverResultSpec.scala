@@ -38,7 +38,6 @@ import com.snowplowanalytics.iglu.core.{SchemaKey, SchemaVer}
 import com.snowplowanalytics.iglu.client.ClientError._
 import com.snowplowanalytics.iglu.client.SpecHelpers
 import com.snowplowanalytics.iglu.client.resolver.ResolverSpecHelpers.StaticLookup
-import com.snowplowanalytics.iglu.client.resolver.registries.RegistryLookup._
 import com.snowplowanalytics.iglu.client.resolver.registries.{Registry, RegistryError}
 import com.snowplowanalytics.iglu.client.resolver.registries.RegistryLookup
 
@@ -519,7 +518,7 @@ class ResolverResultSpec extends Specification with ValidatedMatchers with CatsE
   def e15 = {
     
     import cats.effect.unsafe.IORuntime.global
-    
+    import com.snowplowanalytics.iglu.client.resolver.registries.RegistryLookup.{ioLookupInstance => _}
     implicit val runtime = global
     
     val schemaKey =
