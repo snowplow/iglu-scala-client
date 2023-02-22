@@ -24,7 +24,7 @@ import io.circe.Json
 import scala.concurrent.duration.{DurationInt, FiniteDuration}
 
 // LruMap
-import com.snowplowanalytics.lrumap.{CreateLruMap, LruMap}
+import com.snowplowanalytics.lrumap.LruMap
 
 // Iglu core
 import com.snowplowanalytics.iglu.core.SchemaKey
@@ -39,6 +39,8 @@ import com.snowplowanalytics.iglu.core.SchemaKey
 class ResolverCache[F[_]] private (
   schemas: LruMap[F, SchemaKey, SchemaCacheEntry],
   schemaLists: LruMap[F, ListCacheKey, ListCacheEntry],
+  schemaMutex: ResolverMutex[F, SchemaKey],
+  schemaListMutex: ResolverMutex[F, ListCacheKey],
   val ttl: Option[TTL]
 ) {
 
@@ -133,6 +135,14 @@ class ResolverCache[F[_]] private (
     freshResult: ListLookup
   )(implicit F: Monad[F], C: Clock[F]): F[Either[LookupFailureMap, TimestampedItem[SchemaList]]] =
     putItemResult(schemaLists, (vendor, name, model), freshResult)
+
+  private[resolver] def withLockOnSchemaKey[A](key: SchemaKey)(f: => F[A]): F[A] =
+    schemaMutex.withLockOn(key)(f)
+
+  private[resolver] def withLockOnSchemaModel[A](vendor: Vendor, name: Name, model: Model)(
+    f: => F[A]
+  ): F[A] =
+    schemaListMutex.withLockOn((vendor, name, model))(f)
 }
 
 object ResolverCache {
@@ -144,14 +154,15 @@ object ResolverCache {
     size: Int,
     ttl: Option[TTL]
   )(implicit
-    C: CreateLruMap[F, SchemaKey, SchemaCacheEntry],
-    L: CreateLruMap[F, ListCacheKey, ListCacheEntry]
+    C: CreateResolverCache[F]
   ): F[Option[ResolverCache[F]]] = {
     if (shouldCreateResolverCache(size, ttl)) {
       for {
-        schemas     <- CreateLruMap[F, SchemaKey, SchemaCacheEntry].create(size)
-        schemaLists <- CreateLruMap[F, ListCacheKey, ListCacheEntry].create(size)
-      } yield new ResolverCache[F](schemas, schemaLists, ttl).some
+        schemas     <- C.createSchemaCache(size)
+        schemaLists <- C.createSchemaListCache(size)
+        schemaMutex <- C.createMutex[SchemaKey]
+        listMutex   <- C.createMutex[ListCacheKey]
+      } yield new ResolverCache[F](schemas, schemaLists, schemaMutex, listMutex, ttl).some
     } else
       Applicative[F].pure(none)
   }

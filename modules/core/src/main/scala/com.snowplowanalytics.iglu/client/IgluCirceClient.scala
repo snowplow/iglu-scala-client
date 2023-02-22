@@ -17,7 +17,7 @@ import cats.data.EitherT
 import cats.effect.Clock
 import cats.implicits._
 import com.snowplowanalytics.iglu.client.resolver.registries.RegistryLookup
-import com.snowplowanalytics.iglu.client.resolver.{InitListCache, InitSchemaCache}
+import com.snowplowanalytics.iglu.client.resolver.CreateResolverCache
 import com.snowplowanalytics.iglu.client.validator.CirceValidator.WithCaching.{
   InitValidatorCache,
   SchemaEvaluationCache,
@@ -54,7 +54,7 @@ final class IgluCirceClient[F[_]] private (
 
 object IgluCirceClient {
 
-  def parseDefault[F[_]: Monad: InitSchemaCache: InitListCache: InitValidatorCache](
+  def parseDefault[F[_]: Monad: CreateResolverCache: InitValidatorCache](
     json: Json
   ): EitherT[F, DecodingFailure, IgluCirceClient[F]] =
     for {
