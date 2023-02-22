@@ -57,7 +57,7 @@ object SpecHelpers {
       schemaKey: SchemaKey
     ): IO[Either[RegistryError, Json]] = {
       IO(
-        lookupState.updateAndGet( (l:List[String]) =>
+        lookupState.updateAndGet((l: List[String]) =>
           Seq(registry.config.name, schemaKey.toSchemaUri).mkString("-") :: l
         )
       ) >>
@@ -71,7 +71,7 @@ object SpecHelpers {
       model: Int
     ): IO[Either[RegistryError, SchemaList]] = {
       IO(
-        listState.updateAndGet((l:List[String]) =>
+        listState.updateAndGet((l: List[String]) =>
           Seq(registry.config.name, vendor, name, model.toString).mkString("-") :: l
         )
       ) >>
@@ -80,7 +80,7 @@ object SpecHelpers {
   }
   def mkTrackingRegistry: TrackingRegistry = TrackingRegistry(
     new AtomicReference[List[String]](List.empty[String]),
-    new AtomicReference[List[String]](List.empty[String]),
+    new AtomicReference[List[String]](List.empty[String])
   )
 
   val EmbeddedTest: Registry =

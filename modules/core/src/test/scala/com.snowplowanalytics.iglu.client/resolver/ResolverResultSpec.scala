@@ -513,14 +513,15 @@ class ResolverResultSpec extends Specification with ValidatedMatchers with CatsE
         }
     }
   }
-  
-  
+
   def e15 = {
-    
+
     import cats.effect.unsafe.IORuntime.global
-    import com.snowplowanalytics.iglu.client.resolver.registries.RegistryLookup.{ioLookupInstance => _}
+    import com.snowplowanalytics.iglu.client.resolver.registries.RegistryLookup.{
+      ioLookupInstance => _
+    }
     implicit val runtime = global
-    
+
     val schemaKey =
       SchemaKey(
         "com.sendgrid",
@@ -528,28 +529,32 @@ class ResolverResultSpec extends Specification with ValidatedMatchers with CatsE
         "jsonschema",
         SchemaVer.Full(1, 0, 0)
       )
-      
+
     val IgluCentralServer = Registry.Http(
       Registry.Config("Iglu Central  EU1", 0, List("com.snowplowanalytics")),
       Registry
         .HttpConnection(URI.create("https://com-iglucentral-eu1-prod.iglu.snplow.net/api"), None)
     )
-    
+
     val trackingRegistry: TrackingRegistry = mkTrackingRegistry
-    implicit val reg: RegistryLookup[IO] = trackingRegistry.asInstanceOf[RegistryLookup[IO]] 
+    implicit val reg: RegistryLookup[IO]   = trackingRegistry.asInstanceOf[RegistryLookup[IO]]
     val resolver = Resolver.init[IO](10, None, IgluCentralServer).unsafeRunSync()
 
-    
-    def listWorker = (() => resolver.listSchemas("com.sendgrid", "bounce", 1))
-    def lookupWorker = (() => resolver.lookupSchema(schemaKey))
+    def listWorker   = () => resolver.listSchemas("com.sendgrid", "bounce", 1)
+    def lookupWorker = () => resolver.lookupSchema(schemaKey)
     (List.fill(200)(listWorker) zip List.fill(200)(lookupWorker))
       .flatMap(t => List(t._1, t._2))
       .parTraverseN(100)(f => f())
       .unsafeRunSync()
 
-    (trackingRegistry.listState.get().mkString(", "), trackingRegistry.lookupState.get().mkString(", ")) must equalTo(
-      ("Iglu Central  EU1-com.sendgrid-bounce-1, Iglu Client Embedded-com.sendgrid-bounce-1",
-        "Iglu Central  EU1-iglu:com.sendgrid/bounce/jsonschema/1-0-0, Iglu Client Embedded-iglu:com.sendgrid/bounce/jsonschema/1-0-0")
+    (
+      trackingRegistry.listState.get().mkString(", "),
+      trackingRegistry.lookupState.get().mkString(", ")
+    ) must equalTo(
+      (
+        "Iglu Central  EU1-com.sendgrid-bounce-1, Iglu Client Embedded-com.sendgrid-bounce-1",
+        "Iglu Central  EU1-iglu:com.sendgrid/bounce/jsonschema/1-0-0, Iglu Client Embedded-iglu:com.sendgrid/bounce/jsonschema/1-0-0"
+      )
     )
   }
 }
