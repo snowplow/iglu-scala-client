@@ -17,11 +17,8 @@ import io.circe.Json
 
 import scala.concurrent.duration.FiniteDuration
 
-// LRU
-import com.snowplowanalytics.lrumap.CreateLruMap
-
 // Iglu Core
-import com.snowplowanalytics.iglu.core.{SchemaKey, SchemaList}
+import com.snowplowanalytics.iglu.core.SchemaList
 
 // This project
 import resolver.registries.Registry
@@ -82,7 +79,4 @@ package object resolver {
   /** Cache entry for schema list lookup results */
   type ListCacheEntry = CacheEntry[ListLookup]
 
-  /** Ability to initialize the cache */
-  type InitSchemaCache[F[_]] = CreateLruMap[F, SchemaKey, SchemaCacheEntry]
-  type InitListCache[F[_]]   = CreateLruMap[F, ListCacheKey, ListCacheEntry]
 }

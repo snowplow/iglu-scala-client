@@ -27,7 +27,7 @@ import io.circe.Json
 // LRU Map
 import com.snowplowanalytics.iglu.core.circe.implicits._
 import com.snowplowanalytics.iglu.core.{SchemaKey, SchemaList}
-import com.snowplowanalytics.lrumap.{CreateLruMap, LruMap}
+import com.snowplowanalytics.lrumap.LruMap
 
 // This project
 import com.snowplowanalytics.iglu.client.resolver.registries.{
@@ -89,15 +89,14 @@ object ResolverSpecHelpers {
       State(s => (s.copy(time = s.time + delta), ()))
   }
 
-  val staticCache: InitSchemaCache[StaticLookup] =
-    new CreateLruMap[StaticLookup, SchemaKey, SchemaCacheEntry] {
-      def create(size: Int): StaticLookup[LruMap[StaticLookup, SchemaKey, SchemaCacheEntry]] =
+  val staticResolverCache: CreateResolverCache[StaticLookup] =
+    new CreateResolverCache[StaticLookup] {
+      def createSchemaCache(
+        size: Int
+      ): StaticLookup[LruMap[StaticLookup, SchemaKey, SchemaCacheEntry]] =
         State(s => (s.copy(cacheSize = size), StateCache))
-    }
 
-  val staticCacheForList: InitListCache[StaticLookup] =
-    new CreateLruMap[StaticLookup, ListCacheKey, ListCacheEntry] {
-      def create(
+      def createSchemaListCache(
         size: Int
       ): StaticLookup[LruMap[StaticLookup, ListCacheKey, ListCacheEntry]] =
         State { s =>
@@ -105,6 +104,9 @@ object ResolverSpecHelpers {
           val state                                                     = s.copy(cacheSize = size)
           (state, cache)
         }
+
+      def createMutex[K]: StaticLookup[ResolverMutex[StaticLookup, K]] =
+        State.pure(stateMutex[K])
     }
 
   val staticClock: Clock[StaticLookup] =
@@ -215,4 +217,10 @@ object ResolverSpecHelpers {
         (state.copy(schemaLists = value :: state.schemaLists).tick, ())
       }
   }
+
+  private def stateMutex[K]: ResolverMutex[StaticLookup, K] =
+    new ResolverMutex[StaticLookup, K] {
+      def withLockOn[A](key: K)(f: => StaticLookup[A]): StaticLookup[A] =
+        f
+    }
 }

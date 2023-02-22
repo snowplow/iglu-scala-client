@@ -116,7 +116,6 @@ class ResolverCacheSpec extends Specification {
 
 object ResolverCacheSpec {
   // No need to overwrite anything
-  implicit val a: InitSchemaCache[StaticLookup] = staticCache
-  implicit val c: InitListCache[StaticLookup]   = staticCacheForList
-  implicit val b: Clock[StaticLookup]           = staticClock
+  implicit val a: CreateResolverCache[StaticLookup] = staticResolverCache
+  implicit val b: Clock[StaticLookup]               = staticClock
 }
