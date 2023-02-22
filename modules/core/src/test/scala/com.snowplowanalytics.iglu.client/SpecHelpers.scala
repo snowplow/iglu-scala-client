@@ -13,11 +13,15 @@
 package com.snowplowanalytics.iglu.client
 
 import cats.Applicative
+import com.snowplowanalytics.iglu.client.resolver.registries.{RegistryError, RegistryLookup}
+import com.snowplowanalytics.iglu.core.{SchemaKey, SchemaList}
+import io.circe.Json
 
 import java.net.URI
 import java.time.Instant
 import java.util.concurrent.TimeUnit
 import scala.concurrent.duration.FiniteDuration
+import java.util.concurrent.atomic.AtomicReference
 
 // Cats
 import cats.Id
@@ -43,6 +47,41 @@ object SpecHelpers {
       Registry.Config("Iglu Central", 0, List("com.snowplowanalytics")),
       Registry.HttpConnection(URI.create("http://iglucentral.com"), None)
     )
+
+  case class TrackingRegistry(
+    lookupState: AtomicReference[List[String]],
+    listState: AtomicReference[List[String]]
+  ) extends RegistryLookup[IO] {
+    override def lookup(
+      registry: Registry,
+      schemaKey: SchemaKey
+    ): IO[Either[RegistryError, Json]] = {
+      IO(
+        lookupState.updateAndGet( (l:List[String]) =>
+          Seq(registry.config.name, schemaKey.toSchemaUri).mkString("-") :: l
+        )
+      ) >>
+        RegistryLookup.ioLookupInstance[IO].lookup(registry, schemaKey)
+    }
+
+    override def list(
+      registry: Registry,
+      vendor: String,
+      name: String,
+      model: Int
+    ): IO[Either[RegistryError, SchemaList]] = {
+      IO(
+        listState.updateAndGet((l:List[String]) =>
+          Seq(registry.config.name, vendor, name, model.toString).mkString("-") :: l
+        )
+      ) >>
+        RegistryLookup.ioLookupInstance[IO].list(registry, vendor, name, model)
+    }
+  }
+  def mkTrackingRegistry: TrackingRegistry = TrackingRegistry(
+    new AtomicReference[List[String]](List.empty[String]),
+    new AtomicReference[List[String]](List.empty[String]),
+  )
 
   val EmbeddedTest: Registry =
     Registry.Embedded(

@@ -24,6 +24,7 @@ import scala.concurrent.duration._
 // Cats
 import cats.Id
 import cats.effect.IO
+import cats.effect.implicits._
 import cats.implicits._
 
 // circe
@@ -66,6 +67,7 @@ class ResolverResultSpec extends Specification with ValidatedMatchers with CatsE
   a Resolver should not cache schema if cache is disabled $e12
   a Resolver should return cached schema when ttl not exceeded $e13
   a Resolver should return cached schema when ttl exceeded $e14
+  a Resolver should not spam the registry with similar requests $e15
   """
 
   import ResolverSpec._
@@ -511,5 +513,44 @@ class ResolverResultSpec extends Specification with ValidatedMatchers with CatsE
             ) and (timestamp1 mustNotEqual timestamp2) // same value but different timestamps because original item expired
         }
     }
+  }
+  
+  
+  def e15 = {
+    
+    import cats.effect.unsafe.IORuntime.global
+    
+    implicit val runtime = global
+    
+    val schemaKey =
+      SchemaKey(
+        "com.sendgrid",
+        "bounce",
+        "jsonschema",
+        SchemaVer.Full(1, 0, 0)
+      )
+      
+    val IgluCentralServer = Registry.Http(
+      Registry.Config("Iglu Central  EU1", 0, List("com.snowplowanalytics")),
+      Registry
+        .HttpConnection(URI.create("https://com-iglucentral-eu1-prod.iglu.snplow.net/api"), None)
+    )
+    
+    val trackingRegistry: TrackingRegistry = mkTrackingRegistry
+    implicit val reg: RegistryLookup[IO] = trackingRegistry.asInstanceOf[RegistryLookup[IO]] 
+    val resolver = Resolver.init[IO](10, None, IgluCentralServer).unsafeRunSync()
+
+    
+    def listWorker = (() => resolver.listSchemas("com.sendgrid", "bounce", 1))
+    def lookupWorker = (() => resolver.lookupSchema(schemaKey))
+    (List.fill(200)(listWorker) zip List.fill(200)(lookupWorker))
+      .flatMap(t => List(t._1, t._2))
+      .parTraverseN(100)(f => f())
+      .unsafeRunSync()
+
+    (trackingRegistry.listState.get().mkString(", "), trackingRegistry.lookupState.get().mkString(", ")) must equalTo(
+      ("Iglu Central  EU1-com.sendgrid-bounce-1, Iglu Client Embedded-com.sendgrid-bounce-1",
+        "Iglu Central  EU1-iglu:com.sendgrid/bounce/jsonschema/1-0-0, Iglu Client Embedded-iglu:com.sendgrid/bounce/jsonschema/1-0-0")
+    )
   }
 }
