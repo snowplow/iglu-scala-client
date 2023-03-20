@@ -20,7 +20,7 @@ import com.snowplowanalytics.iglu.core.circe.MetaSchemas
 // Scala
 import com.fasterxml.jackson.databind.JsonNode
 import com.networknt.schema.uri.URIFetcher
-import com.snowplowanalytics.iglu.client.resolver.Resolver.SchemaLookupResult
+import com.snowplowanalytics.iglu.client.resolver.Resolver.{SchemaItem, SchemaLookupResult}
 import java.io.{ByteArrayInputStream, InputStream}
 import java.net.URI
 import java.nio.charset.StandardCharsets
@@ -168,7 +168,7 @@ object CirceValidator extends Validator[Json] {
       evaluationCache: SchemaEvaluationCache[F]
     )(result: SchemaLookupResult): F[Either[ValidatorError.InvalidSchema, JsonSchema]] = {
       result match {
-        case ResolverResult.Cached(key, schema, timestamp) =>
+        case ResolverResult.Cached(key, SchemaItem(schema, _), timestamp) =>
           evaluationCache.get((key, timestamp)).flatMap {
             case Some(alreadyEvaluatedSchema) =>
               alreadyEvaluatedSchema.pure[F]
@@ -177,7 +177,7 @@ object CirceValidator extends Validator[Json] {
                 .pure[F]
                 .flatTap(result => evaluationCache.put((key, timestamp), result))
           }
-        case ResolverResult.NotCached(schema) =>
+        case ResolverResult.NotCached(SchemaItem(schema, _)) =>
           provideNewJsonSchema(schema).pure[F]
       }
     }

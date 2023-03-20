@@ -20,7 +20,8 @@ import cats.data.NonEmptyList
 
 /** ADT describing issues that can be discovered by Validator */
 sealed trait ValidatorError extends Product with Serializable {
-  def toClientError: ClientError = ClientError.ValidationError(this)
+  def toClientError(supersededBy: Option[String]): ClientError =
+    ClientError.ValidationError(this, supersededBy)
 }
 
 object ValidatorError {
