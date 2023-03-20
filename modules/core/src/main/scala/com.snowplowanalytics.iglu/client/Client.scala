@@ -39,9 +39,9 @@ final case class Client[F[_], A](resolver: Resolver[F], validator: Validator[A])
     for {
       schema <- EitherT(resolver.lookupSchema(instance.schema))
       schemaValidation = validator.validateSchema(schema)
-      _ <- EitherT.fromEither[F](schemaValidation).leftMap(_.toClientError)
+      _ <- EitherT.fromEither[F](schemaValidation).leftMap(_.toClientError(None))
       validation = validator.validate(instance.data, schema)
-      _ <- EitherT.fromEither[F](validation).leftMap(_.toClientError)
+      _ <- EitherT.fromEither[F](validation).leftMap(_.toClientError(None))
     } yield ()
 }
 

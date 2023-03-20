@@ -24,6 +24,8 @@ import org.specs2.matcher.MatchResult
 import java.time.Instant
 import scala.concurrent.duration.DurationInt
 
+import Resolver.SchemaItem
+
 class ResolverCacheSpec extends Specification {
   def is = s2"""
   Disallow overwriting successful request with failed one $e1
@@ -36,20 +38,26 @@ class ResolverCacheSpec extends Specification {
 
     val key          = SchemaKey("com.acme", "schema", "jsonschema", SchemaVer.Full(1, 0, 0))
     val schema       = Json.Null
-    val lookupResult = schema.asRight[LookupFailureMap]
+    val lookupResult = SchemaItem(schema, None).asRight[LookupFailureMap]
 
     val expectedState =
-      RegistryState(Map.empty, 4.millis, List((key, (2.millis, Right(Json.Null)))), 5, List())
+      RegistryState(
+        Map.empty,
+        4.millis,
+        List((key, (2.millis, Right(SchemaItem(Json.Null, None))))),
+        5,
+        List()
+      )
 
     val test = for {
       cache <- ResolverCache.init[StaticLookup](5, Some(10.seconds))
       cacheUnsafe = cache.getOrElse(throw new RuntimeException("Cache cannot be created"))
       _      <- cacheUnsafe.putSchema(key, lookupResult)
-      result <- cacheUnsafe.putSchema(key, Map.empty[Registry, LookupHistory].asLeft[Json])
+      result <- cacheUnsafe.putSchema(key, Map.empty[Registry, LookupHistory].asLeft)
     } yield result
 
     val (state, result) = test.run(RegistryState.init).value
-    val schemaResult    = result must beRight(schema)
+    val schemaResult    = result must beRight(SchemaItem(schema, None))
     val stateResult     = state must beEqualTo(expectedState)
 
     schemaResult and stateResult
@@ -95,8 +103,8 @@ class ResolverCacheSpec extends Specification {
     val test = for {
       cache <- ResolverCache.init[StaticLookup](5, Some(10.seconds))
       cacheUnsafe = cache.getOrElse(throw new RuntimeException("Cache cannot be created"))
-      _      <- cacheUnsafe.putSchema(key, failure1.asLeft[Json])
-      result <- cacheUnsafe.putSchema(key, failure2.asLeft[Json])
+      _      <- cacheUnsafe.putSchema(key, failure1.asLeft)
+      result <- cacheUnsafe.putSchema(key, failure2.asLeft)
     } yield result
 
     val (_, result: SchemaLookup) = test.run(RegistryState.init).value

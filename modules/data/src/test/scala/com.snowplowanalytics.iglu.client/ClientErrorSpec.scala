@@ -95,12 +95,14 @@ class ClientErrorSpec extends Specification {
           ValidatorReport("Something went wrong again", None, Nil, None),
           ValidatorReport("Something went wrong with targets", None, List("type", "property"), None)
         )
-      )
+      ),
+      Some("1-0-0")
     )
 
     val json =
       json"""{
         "error" : "ValidationError",
+        "supersededBy": "1-0-0",
         "dataReports" : [
           {
             "message" : "Something went wrong",
