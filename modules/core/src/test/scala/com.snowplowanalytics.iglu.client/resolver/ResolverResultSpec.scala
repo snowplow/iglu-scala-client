@@ -40,6 +40,7 @@ import com.snowplowanalytics.iglu.client.SpecHelpers
 import com.snowplowanalytics.iglu.client.resolver.ResolverSpecHelpers.StaticLookup
 import com.snowplowanalytics.iglu.client.resolver.registries.{Registry, RegistryError}
 import com.snowplowanalytics.iglu.client.resolver.registries.RegistryLookup
+import com.snowplowanalytics.iglu.client.resolver.Resolver.SchemaItem
 
 // Specs2
 import com.snowplowanalytics.iglu.client.SpecHelpers._
@@ -67,6 +68,7 @@ class ResolverResultSpec extends Specification with ValidatedMatchers with CatsE
   a Resolver should return cached schema when ttl not exceeded $e13
   a Resolver should return cached schema when ttl exceeded $e14
   a Resolver should not spam the registry with similar requests $e15
+  a Resolver should return superseded schema $e16
   """
 
   import ResolverSpec._
@@ -231,7 +233,7 @@ class ResolverResultSpec extends Specification with ValidatedMatchers with CatsE
     }
 
     val thirdSucceeded = response3 must beRight[SchemaLookupResult].like {
-      case ResolverResult.Cached(key, value, _) =>
+      case ResolverResult.Cached(key, SchemaItem(value, _), _) =>
         key must beEqualTo(schemaKey) and (value must beEqualTo(Json.Null))
     }
     val requestsNumber = state.req must beEqualTo(2)
@@ -284,7 +286,7 @@ class ResolverResultSpec extends Specification with ValidatedMatchers with CatsE
 
     // Final response must not overwrite a successful one
     val finalResult = response must beRight[SchemaLookupResult].like {
-      case ResolverResult.Cached(key, value, _) =>
+      case ResolverResult.Cached(key, SchemaItem(value, _), _) =>
         key must beEqualTo(schemaKey) and (value must beEqualTo(Json.Null))
     }
 
@@ -432,7 +434,7 @@ class ResolverResultSpec extends Specification with ValidatedMatchers with CatsE
     Resolver
       .init[IO](cacheSize = 0, cacheTtl = None, refs = EmbeddedTest)
       .flatMap(resolver => resolver.lookupSchemaResult(schemaKey))
-      .map(_ must beRight(ResolverResult.NotCached(expectedSchema)))
+      .map(_ must beRight(ResolverResult.NotCached(SchemaItem(expectedSchema, None))))
   }
 
   def e13 = {
@@ -556,5 +558,36 @@ class ResolverResultSpec extends Specification with ValidatedMatchers with CatsE
         "Iglu Central  EU1-iglu:com.sendgrid/bounce/jsonschema/1-0-0, Iglu Client Embedded-iglu:com.sendgrid/bounce/jsonschema/1-0-0"
       )
     )
+  }
+
+  def e16 = {
+
+    val expectedSchema: Json =
+      parse(
+        scala.io.Source
+          .fromInputStream(
+            getClass.getResourceAsStream(
+              "/iglu-test-embedded/schemas/com.snowplowanalytics.iglu-test/superseded-schema/jsonschema/1-0-2"
+            )
+          )
+          .mkString
+      )
+        .fold(e => throw new RuntimeException(s"Cannot parse superseded schema, $e"), identity)
+
+    val schemaKey = SchemaKey(
+      "com.snowplowanalytics.iglu-test",
+      "superseded-schema",
+      "jsonschema",
+      SchemaVer.Full(1, 0, 0)
+    )
+
+    Resolver
+      .init[IO](cacheSize = 0, cacheTtl = None, refs = EmbeddedTest)
+      .flatMap(resolver => resolver.lookupSchemaResult(schemaKey))
+      .map { result =>
+        result must beRight(
+          ResolverResult.NotCached(SchemaItem(expectedSchema, Some(SchemaVer.Full(1, 0, 2))))
+        )
+      }
   }
 }

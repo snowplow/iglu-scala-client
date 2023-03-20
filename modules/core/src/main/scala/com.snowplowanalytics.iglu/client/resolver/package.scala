@@ -12,9 +12,6 @@
  */
 package com.snowplowanalytics.iglu.client
 
-// circe
-import io.circe.Json
-
 import scala.concurrent.duration.FiniteDuration
 
 // Iglu Core
@@ -22,6 +19,7 @@ import com.snowplowanalytics.iglu.core.SchemaList
 
 // This project
 import resolver.registries.Registry
+import resolver.Resolver.SchemaItem
 
 package object resolver {
 
@@ -46,7 +44,7 @@ package object resolver {
    * Json in case of success or Map of all currently failed repositories
    * in case of failure
    */
-  type SchemaLookup = Either[LookupFailureMap, Json]
+  type SchemaLookup = Either[LookupFailureMap, SchemaItem]
 
   /**
    * Validated schema list lookup result containing, cache result which is
