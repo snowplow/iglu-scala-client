@@ -53,7 +53,7 @@ final case class Resolver[F[_]](repos: List[Registry], cache: Option[ResolverCac
     C: Clock[F]
   ): F[Either[ResolutionError, SchemaLookupResult]] = {
     def extractSupersededBy(schema: Json): Either[RegistryError, SupersededBy] =
-      schema.hcursor.downField("self").downField("supersededBy") match {
+      schema.hcursor.downField("$supersededBy") match {
         case _: FailedCursor => None.asRight
         case c =>
           c.as[SchemaVer.Full]
