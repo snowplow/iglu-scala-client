@@ -25,7 +25,7 @@ import com.snowplowanalytics.iglu.client.validator.CirceValidator.WithCaching.{
   SchemaEvaluationKey,
   SchemaEvaluationResult
 }
-import com.snowplowanalytics.iglu.core.{SchemaVer, SelfDescribingData}
+import com.snowplowanalytics.iglu.core.SelfDescribingData
 import com.snowplowanalytics.lrumap.CreateLruMap
 import io.circe.{DecodingFailure, Json}
 
@@ -44,14 +44,14 @@ final class IgluCirceClient[F[_]] private (
     M: Monad[F],
     L: RegistryLookup[F],
     C: Clock[F]
-  ): EitherT[F, (ClientError, SupersededBy), SupersededBy] =
+  ): EitherT[F, ClientError, SupersededBy] =
     for {
-      resolverResult <- EitherT(resolver.lookupSchemaResult(instance.schema)).leftMap(e =>
-        (e, Option.empty[SchemaVer.Full])
-      )
+      resolverResult <- EitherT(resolver.lookupSchemaResult(instance.schema))
       validation =
         CirceValidator.WithCaching.validate(schemaEvaluationCache)(instance.data, resolverResult)
-      _ <- EitherT(validation).leftMap(e => (e.toClientError, resolverResult.value.supersededBy))
+      _ <- EitherT(validation).leftMap(e =>
+        e.toClientError(resolverResult.value.supersededBy.map(_.asString))
+      )
       // Returning superseding schema info as well since we want to inform caller that sdj is validated
       // against superseding schema if it is superseded by another schema.
     } yield resolverResult.value.supersededBy

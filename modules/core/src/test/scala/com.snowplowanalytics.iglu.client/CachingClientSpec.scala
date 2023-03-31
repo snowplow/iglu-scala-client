@@ -177,8 +177,8 @@ class CachingClientSpec extends Specification with CatsEffect {
       result <- client.check(invalidJsonWithSupersededSchema).value
     } yield {
       result must beLeft.like {
-        case (_, Some(v: SchemaVer.Full)) if v == SchemaVer.Full(1, 0, 2) => ok
-        case _                                                            => ko
+        case ClientError.ValidationError(_, Some(supersededBy)) if supersededBy == "1-0-2" => ok
+        case _                                                                             => ko
       }
     }
   }
