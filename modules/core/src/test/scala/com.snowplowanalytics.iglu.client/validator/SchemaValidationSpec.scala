@@ -30,6 +30,7 @@ class SchemaValidationSpec extends Specification {
 
   validating a correct self-desc JSON should return the JSON in a Success $e1
   validating a correct self-desc JSON with JSON Schema with incorrect $$schema property should return Failure $e2
+  validating a unexpected self-desc JSON with valid JSON Schema should return Failure $e3
   """
 
   val validJson =
@@ -54,6 +55,17 @@ class SchemaValidationSpec extends Specification {
       json"""{"schema": "iglu://jsonschema/1-0-0", "data": { "id": 0 } }"""
     )
 
+  val validJsonWithSchemaWithInvalidMetaSchema =
+    SelfDescribingData(
+      SchemaKey(
+        "com.snowplowanalytics.self-desc",
+        "schema",
+        "jsonschema",
+        SchemaVer.Full(1, 0, 0)
+      ),
+      json"""{"schema": "http://iglucentral.com/schemas/com.snowplowanalytics.self-desc/schema/jsonschema/1-0-0#", "data": { "id": 0 } }"""
+    )
+
   val testResolver = SpecHelpers.TestResolver
 
   def e1 = {
@@ -69,6 +81,15 @@ class SchemaValidationSpec extends Specification {
     val action = for {
       client <- SpecHelpers.TestClient
       result <- client.check(validJsonWithInvalidSchema).value
+    } yield result must beLeft
+
+    action.unsafeRunSync()
+  }
+
+  def e3 = {
+    val action = for {
+      client <- SpecHelpers.TestClient
+      result <- client.check(validJsonWithSchemaWithInvalidMetaSchema).value
     } yield result must beLeft
 
     action.unsafeRunSync()

@@ -235,16 +235,28 @@ object CirceValidator extends Validator[Json] {
     schema: JsonSchema,
     instance: Json
   ): EitherNel[ValidatorReport, Unit] = {
-    val messages = schema
-      .validate(circeToJackson(instance))
-      .asScala
-      .toList
-      .map(fromValidationMessage)
+    val messages = Either
+      .catchNonFatal(
+        schema
+          .validate(circeToJackson(instance))
+          .asScala
+          .toList
+          .map(fromValidationMessage)
+      )
+      .leftMap(ValidatorError.schemaIssue)
 
-    messages match {
-      case x :: xs => NonEmptyList(x, xs).asLeft
-      case Nil     => ().asRight
-    }
+    messages.fold(
+      err =>
+        Left(
+          NonEmptyList.one(
+            ValidatorReport(s"Invalid schema ${err.issues.toList.mkString(",")}", None, Nil, None)
+          )
+        ),
+      {
+        case x :: xs => NonEmptyList(x, xs).asLeft
+        case Nil     => ().asRight
+      }
+    )
   }
 
   private def fromValidationMessage(m: ValidationMessage): ValidatorReport =
@@ -262,11 +274,16 @@ object CirceValidator extends Validator[Json] {
   }
 
   private def validateSchemaAgainstV4(schema: JsonNode): List[ValidatorError.SchemaIssue] = {
-    V4Schema
-      .validate(schema)
-      .asScala
-      .toList
-      .map(m => ValidatorError.SchemaIssue(m.getPath, m.getMessage))
+    Either
+      .catchNonFatal(
+        V4Schema
+          .validate(schema)
+          .asScala
+          .toList
+          .map(m => ValidatorError.SchemaIssue(m.getPath, m.getMessage))
+      )
+      .leftMap(ValidatorError.schemaIssue)
+      .fold(_.issues.toList, identity)
   }
 
   /** Similar to original validation but with additional caching of `JsonSchema` instances */
