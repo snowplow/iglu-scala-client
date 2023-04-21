@@ -64,7 +64,7 @@ class SchemaValidationSpec extends Specification with CatsEffect {
         "jsonschema",
         SchemaVer.Full(1, 0, 0)
       ),
-      json"""{"schema": "http://iglucentral.com/schemas/com.snowplowanalytics.self-desc/schema/jsonschema/1-0-0#", "data": { "id": 0 } }"""
+      json"""{"schema": "iglu:com.snowplowanalytics.self-desc/schema/jsonschema/1-0-0", "data": { "id": 0 } }"""
     )
 
   val testResolver = SpecHelpers.TestResolver
