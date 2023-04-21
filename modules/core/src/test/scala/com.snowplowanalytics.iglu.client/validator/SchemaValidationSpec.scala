@@ -13,7 +13,10 @@
 package com.snowplowanalytics.iglu.client.validator
 
 // circe
+import cats.effect.IO
 import cats.effect.testing.specs2.CatsEffect
+import com.snowplowanalytics.iglu.client.Client
+import com.snowplowanalytics.iglu.client.resolver.Resolver
 import io.circe.literal._
 
 // Specs2
@@ -28,6 +31,7 @@ class SchemaValidationSpec extends Specification with CatsEffect {
 
   validating a correct self-desc JSON should return the JSON in a Success $e1
   validating a correct self-desc JSON with JSON Schema with incorrect $$schema property should return Failure $e2
+  validating a unexpected self-desc JSON with valid JSON Schema should return Failure $e3
   """
 
   val validJson =
@@ -52,6 +56,17 @@ class SchemaValidationSpec extends Specification with CatsEffect {
       json"""{"schema": "iglu://jsonschema/1-0-0", "data": { "id": 0 } }"""
     )
 
+  val validJsonWithSchemaWithInvalidMetaSchema =
+    SelfDescribingData(
+      SchemaKey(
+        "com.snowplowanalytics.self-desc",
+        "schema",
+        "jsonschema",
+        SchemaVer.Full(1, 0, 0)
+      ),
+      json"""{"schema": "http://iglucentral.com/schemas/com.snowplowanalytics.self-desc/schema/jsonschema/1-0-0#", "data": { "id": 0 } }"""
+    )
+
   val testResolver = SpecHelpers.TestResolver
 
   def e1 = {
@@ -65,6 +80,16 @@ class SchemaValidationSpec extends Specification with CatsEffect {
     for {
       client <- SpecHelpers.TestClient
       result <- client.check(validJsonWithInvalidSchema).value
+    } yield result must beLeft
+  }
+
+  def e3 = {
+    // todo: Improve this
+    val TestResolver = Resolver.init[IO](10, None, SpecHelpers.IgluCentral)
+    val TestClient   = for { resolver <- TestResolver } yield Client(resolver, CirceValidator)
+    for {
+      client <- TestClient
+      result <- client.check(validJsonWithSchemaWithInvalidMetaSchema).value
     } yield result must beLeft
   }
 }
