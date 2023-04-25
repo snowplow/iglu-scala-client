@@ -15,8 +15,12 @@ package validator
 
 // Scala
 import com.fasterxml.jackson.databind.JsonNode
+import com.networknt.schema.uri.URIFetcher
 import com.snowplowanalytics.iglu.client.resolver.Resolver.SchemaLookupResult
 
+import java.io.{ByteArrayInputStream, InputStream}
+import java.net.URI
+import java.nio.charset.StandardCharsets
 import scala.jdk.CollectionConverters._
 
 // Cats
@@ -198,12 +202,21 @@ object CirceValidator extends Validator[Json] {
 
   private val V4SchemaInstance = JsonSchemaFactory.getInstance(SpecVersion.VersionFlag.V4)
 
+  private val fakeUrlFetcher = new URIFetcher {
+    override def fetch(uri: URI): InputStream = {
+      //No effect on validation, because we return empty JSON Schema which matches any data.
+      val emptyJsonObject = Json.obj()
+      new ByteArrayInputStream(emptyJsonObject.toString().getBytes(StandardCharsets.UTF_8))
+    }
+  }
+
   private val IgluMetaschemaFactory =
     JsonSchemaFactory
       .builder(V4SchemaInstance)
       .addMetaSchema(IgluMetaschema)
       .forceHttps(false)
       .removeEmptyFragmentSuffix(false)
+      .uriFetcher(fakeUrlFetcher, "http", "https")
       .build()
 
   private val SchemaValidatorsConfig: SchemaValidatorsConfig = {
