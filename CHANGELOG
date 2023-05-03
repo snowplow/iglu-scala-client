@@ -1,3 +1,7 @@
+Version 1.4.0 (2023-05-03)
+--------------------------
+Take superseding schema into account during validation (#231)
+
 Version 1.3.1 (2023-04-26)
 --------------------------
 Ignore `$ref` keyword referencing HTTP resources (#238)
