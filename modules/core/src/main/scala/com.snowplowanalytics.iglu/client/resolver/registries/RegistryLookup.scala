@@ -13,17 +13,9 @@
 package com.snowplowanalytics.iglu.client.resolver
 package registries
 
-// Java
-import cats.effect.Sync
-
-import java.net.UnknownHostException
-
-// Scala
-import scala.util.control.NonFatal
-
 // cats
-import cats.Id
-import cats.data.{EitherT, OptionT}
+import cats.effect.Sync
+import cats.data.EitherT
 import cats.effect.implicits._
 import cats.implicits._
 
@@ -88,64 +80,6 @@ object RegistryLookup {
       RegistryLookup[F].list(repositoryRef, vendor: String, name: String, model: Int)
   }
 
-  implicit def ioLookupInstance[F[_]](implicit F: Sync[F]): RegistryLookup[F] =
-    new RegistryLookup[F] {
-      def lookup(repositoryRef: Registry, schemaKey: SchemaKey): F[Either[RegistryError, Json]] =
-        repositoryRef match {
-          case Registry.Http(_, connection)  => httpLookup(connection, schemaKey)
-          case Registry.Embedded(_, path)    => embeddedLookup[F](path, schemaKey)
-          case Registry.InMemory(_, schemas) => F.pure(inMemoryLookup(schemas, schemaKey))
-        }
-
-      def list(
-        registry: Registry,
-        vendor: String,
-        name: String,
-        model: Int
-      ): F[Either[RegistryError, SchemaList]] =
-        registry match {
-          case Registry.Http(_, connection) => httpList(connection, vendor, name, model)
-          case Registry.Embedded(_, base) =>
-            val path = toSubpath(base, vendor, name)
-            Sync[F].delay(Utils.unsafeEmbeddedList(path, model))
-          case _ => F.pure(RegistryError.NotFound.asLeft)
-        }
-    }
-
-  // Id instance also swallows all exceptions into `RegistryError`
-  implicit def idLookupInstance: RegistryLookup[Id] =
-    new RegistryLookup[Id] {
-      def lookup(repositoryRef: Registry, schemaKey: SchemaKey): Id[Either[RegistryError, Json]] =
-        repositoryRef match {
-          case Registry.Http(_, connection) =>
-            Utils
-              .stringToUri(toPath(connection.uri.toString, schemaKey))
-              .flatMap(uri => Utils.unsafeGetFromUri(uri, connection.apikey))
-          case Registry.Embedded(_, base) =>
-            val path = toPath(base, schemaKey)
-            Utils.unsafeEmbeddedLookup(path)
-          case Registry.InMemory(_, schemas) =>
-            inMemoryLookup(schemas, schemaKey)
-        }
-
-      def list(
-        registry: Registry,
-        vendor: String,
-        name: String,
-        model: Int
-      ): Id[Either[RegistryError, SchemaList]] =
-        registry match {
-          case Registry.Http(_, connection) =>
-            val subpath = toSubpath(connection.uri.toString, vendor, name, model)
-            Utils.stringToUri(subpath).flatMap(Utils.unsafeHttpList(_, connection.apikey))
-          case Registry.Embedded(_, base) =>
-            val path = toSubpath(base, vendor, name)
-            Utils.unsafeEmbeddedList(path, model)
-          case _ =>
-            RegistryError.NotFound.asLeft
-        }
-    }
-
   def inMemoryLookup(
     schemas: List[SelfDescribingSchema[Json]],
     key: SchemaKey
@@ -156,7 +90,7 @@ object RegistryLookup {
   private[registries] def toPath(prefix: String, key: SchemaKey): String =
     s"${prefix.stripSuffix("/")}/schemas/${key.toPath}"
 
-  private def toSubpath(
+  private[registries] def toSubpath(
     prefix: String,
     vendor: String,
     name: String,
@@ -164,7 +98,7 @@ object RegistryLookup {
   ): String =
     s"${prefix.stripSuffix("/")}/schemas/$vendor/$name/jsonschema/$model"
 
-  private def toSubpath(
+  private[registries] def toSubpath(
     prefix: String,
     vendor: String,
     name: String
@@ -195,56 +129,4 @@ object RegistryLookup {
     result.value
   }
 
-  /**
-   * Retrieves an Iglu Schema from the HTTP Iglu Repo as a JSON
-   *
-   * @param http endpoint and optional apikey
-   * @param key The SchemaKey uniquely identifying the schema in Iglu
-   * @return either a `Json` on success, or `RegistryError` in case of any failure
-   *         (i.e. all exceptions should be swallowed by `RegistryError`)
-   */
-  private[registries] def httpLookup[F[_]: Sync](
-    http: Registry.HttpConnection,
-    key: SchemaKey
-  ): F[Either[RegistryError, Json]] =
-    Utils
-      .stringToUri(toPath(http.uri.toString, key))
-      .traverse(uri => Utils.getFromUri(uri, http.apikey))
-      .map { response =>
-        val result = for {
-          body <- OptionT(response)
-          json = parse(body)
-          result <- OptionT.liftF[Either[RegistryError, *], Json](
-            json.leftMap(e => RegistryError.RepoFailure(e.show))
-          )
-        } yield result
-
-        result.getOrElseF[Json](RegistryError.NotFound.asLeft)
-      }
-      .recover {
-        case uhe: UnknownHostException =>
-          val error = s"Unknown host issue fetching: ${uhe.getMessage}"
-          RegistryError.RepoFailure(error).asLeft
-        case NonFatal(nfe) =>
-          val error = s"Unexpected exception fetching: $nfe"
-          RegistryError.RepoFailure(error).asLeft
-      }
-
-  private[registries] def httpList[F[_]: Sync](
-    http: Registry.HttpConnection,
-    vendor: String,
-    name: String,
-    model: Int
-  ): F[Either[RegistryError, SchemaList]] =
-    Utils
-      .stringToUri(toSubpath(http.uri.toString, vendor, name, model))
-      .traverse(uri => Utils.getFromUri(uri, http.apikey))
-      .map { response =>
-        for {
-          body <- response
-          text <- body.toRight(RegistryError.NotFound)
-          json <- parse(text).leftMap(e => RegistryError.RepoFailure(e.show))
-          list <- json.as[SchemaList].leftMap(e => RegistryError.RepoFailure(e.show))
-        } yield list
-      }
 }

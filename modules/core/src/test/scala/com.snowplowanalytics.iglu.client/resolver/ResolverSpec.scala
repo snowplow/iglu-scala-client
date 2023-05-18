@@ -36,7 +36,7 @@ import com.snowplowanalytics.iglu.core.{SchemaKey, SchemaVer}
 import com.snowplowanalytics.iglu.client.ClientError._
 import com.snowplowanalytics.iglu.client.SpecHelpers
 import com.snowplowanalytics.iglu.client.resolver.ResolverSpecHelpers.StaticLookup
-import com.snowplowanalytics.iglu.client.resolver.registries.RegistryLookup._
+import com.snowplowanalytics.iglu.client.resolver.registries.JavaNetRegistryLookup._
 import com.snowplowanalytics.iglu.client.resolver.registries.{Registry, RegistryError}
 import com.snowplowanalytics.iglu.client.resolver.registries.RegistryLookup
 
