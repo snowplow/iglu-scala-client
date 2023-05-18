@@ -17,6 +17,7 @@ import cats.effect.testing.specs2.CatsEffect
 import io.circe.literal._
 
 import com.snowplowanalytics.iglu.core.{SchemaKey, SchemaVer, SelfDescribingData}
+import com.snowplowanalytics.iglu.client.resolver.registries.JavaNetRegistryLookup._
 
 // Specs2
 import org.specs2.mutable.Specification
