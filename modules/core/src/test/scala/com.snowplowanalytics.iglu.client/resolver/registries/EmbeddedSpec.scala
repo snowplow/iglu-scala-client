@@ -25,6 +25,7 @@ import com.snowplowanalytics.iglu.core.{SchemaKey, SchemaVer}
 
 // This project
 import com.snowplowanalytics.iglu.client.resolver.registries.RegistryLookup._
+import com.snowplowanalytics.iglu.client.resolver.registries.JavaNetRegistryLookup._
 
 // Specs2
 import com.snowplowanalytics.iglu.client.SpecHelpers

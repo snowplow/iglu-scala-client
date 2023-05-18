@@ -18,6 +18,7 @@ import io.circe.literal._
 
 // Specs2
 import com.snowplowanalytics.iglu.client.SpecHelpers
+import com.snowplowanalytics.iglu.client.resolver.registries.JavaNetRegistryLookup._
 import com.snowplowanalytics.iglu.core.{SchemaKey, SchemaVer, SelfDescribingData}
 import org.specs2.Specification
 

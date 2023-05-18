@@ -13,7 +13,11 @@
 package com.snowplowanalytics.iglu.client
 
 import cats.Applicative
-import com.snowplowanalytics.iglu.client.resolver.registries.{RegistryError, RegistryLookup}
+import com.snowplowanalytics.iglu.client.resolver.registries.{
+  JavaNetRegistryLookup,
+  RegistryError,
+  RegistryLookup
+}
 import com.snowplowanalytics.iglu.core.{SchemaKey, SchemaList}
 import io.circe.Json
 
@@ -61,7 +65,7 @@ object SpecHelpers {
           Seq(registry.config.name, schemaKey.toSchemaUri).mkString("-") :: l
         )
       ) >>
-        RegistryLookup.ioLookupInstance[IO].lookup(registry, schemaKey)
+        JavaNetRegistryLookup.ioLookupInstance[IO].lookup(registry, schemaKey)
     }
 
     override def list(
@@ -75,7 +79,7 @@ object SpecHelpers {
           Seq(registry.config.name, vendor, name, model.toString).mkString("-") :: l
         )
       ) >>
-        RegistryLookup.ioLookupInstance[IO].list(registry, vendor, name, model)
+        JavaNetRegistryLookup.ioLookupInstance[IO].list(registry, vendor, name, model)
     }
   }
   def mkTrackingRegistry: TrackingRegistry = TrackingRegistry(

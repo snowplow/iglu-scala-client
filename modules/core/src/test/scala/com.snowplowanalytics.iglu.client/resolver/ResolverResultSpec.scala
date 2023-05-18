@@ -38,8 +38,12 @@ import com.snowplowanalytics.iglu.core.{SchemaKey, SchemaVer}
 import com.snowplowanalytics.iglu.client.ClientError._
 import com.snowplowanalytics.iglu.client.SpecHelpers
 import com.snowplowanalytics.iglu.client.resolver.ResolverSpecHelpers.StaticLookup
-import com.snowplowanalytics.iglu.client.resolver.registries.{Registry, RegistryError}
-import com.snowplowanalytics.iglu.client.resolver.registries.RegistryLookup
+import com.snowplowanalytics.iglu.client.resolver.registries.{
+  JavaNetRegistryLookup,
+  Registry,
+  RegistryError,
+  RegistryLookup
+}
 
 // Specs2
 import com.snowplowanalytics.iglu.client.SpecHelpers._
@@ -133,6 +137,8 @@ class ResolverResultSpec extends Specification with ValidatedMatchers with CatsE
       )
     )
 
+    implicit val lookup: RegistryLookup[IO] = JavaNetRegistryLookup.ioLookupInstance[IO]
+
     SpecHelpers.TestResolver
       .flatMap(resolver => resolver.lookupSchema(schemaKey))
       .map { result =>
@@ -159,6 +165,8 @@ class ResolverResultSpec extends Specification with ValidatedMatchers with CatsE
       )
     )
 
+    implicit val lookup: RegistryLookup[IO] = JavaNetRegistryLookup.ioLookupInstance[IO]
+
     SpecHelpers.TestResolver
       .flatMap(resolver => resolver.lookupSchema(schemaKey))
       .map { result =>
@@ -174,6 +182,8 @@ class ResolverResultSpec extends Specification with ValidatedMatchers with CatsE
         "jsonschema",
         SchemaVer.Full(1, 0, 0)
       )
+
+    implicit val lookup: RegistryLookup[IO] = JavaNetRegistryLookup.ioLookupInstance[IO]
 
     SpecHelpers.TestResolver
       .flatMap(resolver => resolver.lookupSchema(schemaKey))
@@ -398,7 +408,8 @@ class ResolverResultSpec extends Specification with ValidatedMatchers with CatsE
         .HttpConnection(URI.create("https://com-iglucentral-eu1-prod.iglu.snplow.net/api"), None)
     )
 
-    val resolver = Resolver.init[Id](10, None, IgluCentralServer)
+    val resolver                            = Resolver.init[Id](10, None, IgluCentralServer)
+    implicit val lookup: RegistryLookup[Id] = JavaNetRegistryLookup.idLookupInstance
 
     val resultOne = resolver.listSchemasResult("com.sendgrid", "bounce", 2)
     val resultTwo = resolver.listSchemasResult("com.sendgrid", "bounce", 1)
@@ -428,6 +439,8 @@ class ResolverResultSpec extends Specification with ValidatedMatchers with CatsE
       "jsonschema",
       SchemaVer.Full(1, 0, 0)
     )
+
+    implicit val lookup: RegistryLookup[IO] = JavaNetRegistryLookup.ioLookupInstance[IO]
 
     Resolver
       .init[IO](cacheSize = 0, cacheTtl = None, refs = EmbeddedTest)
@@ -517,9 +530,6 @@ class ResolverResultSpec extends Specification with ValidatedMatchers with CatsE
   def e15 = {
 
     import cats.effect.unsafe.IORuntime.global
-    import com.snowplowanalytics.iglu.client.resolver.registries.RegistryLookup.{
-      ioLookupInstance => _
-    }
     implicit val runtime = global
 
     val schemaKey =

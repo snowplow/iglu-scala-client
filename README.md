@@ -65,8 +65,7 @@ import cats.syntax.show._
 
 import com.snowplowanalytics.iglu.client.Client
 import com.snowplowanalytics.iglu.core.{SchemaKey, SchemaVer, SelfDescribingData}
-
-implicit val clockIoInstance: Clock[IO] = Clock.create[IO] // Usually provided by IOApp
+import com.snowplowanalytics.iglu.client.resolver.registries.JavaNetRegistryLookup._
 
 val resolverConfig: Json = json"""{
   "schema": "iglu:com.snowplowanalytics.iglu/resolver-config/jsonschema/1-0-1",

@@ -18,9 +18,6 @@ import com.snowplowanalytics.iglu.core.{SchemaKey, SchemaVer}
 
 import java.io.{File, InputStream}
 import java.net.URI
-import java.net.http.HttpResponse.BodyHandlers
-import java.net.http.{HttpClient, HttpRequest, HttpResponse}
-import java.time.Duration
 import scala.util.matching.Regex
 
 // Scala
@@ -30,7 +27,6 @@ import scala.util.control.NonFatal
 // Cats
 import cats.effect.Sync
 import cats.syntax.either._
-import cats.syntax.option._
 import cats.syntax.show._
 import cats.syntax.traverse._
 
@@ -41,40 +37,9 @@ import io.circe.{Decoder, DecodingFailure, Json, ParsingFailure}
 // Apache Commons
 import org.apache.commons.lang3.exception.ExceptionUtils
 
-// scalaj
 import com.snowplowanalytics.iglu.core.SchemaList
-import com.snowplowanalytics.iglu.core.circe.CirceIgluCodecs._
 
 private[registries] object Utils {
-  private val ReadTimeoutMs = 4000L
-
-  private lazy val httpClient = HttpClient
-    .newBuilder()
-    .connectTimeout(Duration.ofMillis(1000))
-    .build()
-
-  /**
-   * Read a Json from an URI using optional apikey
-   * with added optional header, so it is unsafe as well and throws same exceptions
-   *
-   * @param uri the URL to fetch the JSON document from
-   * @param apikey optional apikey UUID to authenticate in Iglu Server
-   * @return The document at that URL if code is 2xx
-   */
-  def getFromUri[F[_]: Sync](uri: URI, apikey: Option[String]): F[Option[String]] =
-    Sync[F].blocking(executeCall(uri, apikey))
-
-  /** Non-RT analog of [[getFromUri]] */
-  def unsafeGetFromUri(uri: URI, apikey: Option[String]): Either[RegistryError, Json] =
-    try {
-      executeCall(uri, apikey)
-        .map(parse)
-        .map(_.leftMap(e => RegistryError.RepoFailure(e.show)))
-        .getOrElse(RegistryError.NotFound.asLeft)
-    } catch {
-      case NonFatal(e) =>
-        repoFailure(e).asLeft
-    }
 
   def unsafeEmbeddedList(path: String, modelMatch: Int): Either[RegistryError, SchemaList] =
     try {
@@ -149,13 +114,6 @@ private[registries] object Utils {
         }
     }
 
-  /** Non-RT analog of [[RegistryLookup.httpList]] */
-  def unsafeHttpList(uri: URI, apikey: Option[String]): Either[RegistryError, SchemaList] =
-    for {
-      json <- unsafeGetFromUri(uri, apikey)
-      list <- json.as[SchemaList].leftMap(e => RegistryError.RepoFailure(e.show))
-    } yield list
-
   /**
    * A wrapper around Java's URI.
    *
@@ -179,25 +137,6 @@ private[registries] object Utils {
         uri    <- stringToUri(string).leftMap(e => DecodingFailure(e.show, cursor.history))
       } yield uri
     }
-
-  private def executeCall(uri: URI, apikey: Option[String]): Option[String] = {
-    val httpRequest = buildLookupRequest(uri, apikey)
-    val response    = httpClient.send(httpRequest, BodyHandlers.ofString())
-    if (is2xx(response)) response.body.some else None
-  }
-
-  private def buildLookupRequest(uri: URI, apikey: Option[String]): HttpRequest = {
-    val baseRequest = HttpRequest
-      .newBuilder(uri)
-      .timeout(Duration.ofMillis(ReadTimeoutMs))
-
-    apikey
-      .fold(baseRequest)(key => baseRequest.header("apikey", key))
-      .build()
-  }
-
-  private def is2xx(response: HttpResponse[String]) =
-    response.statusCode() >= 200 && response.statusCode() <= 299
 
   private[resolver] def readResource[F[_]: Sync](path: String): F[Option[InputStream]] =
     Sync[F].delay(unsafeReadResource(path))
