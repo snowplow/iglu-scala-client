@@ -23,9 +23,21 @@ import com.snowplowanalytics.iglu.core.circe.implicits._
 import com.snowplowanalytics.iglu.core.{SchemaKey, SchemaList}
 
 import java.net.UnknownHostException
+import java.net.URI
+import java.net.http.HttpResponse.BodyHandlers
+import java.net.http.{HttpClient, HttpRequest, HttpResponse}
+import java.time.Duration
+
 import scala.util.control.NonFatal
 
 object JavaNetRegistryLookup {
+
+  private val ReadTimeoutMs = 4000L
+
+  private lazy val httpClient = HttpClient
+    .newBuilder()
+    .connectTimeout(Duration.ofMillis(1000))
+    .build()
 
   implicit def ioLookupInstance[F[_]](implicit F: Sync[F]): RegistryLookup[F] =
     new RegistryLookup[F] {
@@ -60,7 +72,7 @@ object JavaNetRegistryLookup {
           case Registry.Http(_, connection) =>
             Utils
               .stringToUri(RegistryLookup.toPath(connection.uri.toString, schemaKey))
-              .flatMap(uri => Utils.unsafeGetFromUri(uri, connection.apikey))
+              .flatMap(uri => unsafeGetFromUri(uri, connection.apikey))
           case Registry.Embedded(_, base) =>
             val path = RegistryLookup.toPath(base, schemaKey)
             Utils.unsafeEmbeddedLookup(path)
@@ -77,7 +89,7 @@ object JavaNetRegistryLookup {
         registry match {
           case Registry.Http(_, connection) =>
             val subpath = RegistryLookup.toSubpath(connection.uri.toString, vendor, name, model)
-            Utils.stringToUri(subpath).flatMap(Utils.unsafeHttpList(_, connection.apikey))
+            Utils.stringToUri(subpath).flatMap(unsafeHttpList(_, connection.apikey))
           case Registry.Embedded(_, base) =>
             val path = RegistryLookup.toSubpath(base, vendor, name)
             Utils.unsafeEmbeddedList(path, model)
@@ -94,13 +106,13 @@ object JavaNetRegistryLookup {
    * @return either a `Json` on success, or `RegistryError` in case of any failure
    *         (i.e. all exceptions should be swallowed by `RegistryError`)
    */
-  private[registries] def httpLookup[F[_]: Sync](
+  private def httpLookup[F[_]: Sync](
     http: Registry.HttpConnection,
     key: SchemaKey
   ): F[Either[RegistryError, Json]] =
     Utils
       .stringToUri(RegistryLookup.toPath(http.uri.toString, key))
-      .traverse(uri => Utils.getFromUri(uri, http.apikey))
+      .traverse(uri => getFromUri(uri, http.apikey))
       .map { response =>
         val result = for {
           body <- OptionT(response)
@@ -121,7 +133,7 @@ object JavaNetRegistryLookup {
           RegistryError.RepoFailure(error).asLeft
       }
 
-  private[registries] def httpList[F[_]: Sync](
+  private def httpList[F[_]: Sync](
     http: Registry.HttpConnection,
     vendor: String,
     name: String,
@@ -129,7 +141,7 @@ object JavaNetRegistryLookup {
   ): F[Either[RegistryError, SchemaList]] =
     Utils
       .stringToUri(RegistryLookup.toSubpath(http.uri.toString, vendor, name, model))
-      .traverse(uri => Utils.getFromUri(uri, http.apikey))
+      .traverse(uri => getFromUri(uri, http.apikey))
       .map { response =>
         for {
           body <- response
@@ -138,5 +150,54 @@ object JavaNetRegistryLookup {
           list <- json.as[SchemaList].leftMap(e => RegistryError.RepoFailure(e.show))
         } yield list
       }
+
+  /**
+   * Read a Json from an URI using optional apikey
+   * with added optional header, so it is unsafe as well and throws same exceptions
+   *
+   * @param uri the URL to fetch the JSON document from
+   * @param apikey optional apikey UUID to authenticate in Iglu Server
+   * @return The document at that URL if code is 2xx
+   */
+  private def getFromUri[F[_]: Sync](uri: URI, apikey: Option[String]): F[Option[String]] =
+    Sync[F].blocking(executeCall(uri, apikey))
+
+  /** Non-RT analog of [[getFromUri]] */
+  private def unsafeGetFromUri(uri: URI, apikey: Option[String]): Either[RegistryError, Json] =
+    try {
+      executeCall(uri, apikey)
+        .map(parse)
+        .map(_.leftMap(e => RegistryError.RepoFailure(e.show)))
+        .getOrElse(RegistryError.NotFound.asLeft)
+    } catch {
+      case NonFatal(e) =>
+        Utils.repoFailure(e).asLeft
+    }
+
+  /** Non-RT analog of [[JavaNetRegistryLookup.httpList]] */
+  private def unsafeHttpList(uri: URI, apikey: Option[String]): Either[RegistryError, SchemaList] =
+    for {
+      json <- unsafeGetFromUri(uri, apikey)
+      list <- json.as[SchemaList].leftMap(e => RegistryError.RepoFailure(e.show))
+    } yield list
+
+  private def executeCall(uri: URI, apikey: Option[String]): Option[String] = {
+    val httpRequest = buildLookupRequest(uri, apikey)
+    val response    = httpClient.send(httpRequest, BodyHandlers.ofString())
+    if (is2xx(response)) response.body.some else None
+  }
+
+  private def buildLookupRequest(uri: URI, apikey: Option[String]): HttpRequest = {
+    val baseRequest = HttpRequest
+      .newBuilder(uri)
+      .timeout(Duration.ofMillis(ReadTimeoutMs))
+
+    apikey
+      .fold(baseRequest)(key => baseRequest.header("apikey", key))
+      .build()
+  }
+
+  private def is2xx(response: HttpResponse[String]) =
+    response.statusCode() >= 200 && response.statusCode() <= 299
 
 }
