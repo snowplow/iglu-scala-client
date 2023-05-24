@@ -90,21 +90,6 @@ object RegistryLookup {
   private[registries] def toPath(prefix: String, key: SchemaKey): String =
     s"${prefix.stripSuffix("/")}/schemas/${key.toPath}"
 
-  private[registries] def toSubpath(
-    prefix: String,
-    vendor: String,
-    name: String,
-    model: Int
-  ): String =
-    s"${prefix.stripSuffix("/")}/schemas/$vendor/$name/jsonschema/$model"
-
-  private[registries] def toSubpath(
-    prefix: String,
-    vendor: String,
-    name: String
-  ): String =
-    s"${prefix.stripSuffix("/")}/schemas/$vendor/$name/jsonschema"
-
   /**
    * Retrieves an Iglu Schema from the Embedded Iglu Repo as a JSON
    *

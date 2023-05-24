@@ -58,7 +58,7 @@ object JavaNetRegistryLookup {
         registry match {
           case Registry.Http(_, connection) => httpList(connection, vendor, name, model)
           case Registry.Embedded(_, base) =>
-            val path = RegistryLookup.toSubpath(base, vendor, name)
+            val path = toSubpath(base, vendor, name)
             Sync[F].delay(Utils.unsafeEmbeddedList(path, model))
           case _ => F.pure(RegistryError.NotFound.asLeft)
         }
@@ -88,10 +88,10 @@ object JavaNetRegistryLookup {
       ): Id[Either[RegistryError, SchemaList]] =
         registry match {
           case Registry.Http(_, connection) =>
-            val subpath = RegistryLookup.toSubpath(connection.uri.toString, vendor, name, model)
+            val subpath = toSubpath(connection.uri.toString, vendor, name, model)
             Utils.stringToUri(subpath).flatMap(unsafeHttpList(_, connection.apikey))
           case Registry.Embedded(_, base) =>
-            val path = RegistryLookup.toSubpath(base, vendor, name)
+            val path = toSubpath(base, vendor, name)
             Utils.unsafeEmbeddedList(path, model)
           case _ =>
             RegistryError.NotFound.asLeft
@@ -140,7 +140,7 @@ object JavaNetRegistryLookup {
     model: Int
   ): F[Either[RegistryError, SchemaList]] =
     Utils
-      .stringToUri(RegistryLookup.toSubpath(http.uri.toString, vendor, name, model))
+      .stringToUri(toSubpath(http.uri.toString, vendor, name, model))
       .traverse(uri => getFromUri(uri, http.apikey))
       .map { response =>
         for {
@@ -199,5 +199,21 @@ object JavaNetRegistryLookup {
 
   private def is2xx(response: HttpResponse[String]) =
     response.statusCode() >= 200 && response.statusCode() <= 299
+
+  private def toSubpath(
+    prefix: String,
+    vendor: String,
+    name: String,
+    model: Int
+  ): String =
+    s"${prefix.stripSuffix("/")}/schemas/$vendor/$name/jsonschema/$model"
+
+  private def toSubpath(
+    prefix: String,
+    vendor: String,
+    name: String
+  ): String =
+    s"${prefix.stripSuffix("/")}/schemas/$vendor/$name/jsonschema"
+
 
 }
