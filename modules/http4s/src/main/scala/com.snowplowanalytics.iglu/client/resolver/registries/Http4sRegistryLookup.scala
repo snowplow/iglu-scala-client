@@ -29,29 +29,23 @@ import scala.util.control.NonFatal
 object Http4sRegistryLookup {
 
   def apply[F[_]: Async](client: HttpClient[F]): RegistryLookup[F] =
-    new RegistryLookup[F] {
-      def lookup(repositoryRef: Registry, schemaKey: SchemaKey): F[Either[RegistryError, Json]] =
-        repositoryRef match {
-          case Registry.Http(_, connection) => httpLookup(client, connection, schemaKey).value
-          case Registry.Embedded(_, path)   => RegistryLookup.embeddedLookup[F](path, schemaKey)
-          case Registry.InMemory(_, schemas) =>
-            Async[F].pure(RegistryLookup.inMemoryLookup(schemas, schemaKey))
-        }
+    new RegistryLookup.StdRegistryLookup[F] {
+      def httpLookup(
+        registry: Registry.Http,
+        schemaKey: SchemaKey
+      ): F[Either[RegistryError, Json]] =
+        lookupImpl(client, registry.http, schemaKey).value
 
-      def list(
-        registry: Registry,
+      def httpList(
+        registry: Registry.Http,
         vendor: String,
         name: String,
         model: Int
       ): F[Either[RegistryError, SchemaList]] =
-        registry match {
-          case Registry.Http(_, connection) =>
-            httpList(client, connection, vendor, name, model).value
-          case _ => Async[F].pure(RegistryError.NotFound.asLeft)
-        }
+        listImpl(client, registry.http, vendor, name, model).value
     }
 
-  def httpLookup[F[_]: Concurrent](
+  private def lookupImpl[F[_]: Concurrent](
     client: HttpClient[F],
     http: Registry.HttpConnection,
     key: SchemaKey
@@ -66,7 +60,7 @@ object Http4sRegistryLookup {
       result <- EitherT(response)
     } yield result
 
-  def httpList[F[_]: Concurrent](
+  private def listImpl[F[_]: Concurrent](
     client: HttpClient[F],
     http: Registry.HttpConnection,
     vendor: String,
@@ -85,12 +79,12 @@ object Http4sRegistryLookup {
       result <- EitherT(response)
     } yield result
 
-  def toPath(cxn: Registry.HttpConnection, key: SchemaKey): Either[RegistryError, Uri] =
+  private def toPath(cxn: Registry.HttpConnection, key: SchemaKey): Either[RegistryError, Uri] =
     Uri
       .fromString(s"${cxn.uri.toString.stripSuffix("/")}/schemas/${key.toPath}")
       .leftMap(e => RegistryError.ClientFailure(e.message))
 
-  def toSubpath(
+  private def toSubpath(
     cxn: Registry.HttpConnection,
     vendor: String,
     name: String,
@@ -100,7 +94,7 @@ object Http4sRegistryLookup {
       .fromString(s"${cxn.uri.toString.stripSuffix("/")}/schemas/$vendor/$name/jsonschema/$model")
       .leftMap(e => RegistryError.ClientFailure(e.message))
 
-  def runRequest[F[_]: Concurrent, A: EntityDecoder[F, *]](
+  private def runRequest[F[_]: Concurrent, A: EntityDecoder[F, *]](
     client: HttpClient[F],
     req: Request[F]
   ): F[Either[RegistryError, A]] = {
@@ -137,6 +131,6 @@ object Http4sRegistryLookup {
     }
   }
 
-  implicit def schemaListDecoder[F[_]: Concurrent]: EntityDecoder[F, SchemaList] =
+  private implicit def schemaListDecoder[F[_]: Concurrent]: EntityDecoder[F, SchemaList] =
     jsonOf[F, SchemaList]
 }

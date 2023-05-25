@@ -15,17 +15,17 @@ package registries
 
 // cats
 import cats.effect.Sync
-import cats.data.EitherT
-import cats.effect.implicits._
 import cats.implicits._
+import cats.ApplicativeThrow
 
 // circe
 import io.circe.Json
-import io.circe.parser.parse
 
 // Iglu Core
 import com.snowplowanalytics.iglu.core.circe.implicits._
 import com.snowplowanalytics.iglu.core.{SchemaKey, SchemaList, SelfDescribingSchema}
+
+import scala.util.control.NonFatal
 
 /**
  * A capability of `F` to communicate with Iglu registries, using `RepositoryRef` ADT,
@@ -80,7 +80,61 @@ object RegistryLookup {
       RegistryLookup[F].list(repositoryRef, vendor: String, name: String, model: Int)
   }
 
-  def inMemoryLookup(
+  /**
+   * An implementation of [[RegistryLookup]] with standard implementations of embedded/in-memory
+   *  lookups and pluggable implementation of http lookups
+   */
+  private[registries] abstract class StdRegistryLookup[F[_]: Sync] extends RegistryLookup[F] {
+
+    /** Abstract methods to be provided by the implementation */
+    def httpLookup(registry: Registry.Http, schemaKey: SchemaKey): F[Either[RegistryError, Json]]
+    def httpList(
+      registry: Registry.Http,
+      vendor: String,
+      name: String,
+      model: Int
+    ): F[Either[RegistryError, SchemaList]]
+
+    /** Common functionality across all implementations */
+    override def lookup(registry: Registry, schemaKey: SchemaKey): F[Either[RegistryError, Json]] =
+      registry match {
+        case http: Registry.Http =>
+          withErrorHandling {
+            httpLookup(http, schemaKey)
+          }
+        case Registry.Embedded(_, path) => Embedded.lookup[F](path, schemaKey)
+        case Registry.InMemory(_, schemas) =>
+          Sync[F].delay(RegistryLookup.inMemoryLookup(schemas, schemaKey))
+      }
+
+    override def list(
+      registry: Registry,
+      vendor: String,
+      name: String,
+      model: Int
+    ): F[Either[RegistryError, SchemaList]] =
+      registry match {
+        case http: Registry.Http =>
+          withErrorHandling {
+            httpList(http, vendor, name, model)
+          }
+        case Registry.Embedded(_, base) =>
+          val path = toSubpath(base, vendor, name)
+          Sync[F].delay(Embedded.unsafeList(path, model))
+        case _ => Sync[F].pure(RegistryError.NotFound.asLeft)
+      }
+
+  }
+
+  private def withErrorHandling[F[_]: ApplicativeThrow, A](
+    f: F[Either[RegistryError, A]]
+  ): F[Either[RegistryError, A]] =
+    f.recover { case NonFatal(nfe) =>
+      val error = s"Unexpected exception fetching: $nfe"
+      RegistryError.RepoFailure(error).asLeft
+    }
+
+  private[registries] def inMemoryLookup(
     schemas: List[SelfDescribingSchema[Json]],
     key: SchemaKey
   ): Either[RegistryError, Json] =
@@ -90,28 +144,19 @@ object RegistryLookup {
   private[registries] def toPath(prefix: String, key: SchemaKey): String =
     s"${prefix.stripSuffix("/")}/schemas/${key.toPath}"
 
-  /**
-   * Retrieves an Iglu Schema from the Embedded Iglu Repo as a JSON
-   *
-   * @param base path on the local filesystem system
-   * @param key The SchemaKey uniquely identifying the schema in Iglu
-   * @return either a `Json` on success, or `RegistryError` in case of any failure
-   *         (i.e. all exceptions should be swallowed by `RegistryError`)
-   */
-  private[registries] def embeddedLookup[F[_]: Sync](
-    base: String,
-    key: SchemaKey
-  ): F[Either[RegistryError, Json]] = {
-    val path   = toPath(base, key)
-    val is     = Utils.readResource[F](path)
-    val schema = is.bracket(_.traverse(Utils.fromStream[F]))(_.traverse_(Utils.closeStream[F]))
-    val result = for {
-      stringOption <- schema.attemptT.leftMap(Utils.repoFailure)
-      string       <- EitherT.fromOption[F](stringOption, RegistryError.NotFound: RegistryError)
-      json         <- EitherT.fromEither[F](parse(string)).leftMap(Utils.invalidSchema)
-    } yield json
+  private[registries] def toSubpath(
+    prefix: String,
+    vendor: String,
+    name: String,
+    model: Int
+  ): String =
+    s"${prefix.stripSuffix("/")}/schemas/$vendor/$name/jsonschema/$model"
 
-    result.value
-  }
+  private[registries] def toSubpath(
+    prefix: String,
+    vendor: String,
+    name: String
+  ): String =
+    s"${prefix.stripSuffix("/")}/schemas/$vendor/$name/jsonschema"
 
 }

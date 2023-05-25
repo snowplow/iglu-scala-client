@@ -15,8 +15,12 @@ package com.snowplowanalytics.iglu.client.resolver.registries
 // Java
 import java.net.URI
 
+// Cats
+import cats.syntax.either._
+import cats.syntax.show._
+
 // circe
-import io.circe.{Decoder, HCursor, Json}
+import io.circe.{Decoder, DecodingFailure, HCursor, Json}
 
 // Iglu Core
 import com.snowplowanalytics.iglu.core.SelfDescribingSchema
@@ -35,7 +39,6 @@ sealed trait Registry extends Product with Serializable {
 }
 
 object Registry {
-  import Utils._
 
   /**
    * An embedded repository is one which is embedded inside the calling code,
@@ -87,6 +90,14 @@ object Registry {
 
   /** Helper class to extract HTTP URI and api key from config JSON */
   case class HttpConnection(uri: URI, apikey: Option[String])
+
+  private implicit val uriCirceJsonDecoder: Decoder[URI] =
+    Decoder.instance { cursor =>
+      for {
+        string <- cursor.as[String]
+        uri    <- Utils.stringToUri(string).leftMap(e => DecodingFailure(e.show, cursor.history))
+      } yield uri
+    }
 
   implicit val httpConnectionDecoder: Decoder[HttpConnection] =
     new Decoder[HttpConnection] {
