@@ -40,28 +40,20 @@ object JavaNetRegistryLookup {
     .build()
 
   implicit def ioLookupInstance[F[_]](implicit F: Sync[F]): RegistryLookup[F] =
-    new RegistryLookup[F] {
-      def lookup(repositoryRef: Registry, schemaKey: SchemaKey): F[Either[RegistryError, Json]] =
-        repositoryRef match {
-          case Registry.Http(_, connection) => httpLookup(connection, schemaKey)
-          case Registry.Embedded(_, path)   => RegistryLookup.embeddedLookup[F](path, schemaKey)
-          case Registry.InMemory(_, schemas) =>
-            F.delay(RegistryLookup.inMemoryLookup(schemas, schemaKey))
-        }
+    new RegistryLookup.StdRegistryLookup[F] {
+      def httpLookup(
+        registry: Registry.Http,
+        schemaKey: SchemaKey
+      ): F[Either[RegistryError, Json]] =
+        lookupImpl(registry.http, schemaKey)
 
-      def list(
-        registry: Registry,
+      def httpList(
+        registry: Registry.Http,
         vendor: String,
         name: String,
         model: Int
       ): F[Either[RegistryError, SchemaList]] =
-        registry match {
-          case Registry.Http(_, connection) => httpList(connection, vendor, name, model)
-          case Registry.Embedded(_, base) =>
-            val path = toSubpath(base, vendor, name)
-            Sync[F].delay(Utils.unsafeEmbeddedList(path, model))
-          case _ => F.pure(RegistryError.NotFound.asLeft)
-        }
+        listImpl(registry.http, vendor, name, model)
     }
 
   // Id instance also swallows all exceptions into `RegistryError`
@@ -75,7 +67,7 @@ object JavaNetRegistryLookup {
               .flatMap(uri => unsafeGetFromUri(uri, connection.apikey))
           case Registry.Embedded(_, base) =>
             val path = RegistryLookup.toPath(base, schemaKey)
-            Utils.unsafeEmbeddedLookup(path)
+            Embedded.unsafeLookup(path)
           case Registry.InMemory(_, schemas) =>
             RegistryLookup.inMemoryLookup(schemas, schemaKey)
         }
@@ -88,11 +80,11 @@ object JavaNetRegistryLookup {
       ): Id[Either[RegistryError, SchemaList]] =
         registry match {
           case Registry.Http(_, connection) =>
-            val subpath = toSubpath(connection.uri.toString, vendor, name, model)
+            val subpath = RegistryLookup.toSubpath(connection.uri.toString, vendor, name, model)
             Utils.stringToUri(subpath).flatMap(unsafeHttpList(_, connection.apikey))
           case Registry.Embedded(_, base) =>
-            val path = toSubpath(base, vendor, name)
-            Utils.unsafeEmbeddedList(path, model)
+            val path = RegistryLookup.toSubpath(base, vendor, name)
+            Embedded.unsafeList(path, model)
           case _ =>
             RegistryError.NotFound.asLeft
         }
@@ -106,7 +98,7 @@ object JavaNetRegistryLookup {
    * @return either a `Json` on success, or `RegistryError` in case of any failure
    *         (i.e. all exceptions should be swallowed by `RegistryError`)
    */
-  private def httpLookup[F[_]: Sync](
+  private def lookupImpl[F[_]: Sync](
     http: Registry.HttpConnection,
     key: SchemaKey
   ): F[Either[RegistryError, Json]] =
@@ -124,23 +116,19 @@ object JavaNetRegistryLookup {
 
         result.getOrElseF[Json](RegistryError.NotFound.asLeft)
       }
-      .recover {
-        case uhe: UnknownHostException =>
-          val error = s"Unknown host issue fetching: ${uhe.getMessage}"
-          RegistryError.RepoFailure(error).asLeft
-        case NonFatal(nfe) =>
-          val error = s"Unexpected exception fetching: $nfe"
-          RegistryError.RepoFailure(error).asLeft
+      .recover { case uhe: UnknownHostException =>
+        val error = s"Unknown host issue fetching: ${uhe.getMessage}"
+        RegistryError.RepoFailure(error).asLeft
       }
 
-  private def httpList[F[_]: Sync](
+  private def listImpl[F[_]: Sync](
     http: Registry.HttpConnection,
     vendor: String,
     name: String,
     model: Int
   ): F[Either[RegistryError, SchemaList]] =
     Utils
-      .stringToUri(toSubpath(http.uri.toString, vendor, name, model))
+      .stringToUri(RegistryLookup.toSubpath(http.uri.toString, vendor, name, model))
       .traverse(uri => getFromUri(uri, http.apikey))
       .map { response =>
         for {
@@ -199,20 +187,5 @@ object JavaNetRegistryLookup {
 
   private def is2xx(response: HttpResponse[String]) =
     response.statusCode() >= 200 && response.statusCode() <= 299
-
-  private def toSubpath(
-    prefix: String,
-    vendor: String,
-    name: String,
-    model: Int
-  ): String =
-    s"${prefix.stripSuffix("/")}/schemas/$vendor/$name/jsonschema/$model"
-
-  private def toSubpath(
-    prefix: String,
-    vendor: String,
-    name: String
-  ): String =
-    s"${prefix.stripSuffix("/")}/schemas/$vendor/$name/jsonschema"
 
 }
