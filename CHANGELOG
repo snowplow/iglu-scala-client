@@ -1,3 +1,11 @@
+Version 3.3.0 (2023-05-30)
+--------------------------
+Embedded and in-memory lookups should be common across http modules (#244)
+Take superseding schema into account during validation (#231)
+Apps should explicitly import java.net.http.HttpClient instances of RegistryLookup (#241)
+Resolver caches suffers from races and http server overload during the cold start (#227)
+Ignore `$ref` keyword referencing HTTP resources (#238)
+
 Version 2.2.1 (2023-01-24)
 --------------------------
 Update links in Readme (#205)
