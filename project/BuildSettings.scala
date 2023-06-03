@@ -68,25 +68,10 @@ object BuildSettings {
   // clear-out mimaBinaryIssueFilters and mimaPreviousVersions.
   // Otherwise, add previous version to set without
   // removing other versions.
-  val mimaPreviousVersionsData = Set()
-  val mimaPreviousVersionsCore = Set()
-  val mimaPreviousVersionsHttp4s = Set()
-  val mimaPreviousVersionsScala3 = Set()
+  val mimaPreviousVersions = Set("3.0.0")
 
   lazy val mimaSettings = Seq(
     mimaPreviousArtifacts := {
-      val mimaPreviousVersions = 
-        (name.value, CrossVersion.partialVersion(scalaVersion.value)) match {
-          case (_, Some((3, _))) =>
-            mimaPreviousVersionsScala3
-          case (name, _) if name.endsWith("http4s") =>
-            mimaPreviousVersionsHttp4s
-          case (name, _) if name.endsWith("data") =>
-            mimaPreviousVersionsData
-          case _ =>
-            mimaPreviousVersionsCore
-        }
-          
       mimaPreviousVersions.map { organization.value %% name.value % _ }
     },
     ThisBuild / mimaFailOnNoPrevious := false,

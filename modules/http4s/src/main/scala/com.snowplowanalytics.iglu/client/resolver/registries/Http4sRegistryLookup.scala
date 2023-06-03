@@ -22,13 +22,33 @@ import io.circe.Json
 import org.http4s.circe._
 import org.http4s.client.{Client => HttpClient}
 import org.http4s.{EntityDecoder, Header, Headers, Method, Request, Status, Uri}
+import org.http4s.client.middleware.{Retry, RetryPolicy}
 import org.typelevel.ci.CIString
 
 import scala.util.control.NonFatal
+import scala.concurrent.duration.{DurationInt, FiniteDuration}
 
 object Http4sRegistryLookup {
 
   def apply[F[_]: Async](client: HttpClient[F]): RegistryLookup[F] =
+    apply(client, maxRetry = 5, maxWait = 5.seconds)
+
+  def apply[F[_]: Async](
+    client: HttpClient[F],
+    maxRetry: Int,
+    maxWait: FiniteDuration
+  ): RegistryLookup[F] =
+    fromClient(Retry[F](retryPolicy(maxRetry, maxWait), redactHeadersWhen)(client))
+
+  private def retryPolicy[F[_]](maxRetry: Int, maxWait: FiniteDuration): RetryPolicy[F] = {
+    val backoff = RetryPolicy.exponentialBackoff(maxWait, maxRetry)
+    RetryPolicy(
+      backoff,
+      { case (_, result) => RetryPolicy.isErrorOrRetriableStatus(result) }
+    )
+  }
+
+  private def fromClient[F[_]: Async](client: HttpClient[F]): RegistryLookup[F] =
     new RegistryLookup.StdRegistryLookup[F] {
       def httpLookup(
         registry: Registry.Http,
@@ -133,4 +153,7 @@ object Http4sRegistryLookup {
 
   private implicit def schemaListDecoder[F[_]: Concurrent]: EntityDecoder[F, SchemaList] =
     jsonOf[F, SchemaList]
+
+  private def redactHeadersWhen(header: CIString) =
+    (Headers.SensitiveHeaders + CIString("apikey")).contains(header)
 }
