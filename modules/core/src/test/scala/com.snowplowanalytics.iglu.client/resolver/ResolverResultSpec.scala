@@ -74,6 +74,8 @@ class ResolverResultSpec extends Specification with ValidatedMatchers with CatsE
   a Resolver should not spam the registry with similar requests $e15
   a Resolver should return superseding schema if resolveSupersedingSchema is true $e16
   a Resolver shouldn't return superseding schema if resolveSupersedingSchema is false $e17
+  a Resolver should return cached "not found" when ttl not exceeded $e18
+  a Resolver should update cached "not found" when ttl exceeded $e19
   """
 
   import ResolverSpec._
@@ -638,4 +640,114 @@ class ResolverResultSpec extends Specification with ValidatedMatchers with CatsE
         )
       }
   }
+
+  def e18 = {
+    val schemaKey =
+      SchemaKey(
+        "com.snowplowanalytics.iglu-test",
+        "mock_schema",
+        "jsonschema",
+        SchemaVer.Full(1, 0, 0)
+      )
+    val schema =
+      Json.Null.asRight[RegistryError]
+    val notFound  = RegistryError.NotFound.asLeft[Json]
+    val responses = List(notFound, schema)
+
+    val httpRep =
+      Registry.Http(Registry.Config("Mock Repo", 1, List("com.snowplowanalytics.iglu-test")), null)
+
+    implicit val cache = ResolverSpecHelpers.staticResolverCache
+    implicit val clock = ResolverSpecHelpers.staticClock
+    implicit val registryLookup: RegistryLookup[StaticLookup] =
+      ResolverSpecHelpers.getLookup(responses, Nil)
+
+    val result = for {
+      resolver  <- Resolver.init[StaticLookup](10, Some(200.seconds), httpRep)
+      response1 <- resolver.lookupSchemaResult(schemaKey)
+      _         <- StaticLookup.addTime(150.seconds) // ttl 200, delay 150
+      response2 <- resolver.lookupSchemaResult(schemaKey)
+      _         <- StaticLookup.addTime(100.seconds) // ttl 200, total delay 250
+      response3 <- resolver.lookupSchemaResult(schemaKey)
+    } yield (response1, response2, response3)
+
+    val (_, (response1, response2, response3)) =
+      result.run(ResolverSpecHelpers.RegistryState.init).value
+
+    val firstNotFound = response1 must beLeft[ResolutionError].like {
+      case ResolutionError(history) =>
+        history must haveValue(
+          LookupHistory(Set(RegistryError.NotFound), 1, Instant.ofEpochMilli(3L))
+        )
+    }
+
+    val firstAndSecondEqual = response1 must beEqualTo(response2)
+
+    val thirdSucceeded = response3 must beRight[SchemaLookupResult].like {
+      case ResolverResult.Cached(key, SchemaItem(value, _), _) =>
+        key must beEqualTo(schemaKey) and (value must beEqualTo(Json.Null))
+    }
+
+    firstNotFound and firstAndSecondEqual and thirdSucceeded
+
+  }
+
+  def e19 = {
+    val schemaKey =
+      SchemaKey(
+        "com.snowplowanalytics.iglu-test",
+        "mock_schema",
+        "jsonschema",
+        SchemaVer.Full(1, 0, 0)
+      )
+    val schema =
+      Json.Null.asRight[RegistryError]
+    val notFound  = RegistryError.NotFound.asLeft[Json]
+    val responses = List(notFound, notFound, schema)
+
+    val repoName = "Mock Repo"
+    val httpRep =
+      Registry.Http(Registry.Config(repoName, 1, List("com.snowplowanalytics.iglu-test")), null)
+
+    implicit val cache = ResolverSpecHelpers.staticResolverCache
+    implicit val clock = ResolverSpecHelpers.staticClock
+    implicit val registryLookup: RegistryLookup[StaticLookup] =
+      ResolverSpecHelpers.getLookup(responses, Nil)
+
+    val result = for {
+      resolver  <- Resolver.init[StaticLookup](10, Some(200.seconds), httpRep)
+      response1 <- resolver.lookupSchemaResult(schemaKey)
+      _         <- StaticLookup.addTime(250.seconds) // ttl 200, delay 250
+      response2 <- resolver.lookupSchemaResult(schemaKey)
+      _         <- StaticLookup.addTime(100.seconds) // ttl 200, total delay 350
+      response3 <- resolver.lookupSchemaResult(schemaKey)
+    } yield (response1, response2, response3)
+
+    val (_, (response1, response2, response3)) =
+      result.run(ResolverSpecHelpers.RegistryState.init).value
+
+    val firstNotFound = response1 must beLeft[ResolutionError].like {
+      case ResolutionError(history) =>
+        history must haveValue(
+          LookupHistory(Set(RegistryError.NotFound), 1, Instant.ofEpochMilli(3L))
+        )
+    }
+
+    val secondNotCached = response1 must beLeft[ResolutionError].like {
+      case ResolutionError(history1) =>
+        val LookupHistory(_, attempts1, lastAttempt1) = history1(repoName)
+        response2 must beLeft[ResolutionError].like { case ResolutionError(history2) =>
+          val LookupHistory(_, attempts2, lastAttempt2) = history2(repoName)
+          (attempts1 must beEqualTo(1)) and
+            (attempts2 must beEqualTo(2)) and
+            (lastAttempt2 mustNotEqual lastAttempt1)
+        }
+    }
+
+    val secondAndThirdEqual = response2 must beEqualTo(response3)
+
+    firstNotFound and secondNotCached and secondAndThirdEqual
+
+  }
+
 }

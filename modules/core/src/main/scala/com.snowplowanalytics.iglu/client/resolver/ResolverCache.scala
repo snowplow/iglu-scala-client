@@ -26,6 +26,8 @@ import com.snowplowanalytics.lrumap.LruMap
 // Iglu core
 import com.snowplowanalytics.iglu.core.{SchemaKey, SchemaList}
 
+import com.snowplowanalytics.iglu.client.resolver.registries.RegistryError
+
 import Resolver.SchemaItem
 
 /**
@@ -173,16 +175,26 @@ object ResolverCache {
     ttl: Option[TTL],
     c: LruMap[F, K, CacheEntry[Lookup[A]]],
     key: K
-  ): F[Option[TimestampedItem[Lookup[A]]]] = {
-    val wrapped = for {
-      (storageTime: StorageTime, lookup) <- OptionT(c.get(key))
-      currentTime                        <- OptionT.liftF(Clock[F].realTime)
-      _ = currentTime
-      if isViable(ttl, currentTime, storageTime) || lookup.isLeft // isLeft
-    } yield TimestampedItem(lookup, storageTime)
-
-    wrapped.value
-  }
+  ): F[Option[TimestampedItem[Lookup[A]]]] =
+    OptionT(c.get(key))
+      .semiflatMap[Option[TimestampedItem[Lookup[A]]]] { case (storageTime, lookup) =>
+        Clock[F].realTime.map { currentTime =>
+          if (isViable(ttl, currentTime, storageTime))
+            Some(TimestampedItem(lookup, storageTime))
+          else {
+            lookup match {
+              case Right(_) => None
+              case Left(failures) =>
+                val noNotFounds = failures.map { case (k, history) =>
+                  k -> history.copy(errors = history.errors - RegistryError.NotFound)
+                }
+                Some(TimestampedItem(Left(noNotFounds), storageTime))
+            }
+          }
+        }
+      }
+      .subflatMap { case o: Option[TimestampedItem[Lookup[A]]] => o }
+      .value
 
   def getItem[F[_]: Monad: Clock, A, K](
     ttl: Option[TTL],

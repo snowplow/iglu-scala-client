@@ -592,6 +592,11 @@ object Resolver {
     now: Instant
   ): List[Registry] = {
     val errorsToRetry = failuresMap.filter {
+      case (_, LookupHistory(errors, _, _)) if errors.contains(RegistryError.NotFound) =>
+        false
+      case (_, LookupHistory(errors, _, _)) if errors.isEmpty =>
+        // The NotFounds have expired because of the cache TTL
+        true
       case (_: Registry.Embedded | _: Registry.InMemory, _) =>
         false
       case (_, LookupHistory(_, attempts, lastAttempt)) =>
@@ -613,13 +618,13 @@ object Resolver {
     Either.cond(ConfigurationSchema.matches(datum.schema), (), failure)
   }
 
-  // Minimum backoff period for retry
-  private val MinBackoff = 500 // ms
+  // Minimum and maximum backoff periods for retry after server/network errors
+  private val MinBackoff = 500L   // ms
+  private val MaxBackoff = 60000L // ms
 
   // Count how many milliseconds the Resolver needs to wait before retrying
-  // TODO: This should not exceed TTL
-  private def backoff(retryCount: Int): Long =
-    retryCount match {
+  private def backoff(retryCount: Int): Long = {
+    val backoff = retryCount match {
       case c if c > 20 => 1200000L + (retryCount * 100L)
       case c if c > 12 =>
         MinBackoff + Math.pow(2, retryCount.toDouble).toLong + 5000L
@@ -628,4 +633,6 @@ object Resolver {
       case _ =>
         MinBackoff + Math.pow(4, retryCount.toDouble).toLong
     }
+    Math.min(backoff, MaxBackoff)
+  }
 }
