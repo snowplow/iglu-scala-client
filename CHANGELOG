@@ -1,4 +1,9 @@
-Version 3.3.0 (2023-05-30)
+Version 3.1.0 (2023-06-09)
+--------------------------
+Not Found results should be cached for as long as the TTL (#248)
+Http4s client should implement a retry policy (#246)
+
+Version 3.0.0 (2023-05-30)
 --------------------------
 Embedded and in-memory lookups should be common across http modules (#244)
 Take superseding schema into account during validation (#231)
