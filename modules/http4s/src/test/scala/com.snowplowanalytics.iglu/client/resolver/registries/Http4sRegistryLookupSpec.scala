@@ -12,6 +12,8 @@
  */
 package com.snowplowanalytics.iglu.client.resolver.registries
 
+import scala.concurrent.duration.DurationInt
+
 import cats.effect.{IO, Resource}
 import cats.effect.testing.specs2.CatsIO
 import io.circe.Json
@@ -81,7 +83,7 @@ class Http4sRegistryLookupSpec extends Specification with CatsIO {
         Resource.eval(IO.raiseError(new RuntimeException("boom!")))
       }
 
-      Http4sRegistryLookup(client).lookup(repositoryRef, schemaKey).map { result =>
+      Http4sRegistryLookup(client, 2, 10.millis).lookup(repositoryRef, schemaKey).map { result =>
         result should beLeft
       }
     }
@@ -130,8 +132,9 @@ class Http4sRegistryLookupSpec extends Specification with CatsIO {
         Resource.eval(IO.raiseError(new RuntimeException("boom!")))
       }
 
-      Http4sRegistryLookup(client).list(registry, "com.myvendor", "myname", 42).map { result =>
-        result should beLeft
+      Http4sRegistryLookup(client, 2, 10.millis).list(registry, "com.myvendor", "myname", 42).map {
+        result =>
+          result should beLeft
       }
     }
 
