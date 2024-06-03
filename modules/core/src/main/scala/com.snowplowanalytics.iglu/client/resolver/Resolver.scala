@@ -220,7 +220,17 @@ final case class Resolver[F[_]](repos: List[Registry], cache: Option[ResolverCac
     L: RegistryLookup[F],
     C: Clock[F]
   ): F[Either[ResolutionError, SchemaListLookupResult]] = {
-    val get: Registry => F[Either[RegistryError, SchemaList]] = r => L.list(r, vendor, name, model)
+    val get: Registry => F[Either[RegistryError, SchemaList]] = { r =>
+      L.list(r, vendor, name, model)
+        .map { either =>
+          either.flatMap { schemaList =>
+            if (mustIncludeKey.forall(schemaList.schemas.contains))
+              Right(schemaList)
+            else
+              Left(RegistryError.NotFound)
+          }
+        }
+    }
 
     def handleAfterFetch(
       result: Either[LookupFailureMap, SchemaList]

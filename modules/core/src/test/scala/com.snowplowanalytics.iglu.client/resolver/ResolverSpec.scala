@@ -75,6 +75,7 @@ class ResolverSpec extends Specification with CatsEffect {
   we can construct a Resolver from a valid resolver 1-0-2 configuration JSON $e10
   a Resolver should cache SchemaLists with different models separately $e11
   a Resolver should use schemaKey provided in SchemaListLike for result validation $e12
+  result from SchemaListLike should contain the exact schemaKey provided $e13
   """
 
   import ResolverSpec._
@@ -451,5 +452,32 @@ class ResolverSpec extends Specification with CatsEffect {
     resultTwo.map(s => SchemaList.parseUnsafe(s.schemas.take(2))) must beRight(
       SchemaList.parseUnsafe(List(schema100, schema101))
     )
+  }
+
+  def e13 = {
+    val IgluCentralServer = Registry.Http(
+      Registry.Config("Iglu Central  EU1", 10, List("com.snowplowanalytics")),
+      Registry
+        .HttpConnection(URI.create("https://com-iglucentral-eu1-prod.iglu.snplow.net/api"), None)
+    )
+
+    val schema100 = SchemaKey(
+      "com.snowplowanalytics.snowplow",
+      "client_session",
+      "jsonschema",
+      SchemaVer.Full(1, 0, 0)
+    )
+    val schema101 = schema100.copy(version = SchemaVer.Full(1, 0, 1))
+    val schema102 = schema100.copy(version = SchemaVer.Full(1, 0, 2))
+
+    val resolver: Resolver[Id] =
+      Resolver.init[Id](10, None, IgluCentralServer, SpecHelpers.EmbeddedTest)
+
+    // Embedded registry only contains 1-0-0 and 1-0-1 versions of client_session schema, while Iglu Central
+    // contains 1-0-0, 1-0-1 and 1-0-2 versions. When listSchemasLike is called with 1-0-2, even though Iglu Central
+    // has lower priority than embedded registry, we expect 1-0-2 to be returned as well in the result list.
+    val result = resolver.listSchemasLike(schema102)
+
+    result must beRight(SchemaList.parseUnsafe(List(schema100, schema101, schema102)))
   }
 }
