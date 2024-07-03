@@ -1,3 +1,7 @@
+Version 3.1.1 (2024-07-03)
+--------------------------
+Fix listSchemasLike when multiple Iglu repositories host the schemas (#252)
+
 Version 3.1.0 (2023-06-09)
 --------------------------
 Not Found results should be cached for as long as the TTL (#248)
