@@ -35,6 +35,8 @@ import org.specs2.Specification
 import scala.concurrent.duration.DurationInt
 
 class CachingValidationSpec extends Specification {
+  val DefaultMaxJsonDepth = 40
+
   def is = s2"""
 
   This is a specification to test the basic caching Validatable functionality
@@ -52,6 +54,10 @@ class CachingValidationSpec extends Specification {
   validation error for V4 non-compliant schema $e11
   cache parsed json schemas $e12
   not cache parsed json schemas $e13
+  return error with the schema that exceeds maximum allowed JSON depth $e14
+  return error with the JSON instance that exceeds maximum allowed JSON depth $e15
+  return empty from checkSchema if schema has no issue $e16
+  return errors from checkSchema if schema exceeds maximum allowed JSON depth $e17
   """
 
   val simpleSchemaResult: Json =
@@ -87,7 +93,8 @@ class CachingValidationSpec extends Specification {
         CirceValidator.WithCaching
           .validate(createCache())(
             json,
-            ResolverResult.NotCached(SchemaItem(simpleSchemaResult, None))
+            ResolverResult.NotCached(SchemaItem(simpleSchemaResult, None)),
+            DefaultMaxJsonDepth
           )
 
       result must beRight
@@ -150,7 +157,8 @@ class CachingValidationSpec extends Specification {
       CirceValidator.WithCaching
         .validate(createCache())(
           nonStringInput,
-          ResolverResult.NotCached(SchemaItem(simpleSchemaResult, None))
+          ResolverResult.NotCached(SchemaItem(simpleSchemaResult, None)),
+          DefaultMaxJsonDepth
         ) must beLeft(
         nonStringExpected
       )
@@ -158,7 +166,8 @@ class CachingValidationSpec extends Specification {
       CirceValidator.WithCaching
         .validate(createCache())(
           missingKeyInput,
-          ResolverResult.NotCached(SchemaItem(simpleSchemaResult, None))
+          ResolverResult.NotCached(SchemaItem(simpleSchemaResult, None)),
+          DefaultMaxJsonDepth
         ) must beLeft(
         missingKeyExpected
       )
@@ -166,7 +175,8 @@ class CachingValidationSpec extends Specification {
       CirceValidator.WithCaching
         .validate(createCache())(
           heterogeneusArrayInput,
-          ResolverResult.NotCached(SchemaItem(simpleSchemaResult, None))
+          ResolverResult.NotCached(SchemaItem(simpleSchemaResult, None)),
+          DefaultMaxJsonDepth
         ) must beLeft(
         heterogeneusArrayExpected
       )
@@ -174,7 +184,8 @@ class CachingValidationSpec extends Specification {
       CirceValidator.WithCaching
         .validate(createCache())(
           doubleErrorInput,
-          ResolverResult.NotCached(SchemaItem(simpleSchemaResult, None))
+          ResolverResult.NotCached(SchemaItem(simpleSchemaResult, None)),
+          DefaultMaxJsonDepth
         ) must beLeft(
         doubleErrorExpected
       )
@@ -205,7 +216,8 @@ class CachingValidationSpec extends Specification {
     CirceValidator.WithCaching
       .validate(createCache())(
         input,
-        ResolverResult.NotCached(SchemaItem(schema, None))
+        ResolverResult.NotCached(SchemaItem(schema, None)),
+        DefaultMaxJsonDepth
       ) must beLeft(
       expected
     )
@@ -224,7 +236,8 @@ class CachingValidationSpec extends Specification {
     CirceValidator.WithCaching
       .validate(createCache())(
         input,
-        ResolverResult.NotCached(SchemaItem(schema, None))
+        ResolverResult.NotCached(SchemaItem(schema, None)),
+        DefaultMaxJsonDepth
       ) must beRight
   }
 
@@ -257,7 +270,8 @@ class CachingValidationSpec extends Specification {
     CirceValidator.WithCaching
       .validate(createCache())(
         input,
-        ResolverResult.NotCached(SchemaItem(schema, None))
+        ResolverResult.NotCached(SchemaItem(schema, None)),
+        DefaultMaxJsonDepth
       ) must beLeft(
       expected
     )
@@ -289,7 +303,8 @@ class CachingValidationSpec extends Specification {
     CirceValidator.WithCaching
       .validate(createCache())(
         input,
-        ResolverResult.NotCached(SchemaItem(schema, None))
+        ResolverResult.NotCached(SchemaItem(schema, None)),
+        DefaultMaxJsonDepth
       ) must beLeft(
       expected
     )
@@ -301,7 +316,8 @@ class CachingValidationSpec extends Specification {
     CirceValidator.WithCaching
       .validate(createCache())(
         input,
-        ResolverResult.NotCached(SchemaItem(schema, None))
+        ResolverResult.NotCached(SchemaItem(schema, None)),
+        DefaultMaxJsonDepth
       ) must beRight
   }
 
@@ -311,7 +327,8 @@ class CachingValidationSpec extends Specification {
     CirceValidator.WithCaching
       .validate(createCache())(
         input,
-        ResolverResult.NotCached(SchemaItem(schema, None))
+        ResolverResult.NotCached(SchemaItem(schema, None)),
+        DefaultMaxJsonDepth
       ) must beRight
   }
 
@@ -321,7 +338,8 @@ class CachingValidationSpec extends Specification {
     CirceValidator.WithCaching
       .validate(createCache())(
         input,
-        ResolverResult.NotCached(SchemaItem(schema, None))
+        ResolverResult.NotCached(SchemaItem(schema, None)),
+        DefaultMaxJsonDepth
       ) must beLeft
   }
 
@@ -331,7 +349,8 @@ class CachingValidationSpec extends Specification {
     CirceValidator.WithCaching
       .validate(createCache())(
         input,
-        ResolverResult.NotCached(SchemaItem(schema, None))
+        ResolverResult.NotCached(SchemaItem(schema, None)),
+        DefaultMaxJsonDepth
       ) must beRight
 
   }
@@ -351,7 +370,8 @@ class CachingValidationSpec extends Specification {
     CirceValidator.WithCaching
       .validate(createCache())(
         input,
-        ResolverResult.NotCached(SchemaItem(schema, None))
+        ResolverResult.NotCached(SchemaItem(schema, None)),
+        DefaultMaxJsonDepth
       ) must beLeft(
       expected
     )
@@ -368,7 +388,8 @@ class CachingValidationSpec extends Specification {
       CirceValidator.WithCaching
         .validate(cache)(
           input,
-          ResolverResult.Cached(schemaKey, SchemaItem(schema, None), timestamp = 1.seconds)
+          ResolverResult.Cached(schemaKey, SchemaItem(schema, None), timestamp = 1.seconds),
+          DefaultMaxJsonDepth
         )
 
     result must beRight(()) and
@@ -382,10 +403,141 @@ class CachingValidationSpec extends Specification {
     val schema = json"""{ "type": "number" }"""
     val input  = json"""5"""
     val result = CirceValidator.WithCaching
-      .validate(cache)(input, ResolverResult.NotCached(SchemaItem(schema, None)))
+      .validate(cache)(
+        input,
+        ResolverResult.NotCached(SchemaItem(schema, None)),
+        DefaultMaxJsonDepth
+      )
 
     result must beRight(()) and
       (cache.get((schemaKey, 1.seconds)) must beNone)
+  }
+
+  def e14 = {
+    val schema =
+      json"""{
+        "type": "object",
+        "properties": {
+            "example_field": {
+                "type": "array",
+                "description": "the example_field is a collection of user names",
+                "users": {
+                    "type": "object",
+                    "properties": {
+                        "name": {
+                            "type": "string",
+                            "maxLength": 128
+                        }
+                    },
+                    "required": [
+                        "id"
+                    ],
+                    "additionalProperties": false
+                }
+            }
+        }
+      }"""
+    val input = json"""5"""
+    val expected = ValidatorError.InvalidSchema(
+      NonEmptyList.of(
+        SchemaIssue(
+          "/",
+          "Maximum allowed JSON depth exceeded"
+        )
+      )
+    )
+
+    CirceValidator.WithCaching
+      .validate(createCache())(
+        input,
+        ResolverResult.NotCached(SchemaItem(schema, None)),
+        maxJsonDepth = 5
+      ) must beLeft(expected)
+  }
+
+  def e15 = {
+    val schema = json"""{ "type": "number" }"""
+    val input =
+      json"""{"d1":{"d2":{"d3":{"d4":{"d5":{"d6":6}}}}}}"""
+    val expected = ValidatorError.InvalidData(
+      NonEmptyList.of(
+        ValidatorReport(
+          "Maximum allowed JSON depth exceeded",
+          Some("/"),
+          List.empty,
+          None
+        )
+      )
+    )
+
+    CirceValidator.WithCaching
+      .validate(createCache())(
+        input,
+        ResolverResult.NotCached(SchemaItem(schema, None)),
+        maxJsonDepth = 5
+      ) must beLeft(expected)
+  }
+
+  def e16 = {
+    val schema =
+      json"""{
+        "type": "object",
+        "properties": {
+            "example_field": {
+                "type": "array",
+                "description": "the example_field is a collection of user names",
+                "users": {
+                    "type": "object",
+                    "properties": {
+                        "name": {
+                            "type": "string",
+                            "maxLength": 128
+                        }
+                    },
+                    "required": [
+                        "id"
+                    ],
+                    "additionalProperties": false
+                }
+            }
+        }
+      }"""
+
+    CirceValidator.checkSchema(schema, maxJsonDepth = 10) must beEmpty
+  }
+
+  def e17 = {
+    val schema =
+      json"""{
+        "type": "object",
+        "properties": {
+            "example_field": {
+                "type": "array",
+                "description": "the example_field is a collection of user names",
+                "users": {
+                    "type": "object",
+                    "properties": {
+                        "name": {
+                            "type": "string",
+                            "maxLength": 128
+                        }
+                    },
+                    "required": [
+                        "id"
+                    ],
+                    "additionalProperties": false
+                }
+            }
+        }
+      }"""
+    val expected = List(
+      SchemaIssue(
+        "/",
+        "Maximum allowed JSON depth exceeded"
+      )
+    )
+
+    CirceValidator.checkSchema(schema, maxJsonDepth = 5) must beEqualTo(expected)
   }
 
   private def createCache() =

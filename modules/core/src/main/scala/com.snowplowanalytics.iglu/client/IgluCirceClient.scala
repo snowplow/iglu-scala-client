@@ -36,8 +36,13 @@ import io.circe.{DecodingFailure, Json}
  */
 final class IgluCirceClient[F[_]] private (
   resolver: Resolver[F],
-  schemaEvaluationCache: SchemaEvaluationCache[F]
+  schemaEvaluationCache: SchemaEvaluationCache[F],
+  maxJsonDepth: Int
 ) {
+  @deprecated("Use `IgluCirceClient(resolver, cache, maxJsonDepth)`", "3.2.0")
+  def this(resolver: Resolver[F], cache: SchemaEvaluationCache[F]) =
+    this(resolver, cache, Int.MaxValue)
+
   def check(
     instance: SelfDescribingData[Json]
   )(implicit
@@ -50,7 +55,8 @@ final class IgluCirceClient[F[_]] private (
         resolver.lookupSchemaResult(instance.schema, resolveSupersedingSchema = true)
       )
       validation =
-        CirceValidator.WithCaching.validate(schemaEvaluationCache)(instance.data, resolverResult)
+        CirceValidator.WithCaching
+          .validate(schemaEvaluationCache)(instance.data, resolverResult, maxJsonDepth)
       _ <- EitherT(validation).leftMap(e =>
         e.toClientError(resolverResult.value.supersededBy.map(_.asString))
       )
@@ -61,21 +67,36 @@ final class IgluCirceClient[F[_]] private (
 
 object IgluCirceClient {
 
+  @deprecated("Use `parseDefault(json, maxJsonDepth)`", "3.2.0")
   def parseDefault[F[_]: Monad: CreateResolverCache: InitValidatorCache](
     json: Json
+  ): EitherT[F, DecodingFailure, IgluCirceClient[F]] =
+    parseDefault(json, Int.MaxValue)
+
+  def parseDefault[F[_]: Monad: CreateResolverCache: InitValidatorCache](
+    json: Json,
+    maxJsonDepth: Int
   ): EitherT[F, DecodingFailure, IgluCirceClient[F]] =
     for {
       config   <- EitherT.fromEither[F](Resolver.parseConfig(json))
       resolver <- Resolver.fromConfig[F](config)
-      client   <- EitherT.liftF(fromResolver(resolver, config.cacheSize))
+      client   <- EitherT.liftF(fromResolver(resolver, config.cacheSize, maxJsonDepth))
     } yield client
 
+  @deprecated("Use `fromResolver(resolver, cacheSize, maxJsonDepth)`", "3.2.0")
   def fromResolver[F[_]: Monad: InitValidatorCache](
     resolver: Resolver[F],
     cacheSize: Int
+  ): F[IgluCirceClient[F]] =
+    fromResolver(resolver, cacheSize, Int.MaxValue)
+
+  def fromResolver[F[_]: Monad: InitValidatorCache](
+    resolver: Resolver[F],
+    cacheSize: Int,
+    maxJsonDepth: Int
   ): F[IgluCirceClient[F]] = {
     schemaEvaluationCache[F](cacheSize).map { cache =>
-      new IgluCirceClient(resolver, cache)
+      new IgluCirceClient(resolver, cache, maxJsonDepth)
     }
   }
 

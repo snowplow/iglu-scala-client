@@ -108,5 +108,7 @@ object SpecHelpers {
   val TestResolver = Resolver.init[IO](10, None, EmbeddedTest)
   val TestClient   = for { resolver <- TestResolver } yield Client(resolver, CirceValidator)
   val CachingTestClient =
-    TestResolver.flatMap(resolver => IgluCirceClient.fromResolver[IO](resolver, cacheSize = 10))
+    TestResolver.flatMap(resolver =>
+      IgluCirceClient.fromResolver[IO](resolver, cacheSize = 10, maxJsonDepth = 40)
+    )
 }
