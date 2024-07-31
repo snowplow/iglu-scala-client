@@ -88,25 +88,30 @@ object CirceValidator extends Validator[Json] {
     V4SchemaInstance.getSchema(new ObjectMapper().readTree(MetaSchemas.JsonSchemaV4Text))
 
   def validate(data: Json, schema: Json): Either[ValidatorError, Unit] = {
-    val jacksonJson = circeToJackson(schema)
+    val jacksonJson = circeToJackson(schema, Int.MaxValue)
     evaluateSchema(jacksonJson)
       .flatMap { schema =>
-        validateOnReadySchema(schema, data).leftMap(ValidatorError.InvalidData.apply)
+        validateOnReadySchema(schema, data, Int.MaxValue).leftMap(ValidatorError.InvalidData.apply)
       }
   }
 
-  def checkSchema(schema: Json): List[ValidatorError.SchemaIssue] = {
-    val jacksonJson = circeToJackson(schema)
+  @deprecated("Use `checkSchema(schema, maxJsonDepth)`", "3.2.0")
+  def checkSchema(schema: Json): List[ValidatorError.SchemaIssue] =
+    checkSchema(schema, Int.MaxValue)
+
+  def checkSchema(schema: Json, maxJsonDepth: Int): List[ValidatorError.SchemaIssue] = {
+    val jacksonJson = circeToJackson(schema, maxJsonDepth)
     validateSchemaAgainstV4(jacksonJson)
   }
 
   /** Validate instance against schema and return same instance */
   private def validateOnReadySchema(
     schema: JsonSchema,
-    instance: Json
+    instance: Json,
+    maxJsonDepth: Int
   ): EitherNel[ValidatorReport, Unit] = {
     val messages = schema
-      .validate(circeToJackson(instance))
+      .validate(circeToJackson(instance, maxJsonDepth))
       .asScala
       .toList
       .map(fromValidationMessage)
@@ -154,11 +159,15 @@ object CirceValidator extends Validator[Json] {
 
     def validate[F[_]: Monad](
       schemaEvaluationCache: SchemaEvaluationCache[F]
-    )(data: Json, schema: SchemaLookupResult): F[Either[ValidatorError, Unit]] = {
-      getFromCacheOrEvaluate(schemaEvaluationCache)(schema)
+    )(
+      data: Json,
+      schema: SchemaLookupResult,
+      maxJsonDepth: Int
+    ): F[Either[ValidatorError, Unit]] = {
+      getFromCacheOrEvaluate(schemaEvaluationCache)(schema, maxJsonDepth)
         .map {
           _.flatMap { jsonschema =>
-            validateOnReadySchema(jsonschema, data)
+            validateOnReadySchema(jsonschema, data, maxJsonDepth)
               .leftMap(ValidatorError.InvalidData.apply)
           }
         }
@@ -166,26 +175,30 @@ object CirceValidator extends Validator[Json] {
 
     private def getFromCacheOrEvaluate[F[_]: Monad](
       evaluationCache: SchemaEvaluationCache[F]
-    )(result: SchemaLookupResult): F[Either[ValidatorError.InvalidSchema, JsonSchema]] = {
+    )(
+      result: SchemaLookupResult,
+      maxJsonDepth: Int
+    ): F[Either[ValidatorError.InvalidSchema, JsonSchema]] = {
       result match {
         case ResolverResult.Cached(key, SchemaItem(schema, _), timestamp) =>
           evaluationCache.get((key, timestamp)).flatMap {
             case Some(alreadyEvaluatedSchema) =>
               alreadyEvaluatedSchema.pure[F]
             case None =>
-              provideNewJsonSchema(schema)
+              provideNewJsonSchema(schema, maxJsonDepth)
                 .pure[F]
                 .flatTap(result => evaluationCache.put((key, timestamp), result))
           }
         case ResolverResult.NotCached(SchemaItem(schema, _)) =>
-          provideNewJsonSchema(schema).pure[F]
+          provideNewJsonSchema(schema, maxJsonDepth).pure[F]
       }
     }
 
     private def provideNewJsonSchema(
-      schema: Json
+      schema: Json,
+      maxJsonDepth: Int
     ): Either[ValidatorError.InvalidSchema, JsonSchema] = {
-      val schemaAsNode = circeToJackson(schema)
+      val schemaAsNode = circeToJackson(schema, maxJsonDepth)
       for {
         _         <- validateSchema(schemaAsNode)
         evaluated <- evaluateSchema(schemaAsNode)
