@@ -34,7 +34,7 @@ package object snowplow {
    * @param json instance of circe's Json
    * @return converted JsonNode
    */
-  final def circeToJackson(json: Json): JsonNode =
+  final def circeToJackson(json: Json, maxDepth: Int): JsonNode =
     json.fold(
       NullNode.instance,
       BooleanNode.valueOf(_),
@@ -71,12 +71,14 @@ package object snowplow {
               }
           },
       s => TextNode.valueOf(s),
-      array => JsonNodeFactory.instance.arrayNode.addAll(array.map(circeToJackson).asJava),
+      array =>
+        JsonNodeFactory.instance.arrayNode
+          .addAll(array.map(circeToJackson(_, maxDepth - 1)).asJava),
       obj =>
         objectNodeSetAll(
           JsonNodeFactory.instance.objectNode,
           obj.toMap.map { case (k, v) =>
-            (k, circeToJackson(v))
+            (k, circeToJackson(v, maxDepth - 1))
           }.asJava
         )
     )
