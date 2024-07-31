@@ -13,6 +13,9 @@
 package io.circe
 package jackson
 
+import cats.syntax.either._
+import cats.syntax.traverse._
+
 import scala.jdk.CollectionConverters._
 
 import java.math.{BigDecimal => JBigDecimal}
@@ -30,60 +33,74 @@ package object snowplow {
   /**
    * Converts given circe's Json instance to Jackson's JsonNode
    * Numbers with exponents exceeding Integer.MAX_VALUE are converted to strings
-   * '''Warning: This implementation is not stack safe and will fail on very deep structures'''
    * @param json instance of circe's Json
    * @return converted JsonNode
    */
-  final def circeToJackson(json: Json): JsonNode =
-    json.fold(
-      NullNode.instance,
-      BooleanNode.valueOf(_),
-      number =>
-        if (json == negativeZeroJson)
-          DoubleNode.valueOf(number.toDouble)
-        else
-          number match {
-            case _: JsonBiggerDecimal | _: JsonBigDecimal =>
-              number.toBigDecimal
-                .map(bigDecimal => {
-                  if (bigDecimal.isValidInt)
-                    IntNode.valueOf(bigDecimal.intValue)
-                  else if (bigDecimal.isValidLong) {
-                    LongNode.valueOf(bigDecimal.longValue)
-                  } else if (bigDecimal.isWhole) {
-                    BigIntegerNode.valueOf(bigDecimal.toBigInt.underlying)
-                  } else
-                    DecimalNode.valueOf(bigDecimal.underlying)
-                })
-                .getOrElse(TextNode.valueOf(number.toString))
-            case JsonLong(x)   => LongNode.valueOf(x)
-            case JsonDouble(x) => DoubleNode.valueOf(x)
-            case JsonFloat(x)  => FloatNode.valueOf(x)
-            case JsonDecimal(x) =>
-              try
-                if (x.contains('.') || x.toLowerCase.contains('e'))
-                  DecimalNode.valueOf(new JBigDecimal(x))
-                else
-                  getJsonNodeFromStringContent(x)
-              catch {
-                case _: NumberFormatException => TextNode.valueOf(x)
-                case _: JsonParseException    => TextNode.valueOf(x)
+  final def circeToJackson(json: Json, maxJsonDepth: Int): Either[CirceToJsonError, JsonNode] =
+    if (maxJsonDepth <= 0) CirceToJsonError.MaxDepthExceeded.asLeft
+    else
+      json.fold(
+        NullNode.instance.asRight,
+        BooleanNode.valueOf(_).asRight,
+        number =>
+          {
+            if (json == negativeZeroJson)
+              DoubleNode.valueOf(number.toDouble)
+            else
+              number match {
+                case _: JsonBiggerDecimal | _: JsonBigDecimal =>
+                  number.toBigDecimal
+                    .map(bigDecimal => {
+                      if (bigDecimal.isValidInt)
+                        IntNode.valueOf(bigDecimal.intValue)
+                      else if (bigDecimal.isValidLong) {
+                        LongNode.valueOf(bigDecimal.longValue)
+                      } else if (bigDecimal.isWhole) {
+                        BigIntegerNode.valueOf(bigDecimal.toBigInt.underlying)
+                      } else
+                        DecimalNode.valueOf(bigDecimal.underlying)
+                    })
+                    .getOrElse(TextNode.valueOf(number.toString))
+                case JsonLong(x)   => LongNode.valueOf(x)
+                case JsonDouble(x) => DoubleNode.valueOf(x)
+                case JsonFloat(x)  => FloatNode.valueOf(x)
+                case JsonDecimal(x) =>
+                  try
+                    if (x.contains('.') || x.toLowerCase.contains('e'))
+                      DecimalNode.valueOf(new JBigDecimal(x))
+                    else
+                      getJsonNodeFromStringContent(x)
+                  catch {
+                    case _: NumberFormatException => TextNode.valueOf(x)
+                    case _: JsonParseException    => TextNode.valueOf(x)
+                  }
               }
-          },
-      s => TextNode.valueOf(s),
-      array => JsonNodeFactory.instance.arrayNode.addAll(array.map(circeToJackson).asJava),
-      obj =>
-        objectNodeSetAll(
-          JsonNodeFactory.instance.objectNode,
-          obj.toMap.map { case (k, v) =>
-            (k, circeToJackson(v))
-          }.asJava
-        )
-    )
+          }.asRight,
+        s => TextNode.valueOf(s).asRight,
+        array =>
+          array
+            .traverse(circeToJackson(_, maxJsonDepth - 1))
+            .map(l => JsonNodeFactory.instance.arrayNode.addAll(l.asJava)),
+        obj =>
+          obj.toList
+            .traverse { case (k, v) =>
+              circeToJackson(v, maxJsonDepth - 1).map((k, _))
+            }
+            .map { l =>
+              objectNodeSetAll(
+                JsonNodeFactory.instance.objectNode,
+                l.toMap.asJava
+              )
+            }
+      )
 
   def objectNodeSetAll(node: ObjectNode, fields: java.util.Map[String, JsonNode]): JsonNode =
     node.setAll[JsonNode](fields)
 
   private def getJsonNodeFromStringContent(content: String): JsonNode =
     mapper.readTree(content)
+
+  @deprecated("Use `circeToJackson(json, maxJsonDepth)`", "3.2.0")
+  final def circeToJackson(json: Json): JsonNode =
+    circeToJackson(json, Int.MaxValue).toOption.get
 }
