@@ -181,6 +181,101 @@ final case class Resolver[F[_]](repos: List[Registry], cache: Option[ResolverCac
   ): F[Either[ResolutionError, Json]] =
     lookupSchemaResult(schemaKey).map(_.map(_.value.schema))
 
+  def lookupSchemasUntil(
+    maxSchemaKey: SchemaKey
+  )(implicit
+    F: Monad[F],
+    L: RegistryLookup[F],
+    C: Clock[F]
+  ): F[Either[SchemaResolutionError, List[Json]]] = {
+
+    // Looks up addition 0 and keeps looking up until NotFound or other ResolutionError.
+    // At least one schema should get returned. If not, the first ResolutionError gets returned,
+    // even if it is NotFound.
+    def indeterministicFetchAll(
+      schemaKey: SchemaKey
+    ): F[Either[SchemaResolutionError, List[Json]]] = {
+      case class Fetched(
+        error: Option[SchemaResolutionError],
+        schemas: List[Json],
+        finished: Boolean
+      )
+      Monad[F]
+        .iterateWhileM[Fetched](
+          Fetched(None, List.empty[Json], false)
+        ) { case Fetched(error, schemas, finished) =>
+          val nextSchemaKey =
+            schemaKey.copy(version = schemaKey.version.copy(addition = schemas.size))
+          lookupSchema(nextSchemaKey).map {
+            case Left(resolutionError) if resolutionError.isNotFound && schemas.nonEmpty =>
+              Fetched(None, schemas, true)
+            case Left(resolutionError) =>
+              Fetched(Some(SchemaResolutionError(nextSchemaKey, resolutionError)), schemas, true)
+            case Right(json) =>
+              Fetched(error, json :: schemas, finished)
+          }
+        }(!_.finished)
+        .map {
+          case Fetched(Some(resolutionError), _, _) =>
+            Left(resolutionError)
+          case Fetched(_, schemas, _) =>
+            Right(schemas.reverse)
+        }
+    }
+
+    // Looks up all the additions from 0 until the one in maxSchemaKey
+    def deterministicFetchAll(
+      maxSchemaKey: SchemaKey
+    ): F[Either[SchemaResolutionError, List[Json]]] = {
+      case class Fetched(error: Option[SchemaResolutionError], schemas: List[Json])
+      Monad[F]
+        .iterateWhileM[Fetched](
+          Fetched(None, List.empty[Json])
+        ) { case Fetched(error, schemas) =>
+          val nextSchemaKey =
+            maxSchemaKey.copy(version = maxSchemaKey.version.copy(addition = schemas.size))
+          lookupSchema(nextSchemaKey).map {
+            case Left(resolutionError) =>
+              Fetched(Some(SchemaResolutionError(nextSchemaKey, resolutionError)), schemas)
+            case Right(json) =>
+              Fetched(error, json :: schemas)
+          }
+        }(f => f.error.isEmpty && f.schemas.size < maxSchemaKey.version.addition + 1)
+        .map {
+          case Fetched(Some(resolutionError), _) =>
+            Left(resolutionError)
+          case Fetched(_, schemas) =>
+            Right(schemas.reverse)
+        }
+    }
+
+    case class Fetched(error: Option[SchemaResolutionError], schemas: List[List[Json]])
+    Monad[F]
+      .iterateWhileM[Fetched](
+        Fetched(None, List.empty[List[Json]])
+      ) { case Fetched(error, schemas) =>
+        val fetched =
+          if (schemas.size < maxSchemaKey.version.revision)
+            indeterministicFetchAll(
+              maxSchemaKey.copy(version = maxSchemaKey.version.copy(revision = schemas.size))
+            )
+          else
+            deterministicFetchAll(maxSchemaKey)
+        fetched.map {
+          case Left(resolutionError) =>
+            Fetched(Some(resolutionError), schemas)
+          case Right(jsons) =>
+            Fetched(error, schemas ++ List(jsons))
+        }
+      }(f => f.error.isEmpty && f.schemas.size < maxSchemaKey.version.revision + 1)
+      .map {
+        case Fetched(Some(resolutionError), _) =>
+          Left(resolutionError)
+        case Fetched(_, schemas) =>
+          Right(schemas.flatten)
+      }
+  }
+
   /**
    * Get list of available schemas for particular vendor and name part
    * Server supposed to return them in proper order
@@ -388,6 +483,8 @@ object Resolver {
    *                     Otherwise, it is None.
    */
   case class SchemaItem(schema: Json, supersededBy: SupersededBy)
+
+  case class SchemaResolutionError(schemaKey: SchemaKey, error: ResolutionError)
 
   /** The result of doing a lookup with the resolver, carrying information on whether the cache was used */
   sealed trait ResolverResult[+K, +A] {

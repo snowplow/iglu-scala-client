@@ -44,7 +44,7 @@ import com.snowplowanalytics.iglu.client.resolver.registries.{
   RegistryError,
   RegistryLookup
 }
-import com.snowplowanalytics.iglu.client.resolver.Resolver.SchemaItem
+import com.snowplowanalytics.iglu.client.resolver.Resolver.{SchemaItem, SchemaResolutionError}
 
 // Specs2
 import com.snowplowanalytics.iglu.client.SpecHelpers._
@@ -76,6 +76,18 @@ class ResolverResultSpec extends Specification with ValidatedMatchers with CatsE
   a Resolver shouldn't return superseding schema if resolveSupersedingSchema is false $e17
   a Resolver should return cached "not found" when ttl not exceeded $e18
   a Resolver should update cached "not found" when ttl exceeded $e19
+  lookupSchemasUntil should
+    return 1-0-0 $e20
+    return 1-0-0 and 1-1-0 $e21
+    return 1-0-0, 1-1-0 and 1-1-1 $e22
+    return 1-0-0, 1-1-0, 1-1-1 and 1-1-2 $e23
+    return 1-0-0, 1-1-0, 1-1-1, 1-1-2 and 1-2-0 $e24
+    return 1-0-0, 1-1-0, 1-1-1, 1-1-2, 1-2-0 and 1-2-1 $e25
+    return 1-0-0, 1-1-0, 1-1-1, 1-1-2, 1-2-0, 1-2-1 and 1-2-2 $e26
+    return an error if a schema is invalid in the deterministic fetch $e27
+    return an error if a schema is invalid in the indeterministic fetch $e28
+    return 2-0-0 (no 1-*-* schemas) $e29
+    return 2-0-0 from a registry and 2-1-0 from another one $e30
   """
 
   import ResolverSpec._
@@ -747,7 +759,72 @@ class ResolverResultSpec extends Specification with ValidatedMatchers with CatsE
     val secondAndThirdEqual = response2 must beEqualTo(response3)
 
     firstNotFound and secondNotCached and secondAndThirdEqual
-
   }
 
+  import ResolverSpecHelpers.LookupSchemasUntil._
+
+  def testLookupUntil(maxSchemaKey: SchemaKey, expected: List[Json]) =
+    for {
+      resolver <- mkResolver
+      result   <- resolver.lookupSchemasUntil(maxSchemaKey)
+    } yield result must beRight.like { case jsons => jsons must beEqualTo(expected) }
+
+  def e20 = testLookupUntil(
+    getUntilSchemaKey(1, 0, 0),
+    List(until100)
+  )
+
+  def e21 = testLookupUntil(
+    getUntilSchemaKey(1, 1, 0),
+    List(until100, until110)
+  )
+
+  def e22 = testLookupUntil(
+    getUntilSchemaKey(1, 1, 1),
+    List(until100, until110, until111)
+  )
+
+  def e23 = testLookupUntil(
+    getUntilSchemaKey(1, 1, 2),
+    List(until100, until110, until111, until112)
+  )
+
+  def e24 = testLookupUntil(
+    getUntilSchemaKey(1, 2, 0),
+    List(until100, until110, until111, until112, until120)
+  )
+
+  def e25 = testLookupUntil(
+    getUntilSchemaKey(1, 2, 1),
+    List(until100, until110, until111, until112, until120, until121)
+  )
+
+  def e26 = testLookupUntil(
+    getUntilSchemaKey(1, 2, 2),
+    List(until100, until110, until111, until112, until120, until121, until122)
+  )
+
+  def e27 = for {
+    resolver <- mkResolver
+    result   <- resolver.lookupSchemasUntil(getUntilSchemaKey(1, 3, 0))
+  } yield result must beLeft.like { case SchemaResolutionError(schemaKey, _) =>
+    schemaKey must beEqualTo(getUntilSchemaKey(1, 3, 0))
+  }
+
+  def e28 = for {
+    resolver <- mkResolver
+    result   <- resolver.lookupSchemasUntil(getUntilSchemaKey(1, 4, 0))
+  } yield result must beLeft.like { case SchemaResolutionError(schemaKey, _) =>
+    schemaKey must beEqualTo(getUntilSchemaKey(1, 3, 0))
+  }
+
+  def e29 = testLookupUntil(
+    getUntilSchemaKey(2, 0, 0),
+    List(until200)
+  )
+
+  def e30 = testLookupUntil(
+    getUntilSchemaKey(2, 1, 0),
+    List(until200, until210)
+  )
 }
