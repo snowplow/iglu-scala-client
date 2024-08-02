@@ -13,24 +13,34 @@
 package com.snowplowanalytics.iglu.client
 package resolver
 
+import scala.io.Source
+
 // Cats
 import cats.Applicative
 import cats.data.State
-import cats.effect.Clock
+import cats.effect.{Clock, IO}
 import cats.syntax.either._
 
 import scala.concurrent.duration.{DurationInt, FiniteDuration}
 
 // Circe
 import io.circe.Json
+import io.circe.parser._
 
 // LRU Map
 import com.snowplowanalytics.iglu.core.circe.implicits._
-import com.snowplowanalytics.iglu.core.{SchemaKey, SchemaList}
+import com.snowplowanalytics.iglu.core.{
+  SchemaKey,
+  SchemaList,
+  SchemaMap,
+  SchemaVer,
+  SelfDescribingSchema
+}
 import com.snowplowanalytics.lrumap.LruMap
 
 // This project
 import com.snowplowanalytics.iglu.client.resolver.registries.{
+  JavaNetRegistryLookup,
   Registry,
   RegistryError,
   RegistryLookup
@@ -223,4 +233,48 @@ object ResolverSpecHelpers {
       def withLockOn[A](key: K)(f: => StaticLookup[A]): StaticLookup[A] =
         f
     }
+
+  object LookupSchemasUntil {
+    val vendor = "com.snowplowanalytics.iglu-test"
+    val name   = "lookup-schemas-until"
+    val format = "jsonschema"
+
+    val until100 = parseSchemaUntil(1, 0, 0)
+    val until110 = parseSchemaUntil(1, 1, 0)
+    val until111 = parseSchemaUntil(1, 1, 1)
+    val until112 = parseSchemaUntil(1, 1, 2)
+    val until120 = parseSchemaUntil(1, 2, 0)
+    val until121 = parseSchemaUntil(1, 2, 1)
+    val until122 = parseSchemaUntil(1, 2, 2)
+    val until300 = parseSchemaUntil(3, 0, 0)
+    val until310 = parseSchemaUntil(3, 1, 0, "iglu-client-embedded")
+
+    implicit val lookup: RegistryLookup[IO] = JavaNetRegistryLookup.ioLookupInstance[IO]
+    def mkResolver                          = Resolver.init[IO](0, None, SpecHelpers.EmbeddedTest)
+
+    def getUntilSchemaKey(model: Int, revision: Int, addition: Int): SchemaKey =
+      SchemaKey(
+        vendor,
+        name,
+        format,
+        SchemaVer.Full(model, revision, addition)
+      )
+
+    def parseSchemaUntil(
+      model: Int,
+      revision: Int,
+      addition: Int,
+      embeddedFolder: String = "iglu-test-embedded"
+    ): SelfDescribingSchema[Json] = {
+      val path =
+        s"/$embeddedFolder/schemas/$vendor/$name/$format/$model-$revision-$addition"
+      val content = Source.fromInputStream(getClass.getResourceAsStream(path)).mkString
+      parse(content) match {
+        case Right(json) =>
+          SelfDescribingSchema(SchemaMap(getUntilSchemaKey(model, revision, addition)), json)
+        case Left(err) =>
+          throw new IllegalArgumentException(s"$path can't be parsed as JSON : [$err]")
+      }
+    }
+  }
 }

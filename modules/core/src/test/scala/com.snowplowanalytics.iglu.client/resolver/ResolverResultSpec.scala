@@ -23,6 +23,7 @@ import scala.concurrent.duration._
 
 // Cats
 import cats.Id
+import cats.data.NonEmptyList
 import cats.effect.IO
 import cats.effect.implicits._
 import cats.implicits._
@@ -32,7 +33,7 @@ import io.circe.Json
 import io.circe.literal._
 
 // Iglu Core
-import com.snowplowanalytics.iglu.core.{SchemaKey, SchemaVer}
+import com.snowplowanalytics.iglu.core.{SchemaKey, SchemaVer, SelfDescribingSchema}
 
 // This project
 import com.snowplowanalytics.iglu.client.ClientError._
@@ -44,7 +45,7 @@ import com.snowplowanalytics.iglu.client.resolver.registries.{
   RegistryError,
   RegistryLookup
 }
-import com.snowplowanalytics.iglu.client.resolver.Resolver.SchemaItem
+import com.snowplowanalytics.iglu.client.resolver.Resolver.{SchemaItem, SchemaResolutionError}
 
 // Specs2
 import com.snowplowanalytics.iglu.client.SpecHelpers._
@@ -76,6 +77,20 @@ class ResolverResultSpec extends Specification with ValidatedMatchers with CatsE
   a Resolver shouldn't return superseding schema if resolveSupersedingSchema is false $e17
   a Resolver should return cached "not found" when ttl not exceeded $e18
   a Resolver should update cached "not found" when ttl exceeded $e19
+  lookupSchemasUntil should
+    return 1-0-0 $e20
+    return 1-0-0 and 1-1-0 $e21
+    return 1-0-0, 1-1-0 and 1-1-1 $e22
+    return 1-0-0, 1-1-0, 1-1-1 and 1-1-2 $e23
+    return 1-0-0, 1-1-0, 1-1-1, 1-1-2 and 1-2-0 $e24
+    return 1-0-0, 1-1-0, 1-1-1, 1-1-2, 1-2-0 and 1-2-1 $e25
+    return 1-0-0, 1-1-0, 1-1-1, 1-1-2, 1-2-0, 1-2-1 and 1-2-2 $e26
+    return an error if the first schema of current revision is invalid $e27
+    return an error if the first schema of previous revision is invalid $e28
+    return an error if the second schema of current revision is invalid $e29
+    return an error if the second schema of previous revision is invalid $e30
+    return 3-0-0 (no 1-*-* and 2-*-* schemas) $e31
+    return 3-0-0 from a registry and 3-1-0 from another one $e32
   """
 
   import ResolverSpec._
@@ -214,16 +229,13 @@ class ResolverResultSpec extends Specification with ValidatedMatchers with CatsE
     val time      = Instant.ofEpochMilli(3L)
     val responses = List(timeoutError, correctResult)
 
-    val httpRep =
-      Registry.Http(Registry.Config("Mock Repo", 1, List("com.snowplowanalytics.iglu-test")), null)
-
     implicit val cache = ResolverSpecHelpers.staticResolverCache
     implicit val clock = ResolverSpecHelpers.staticClock
     implicit val registryLookup: RegistryLookup[StaticLookup] =
       ResolverSpecHelpers.getLookup(responses, Nil)
 
     val result = for {
-      resolver  <- Resolver.init[StaticLookup](10, None, httpRep)
+      resolver  <- Resolver.init[StaticLookup](10, None, Repos.httpRep)
       response1 <- resolver.lookupSchemaResult(schemaKey)
       response2 <- resolver.lookupSchemaResult(schemaKey)
       _         <- StaticLookup.addTime(600.milliseconds)
@@ -270,9 +282,6 @@ class ResolverResultSpec extends Specification with ValidatedMatchers with CatsE
       RegistryError.RepoFailure("Should never be reached").asLeft
     )
 
-    val httpRep =
-      Registry.Http(Registry.Config("Mock Repo", 1, List("com.snowplowanalytics.iglu-test")), null)
-
     implicit val cache = ResolverSpecHelpers.staticResolverCache
     implicit val clock = ResolverSpecHelpers.staticClock
     implicit val registryLookup: RegistryLookup[StaticLookup] =
@@ -284,7 +293,7 @@ class ResolverResultSpec extends Specification with ValidatedMatchers with CatsE
           .init[StaticLookup](
             10,
             Some(1.seconds),
-            httpRep
+            Repos.httpRep
           )
       _      <- resolver.lookupSchemaResult(schemaKey)
       _      <- StaticLookup.addTime(2.seconds)
@@ -323,14 +332,8 @@ class ResolverResultSpec extends Specification with ValidatedMatchers with CatsE
     val error4 = RegistryError.RepoFailure("Server segfault")
 
     // Mocking repositories
-    val httpRep1 = Registry.Http(
-      Registry.Config("Mock Repo 1", 1, List("com.snowplowanalytics.iglu-test")),
-      null
-    )
-    val httpRep2 = Registry.Http(
-      Registry.Config("Mock Repo 2", 1, List("com.snowplowanalytics.iglu-test")),
-      null
-    )
+    val httpRep1 = Repos.httpRep.copy(config = Repos.httpRep.config.copy(name = "Mock Repo 1"))
+    val httpRep2 = Repos.httpRep.copy(config = Repos.httpRep.config.copy(name = "Mock Repo 2"))
 
     implicit val cache = ResolverSpecHelpers.staticResolverCache
     implicit val clock = ResolverSpecHelpers.staticClock
@@ -465,16 +468,13 @@ class ResolverResultSpec extends Specification with ValidatedMatchers with CatsE
       Json.Null.asRight[RegistryError]
     val responses = List(schema, schema)
 
-    val httpRep =
-      Registry.Http(Registry.Config("Mock Repo", 1, List("com.snowplowanalytics.iglu-test")), null)
-
     implicit val cache = ResolverSpecHelpers.staticResolverCache
     implicit val clock = ResolverSpecHelpers.staticClock
     implicit val registryLookup: RegistryLookup[StaticLookup] =
       ResolverSpecHelpers.getLookup(responses, Nil)
 
     val result = for {
-      resolver  <- Resolver.init[StaticLookup](10, Some(200.seconds), httpRep)
+      resolver  <- Resolver.init[StaticLookup](10, Some(200.seconds), Repos.httpRep)
       response1 <- resolver.lookupSchemaResult(schemaKey)
       _         <- StaticLookup.addTime(150.seconds) // ttl 200, delay 150
       response2 <- resolver.lookupSchemaResult(schemaKey)
@@ -503,16 +503,13 @@ class ResolverResultSpec extends Specification with ValidatedMatchers with CatsE
       Json.Null.asRight[RegistryError]
     val responses = List(schema, schema)
 
-    val httpRep =
-      Registry.Http(Registry.Config("Mock Repo", 1, List("com.snowplowanalytics.iglu-test")), null)
-
     implicit val cache = ResolverSpecHelpers.staticResolverCache
     implicit val clock = ResolverSpecHelpers.staticClock
     implicit val registryLookup: RegistryLookup[StaticLookup] =
       ResolverSpecHelpers.getLookup(responses, Nil)
 
     val result = for {
-      resolver  <- Resolver.init[StaticLookup](10, Some(200.seconds), httpRep)
+      resolver  <- Resolver.init[StaticLookup](10, Some(200.seconds), Repos.httpRep)
       response1 <- resolver.lookupSchemaResult(schemaKey)
       _         <- StaticLookup.addTime(250.seconds) // ttl 200, delay 250
       response2 <- resolver.lookupSchemaResult(schemaKey)
@@ -654,16 +651,13 @@ class ResolverResultSpec extends Specification with ValidatedMatchers with CatsE
     val notFound  = RegistryError.NotFound.asLeft[Json]
     val responses = List(notFound, schema)
 
-    val httpRep =
-      Registry.Http(Registry.Config("Mock Repo", 1, List("com.snowplowanalytics.iglu-test")), null)
-
     implicit val cache = ResolverSpecHelpers.staticResolverCache
     implicit val clock = ResolverSpecHelpers.staticClock
     implicit val registryLookup: RegistryLookup[StaticLookup] =
       ResolverSpecHelpers.getLookup(responses, Nil)
 
     val result = for {
-      resolver  <- Resolver.init[StaticLookup](10, Some(200.seconds), httpRep)
+      resolver  <- Resolver.init[StaticLookup](10, Some(200.seconds), Repos.httpRep)
       response1 <- resolver.lookupSchemaResult(schemaKey)
       _         <- StaticLookup.addTime(150.seconds) // ttl 200, delay 150
       response2 <- resolver.lookupSchemaResult(schemaKey)
@@ -705,9 +699,7 @@ class ResolverResultSpec extends Specification with ValidatedMatchers with CatsE
     val notFound  = RegistryError.NotFound.asLeft[Json]
     val responses = List(notFound, notFound, schema)
 
-    val repoName = "Mock Repo"
-    val httpRep =
-      Registry.Http(Registry.Config(repoName, 1, List("com.snowplowanalytics.iglu-test")), null)
+    val repoName = Repos.httpRep.config.name
 
     implicit val cache = ResolverSpecHelpers.staticResolverCache
     implicit val clock = ResolverSpecHelpers.staticClock
@@ -715,7 +707,7 @@ class ResolverResultSpec extends Specification with ValidatedMatchers with CatsE
       ResolverSpecHelpers.getLookup(responses, Nil)
 
     val result = for {
-      resolver  <- Resolver.init[StaticLookup](10, Some(200.seconds), httpRep)
+      resolver  <- Resolver.init[StaticLookup](10, Some(200.seconds), Repos.httpRep)
       response1 <- resolver.lookupSchemaResult(schemaKey)
       _         <- StaticLookup.addTime(250.seconds) // ttl 200, delay 250
       response2 <- resolver.lookupSchemaResult(schemaKey)
@@ -747,7 +739,86 @@ class ResolverResultSpec extends Specification with ValidatedMatchers with CatsE
     val secondAndThirdEqual = response2 must beEqualTo(response3)
 
     firstNotFound and secondNotCached and secondAndThirdEqual
-
   }
 
+  import ResolverSpecHelpers.LookupSchemasUntil._
+
+  def testLookupUntil(maxSchemaKey: SchemaKey, expected: NonEmptyList[SelfDescribingSchema[Json]]) =
+    for {
+      resolver <- mkResolver
+      result   <- resolver.lookupSchemasUntil(maxSchemaKey)
+    } yield result must beRight.like { case schemas => schemas must beEqualTo(expected) }
+
+  def e20 = testLookupUntil(
+    getUntilSchemaKey(1, 0, 0),
+    NonEmptyList.one(until100)
+  )
+
+  def e21 = testLookupUntil(
+    getUntilSchemaKey(1, 1, 0),
+    NonEmptyList.of(until100, until110)
+  )
+
+  def e22 = testLookupUntil(
+    getUntilSchemaKey(1, 1, 1),
+    NonEmptyList.of(until100, until110, until111)
+  )
+
+  def e23 = testLookupUntil(
+    getUntilSchemaKey(1, 1, 2),
+    NonEmptyList.of(until100, until110, until111, until112)
+  )
+
+  def e24 = testLookupUntil(
+    getUntilSchemaKey(1, 2, 0),
+    NonEmptyList.of(until100, until110, until111, until112, until120)
+  )
+
+  def e25 = testLookupUntil(
+    getUntilSchemaKey(1, 2, 1),
+    NonEmptyList.of(until100, until110, until111, until112, until120, until121)
+  )
+
+  def e26 = testLookupUntil(
+    getUntilSchemaKey(1, 2, 2),
+    NonEmptyList.of(until100, until110, until111, until112, until120, until121, until122)
+  )
+
+  def e27 = for {
+    resolver <- mkResolver
+    result   <- resolver.lookupSchemasUntil(getUntilSchemaKey(1, 3, 0))
+  } yield result must beLeft.like { case SchemaResolutionError(schemaKey, _) =>
+    schemaKey must beEqualTo(getUntilSchemaKey(1, 3, 0))
+  }
+
+  def e28 = for {
+    resolver <- mkResolver
+    result   <- resolver.lookupSchemasUntil(getUntilSchemaKey(1, 4, 0))
+  } yield result must beLeft.like { case SchemaResolutionError(schemaKey, _) =>
+    schemaKey must beEqualTo(getUntilSchemaKey(1, 3, 0))
+  }
+
+  def e29 = for {
+    resolver <- mkResolver
+    result   <- resolver.lookupSchemasUntil(getUntilSchemaKey(2, 0, 1))
+  } yield result must beLeft.like { case SchemaResolutionError(schemaKey, _) =>
+    schemaKey must beEqualTo(getUntilSchemaKey(2, 0, 1))
+  }
+
+  def e30 = for {
+    resolver <- mkResolver
+    result   <- resolver.lookupSchemasUntil(getUntilSchemaKey(2, 1, 0))
+  } yield result must beLeft.like { case SchemaResolutionError(schemaKey, _) =>
+    schemaKey must beEqualTo(getUntilSchemaKey(2, 0, 1))
+  }
+
+  def e31 = testLookupUntil(
+    getUntilSchemaKey(3, 0, 0),
+    NonEmptyList.one(until300)
+  )
+
+  def e32 = testLookupUntil(
+    getUntilSchemaKey(3, 1, 0),
+    NonEmptyList.of(until300, until310)
+  )
 }

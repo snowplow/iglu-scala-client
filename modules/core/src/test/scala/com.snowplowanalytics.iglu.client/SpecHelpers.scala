@@ -52,6 +52,12 @@ object SpecHelpers {
       Registry.HttpConnection(URI.create("http://iglucentral.com"), None)
     )
 
+  val IgluCentralMirror: Registry =
+    Registry.Http(
+      Registry.Config("Iglu Central - GCP Mirror", 10, List("com.snowplowanalytics")),
+      Registry.HttpConnection(URI.create("http://mirror01.iglucentral.com"), None)
+    )
+
   case class TrackingRegistry(
     lookupState: AtomicReference[List[String]],
     listState: AtomicReference[List[String]]
