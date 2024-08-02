@@ -38,6 +38,12 @@ final case class Resolver[F[_]](repos: List[Registry], cache: Option[ResolverCac
   private[client] val allRepos: NonEmptyList[Registry] =
     NonEmptyList[Registry](Registry.EmbeddedRegistry, repos)
 
+  private val allIgluCentral: Set[String] = repos.collect {
+    case Registry.Http(config, connection)
+        if connection.uri.getHost.matches(""".*\biglucentral\b.*""") =>
+      config.name
+  }.toSet
+
   /**
    * Tries to find the given schema in any of the provided repository refs
    * If any of repositories gives non-non-found error, lookup will retried
@@ -180,6 +186,71 @@ final case class Resolver[F[_]](repos: List[Registry], cache: Option[ResolverCac
     C: Clock[F]
   ): F[Either[ResolutionError, Json]] =
     lookupSchemaResult(schemaKey).map(_.map(_.value.schema))
+
+  /**
+   * If Iglu Central or any of its mirrors doesn't have a schema,
+   * it should be considered NotFound, even if one of them returned an error.
+   */
+  private[resolver] def isNotFound(error: ResolutionError): Boolean = {
+    val (igluCentral, custom) = error.value.partition { case (repo, _) =>
+      allIgluCentral.contains(repo)
+    }
+    (igluCentral.isEmpty || igluCentral.values.exists(
+      _.errors.exists(_ == RegistryError.NotFound)
+    )) && custom.values.flatMap(_.errors).forall(_ == RegistryError.NotFound)
+  }
+
+  /**
+   * Looks up all the schemas with the same model until `maxSchemaKey`.
+   * For the schemas of previous revisions, it starts with addition = 0
+   * and increments it until a NotFound.
+   *
+   * @param maxSchemaKey The SchemaKey until which schemas of the same model should get returned
+   * @return All the schemas if all went well, [[Resolver.SchemaResolutionError]] with the first error that happened
+   *         while looking up the schemas if something went wrong.
+   */
+  def lookupSchemasUntil(
+    maxSchemaKey: SchemaKey
+  )(implicit
+    F: Monad[F],
+    L: RegistryLookup[F],
+    C: Clock[F]
+  ): F[Either[SchemaResolutionError, NonEmptyList[SelfDescribingSchema[Json]]]] = {
+    def go(
+      current: SchemaVer.Full,
+      acc: List[SelfDescribingSchema[Json]]
+    ): F[Either[SchemaResolutionError, NonEmptyList[SelfDescribingSchema[Json]]]] = {
+      val currentSchemaKey = maxSchemaKey.copy(version = current)
+      lookupSchema(currentSchemaKey).flatMap {
+        case Left(e) =>
+          if (current.addition === 0)
+            Monad[F].pure(Left(SchemaResolutionError(currentSchemaKey, e)))
+          else if (current.revision < maxSchemaKey.version.revision && isNotFound(e))
+            go(current.copy(revision = current.revision + 1, addition = 0), acc)
+          else
+            Monad[F].pure(Left(SchemaResolutionError(currentSchemaKey, e)))
+        case Right(json) =>
+          if (current.revision < maxSchemaKey.version.revision)
+            go(
+              current.copy(addition = current.addition + 1),
+              SelfDescribingSchema(SchemaMap(currentSchemaKey), json) :: acc
+            )
+          else if (current.addition < maxSchemaKey.version.addition)
+            go(
+              current.copy(addition = current.addition + 1),
+              SelfDescribingSchema(SchemaMap(currentSchemaKey), json) :: acc
+            )
+          else
+            Monad[F].pure(
+              Right(
+                NonEmptyList(SelfDescribingSchema(SchemaMap(currentSchemaKey), json), acc).reverse
+              )
+            )
+      }
+    }
+
+    go(SchemaVer.Full(maxSchemaKey.version.model, 0, 0), Nil)
+  }
 
   /**
    * Get list of available schemas for particular vendor and name part
@@ -388,6 +459,8 @@ object Resolver {
    *                     Otherwise, it is None.
    */
   case class SchemaItem(schema: Json, supersededBy: SupersededBy)
+
+  case class SchemaResolutionError(schemaKey: SchemaKey, error: ResolutionError)
 
   /** The result of doing a lookup with the resolver, carrying information on whether the cache was used */
   sealed trait ResolverResult[+K, +A] {
