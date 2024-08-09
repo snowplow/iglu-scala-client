@@ -13,24 +13,28 @@
 package com.snowplowanalytics.iglu.client
 package resolver
 
+import scala.io.Source
+
 // Cats
 import cats.Applicative
 import cats.data.State
-import cats.effect.Clock
+import cats.effect.{Clock, IO}
 import cats.syntax.either._
 
 import scala.concurrent.duration.{DurationInt, FiniteDuration}
 
 // Circe
 import io.circe.Json
+import io.circe.parser._
 
 // LRU Map
 import com.snowplowanalytics.iglu.core.circe.implicits._
-import com.snowplowanalytics.iglu.core.{SchemaKey, SchemaList}
+import com.snowplowanalytics.iglu.core.{SchemaKey, SchemaList, SchemaVer}
 import com.snowplowanalytics.lrumap.LruMap
 
 // This project
 import com.snowplowanalytics.iglu.client.resolver.registries.{
+  JavaNetRegistryLookup,
   Registry,
   RegistryError,
   RegistryLookup
@@ -223,4 +227,38 @@ object ResolverSpecHelpers {
       def withLockOn[A](key: K)(f: => StaticLookup[A]): StaticLookup[A] =
         f
     }
+
+  object LookupSchemasUntil {
+    val until100 = parseSchemaUntil("1-0-0")
+    val until110 = parseSchemaUntil("1-1-0")
+    val until111 = parseSchemaUntil("1-1-1")
+    val until112 = parseSchemaUntil("1-1-2")
+    val until120 = parseSchemaUntil("1-2-0")
+    val until121 = parseSchemaUntil("1-2-1")
+    val until122 = parseSchemaUntil("1-2-2")
+    val until200 = parseSchemaUntil("2-0-0")
+    val until210 = parseSchemaUntil("2-1-0", "iglu-client-embedded")
+
+    implicit val lookup: RegistryLookup[IO] = JavaNetRegistryLookup.ioLookupInstance[IO]
+    def mkResolver                          = Resolver.init[IO](0, None, SpecHelpers.EmbeddedTest)
+
+    def getUntilSchemaKey(model: Int, revision: Int, addition: Int): SchemaKey =
+      SchemaKey(
+        "com.snowplowanalytics.iglu-test",
+        "lookup-schemas-until",
+        "jsonschema",
+        SchemaVer.Full(model, revision, addition)
+      )
+
+    def parseSchemaUntil(version: String, embeddedFolder: String = "iglu-test-embedded"): Json = {
+      val path =
+        s"/$embeddedFolder/schemas/com.snowplowanalytics.iglu-test/lookup-schemas-until/jsonschema/$version"
+      val content = Source.fromInputStream(getClass.getResourceAsStream(path)).mkString
+      parse(content) match {
+        case Right(json) => json
+        case Left(err) =>
+          throw new IllegalArgumentException(s"$path can't be parsed as JSON : [$err]")
+      }
+    }
+  }
 }

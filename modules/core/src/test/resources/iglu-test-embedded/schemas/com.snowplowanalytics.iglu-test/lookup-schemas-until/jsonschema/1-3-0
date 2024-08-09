@@ -1,0 +1,41 @@
+{
+	"$schema": "http://iglucentral.com/schemas/com.snowplowanalytics.self-desc/schema/jsonschema/1-0-0#",
+	"description": "Invalid schema to test lookupSchemasUntil function - Misses comma after properties",
+	"self": {
+		"vendor": "com.snowplowanalytics",
+		"name": "lookup-schemas-until",
+		"format": "jsonschema",
+		"version": "1-3-0"
+	},
+	"type": "object",
+	"properties": {
+		"field_1": {
+			"type": "string"
+		},
+		"field_2": {
+			"type": ["string", "null"]
+		},
+		"field_3": {
+			"type": ["string", "null"]
+		},
+		"field_4": {
+			"type": ["string", "null"]
+		},
+		"field_5": {
+			"type": ["string", "null"]
+		},
+		"field_6": {
+			"type": ["string", "null"]
+		},
+		"field_7": {
+			"type": ["string", "null"]
+		},
+		"field_8": {
+			"type": ["string", "null"]
+		}
+	}
+	"required": [
+		"field_1"
+	],
+	"additionalProperties": false
+}
