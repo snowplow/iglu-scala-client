@@ -188,92 +188,30 @@ final case class Resolver[F[_]](repos: List[Registry], cache: Option[ResolverCac
     L: RegistryLookup[F],
     C: Clock[F]
   ): F[Either[SchemaResolutionError, List[Json]]] = {
-
-    // Looks up addition 0 and keeps looking up until NotFound or other ResolutionError.
-    // At least one schema should get returned. If not, the first ResolutionError gets returned,
-    // even if it is NotFound.
-    def indeterministicFetchAll(
-      schemaKey: SchemaKey
+    def go(
+      current: SchemaVer.Full,
+      acc: List[Json]
     ): F[Either[SchemaResolutionError, List[Json]]] = {
-      case class Fetched(
-        error: Option[SchemaResolutionError],
-        schemas: List[Json],
-        finished: Boolean
-      )
-      Monad[F]
-        .iterateWhileM[Fetched](
-          Fetched(None, List.empty[Json], false)
-        ) { case Fetched(error, schemas, finished) =>
-          val nextSchemaKey =
-            schemaKey.copy(version = schemaKey.version.copy(addition = schemas.size))
-          lookupSchema(nextSchemaKey).map {
-            case Left(resolutionError) if resolutionError.isNotFound && schemas.nonEmpty =>
-              Fetched(None, schemas, true)
-            case Left(resolutionError) =>
-              Fetched(Some(SchemaResolutionError(nextSchemaKey, resolutionError)), schemas, true)
-            case Right(json) =>
-              Fetched(error, json :: schemas, finished)
-          }
-        }(!_.finished)
-        .map {
-          case Fetched(Some(resolutionError), _, _) =>
-            Left(resolutionError)
-          case Fetched(_, schemas, _) =>
-            Right(schemas.reverse)
-        }
-    }
-
-    // Looks up all the additions from 0 until the one in maxSchemaKey
-    def deterministicFetchAll(
-      maxSchemaKey: SchemaKey
-    ): F[Either[SchemaResolutionError, List[Json]]] = {
-      case class Fetched(error: Option[SchemaResolutionError], schemas: List[Json])
-      Monad[F]
-        .iterateWhileM[Fetched](
-          Fetched(None, List.empty[Json])
-        ) { case Fetched(error, schemas) =>
-          val nextSchemaKey =
-            maxSchemaKey.copy(version = maxSchemaKey.version.copy(addition = schemas.size))
-          lookupSchema(nextSchemaKey).map {
-            case Left(resolutionError) =>
-              Fetched(Some(SchemaResolutionError(nextSchemaKey, resolutionError)), schemas)
-            case Right(json) =>
-              Fetched(error, json :: schemas)
-          }
-        }(f => f.error.isEmpty && f.schemas.size < maxSchemaKey.version.addition + 1)
-        .map {
-          case Fetched(Some(resolutionError), _) =>
-            Left(resolutionError)
-          case Fetched(_, schemas) =>
-            Right(schemas.reverse)
-        }
-    }
-
-    case class Fetched(error: Option[SchemaResolutionError], schemas: List[List[Json]])
-    Monad[F]
-      .iterateWhileM[Fetched](
-        Fetched(None, List.empty[List[Json]])
-      ) { case Fetched(error, schemas) =>
-        val fetched =
-          if (schemas.size < maxSchemaKey.version.revision)
-            indeterministicFetchAll(
-              maxSchemaKey.copy(version = maxSchemaKey.version.copy(revision = schemas.size))
-            )
+      val currentSchemaKey = maxSchemaKey.copy(version = current)
+      lookupSchema(currentSchemaKey).flatMap {
+        case Left(e) =>
+          if (current.addition === 0)
+            Monad[F].pure(Left(SchemaResolutionError(currentSchemaKey, e)))
+          else if (current.revision < maxSchemaKey.version.revision)
+            go(current.copy(revision = current.revision + 1, addition = 0), acc)
           else
-            deterministicFetchAll(maxSchemaKey)
-        fetched.map {
-          case Left(resolutionError) =>
-            Fetched(Some(resolutionError), schemas)
-          case Right(jsons) =>
-            Fetched(error, schemas ++ List(jsons))
-        }
-      }(f => f.error.isEmpty && f.schemas.size < maxSchemaKey.version.revision + 1)
-      .map {
-        case Fetched(Some(resolutionError), _) =>
-          Left(resolutionError)
-        case Fetched(_, schemas) =>
-          Right(schemas.flatten)
+            Monad[F].pure(Left(SchemaResolutionError(currentSchemaKey, e)))
+        case Right(json) =>
+          if (current.revision < maxSchemaKey.version.revision)
+            go(current.copy(addition = current.addition + 1), json :: acc)
+          else if (current.addition < maxSchemaKey.version.addition)
+            go(current.copy(addition = current.addition + 1), json :: acc)
+          else
+            Monad[F].pure(Right((json :: acc).reverse))
       }
+    }
+
+    go(SchemaVer.Full(maxSchemaKey.version.model, 0, 0), Nil)
   }
 
   /**
