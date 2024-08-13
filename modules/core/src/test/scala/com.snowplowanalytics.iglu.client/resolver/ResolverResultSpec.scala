@@ -32,7 +32,7 @@ import io.circe.Json
 import io.circe.literal._
 
 // Iglu Core
-import com.snowplowanalytics.iglu.core.{SchemaKey, SchemaVer}
+import com.snowplowanalytics.iglu.core.{SchemaKey, SchemaVer, SelfDescribingSchema}
 
 // This project
 import com.snowplowanalytics.iglu.client.ClientError._
@@ -44,11 +44,7 @@ import com.snowplowanalytics.iglu.client.resolver.registries.{
   RegistryError,
   RegistryLookup
 }
-import com.snowplowanalytics.iglu.client.resolver.Resolver.{
-  RawSchema,
-  SchemaItem,
-  SchemaResolutionError
-}
+import com.snowplowanalytics.iglu.client.resolver.Resolver.{SchemaItem, SchemaResolutionError}
 
 // Specs2
 import com.snowplowanalytics.iglu.client.SpecHelpers._
@@ -769,7 +765,7 @@ class ResolverResultSpec extends Specification with ValidatedMatchers with CatsE
 
   import ResolverSpecHelpers.LookupSchemasUntil._
 
-  def testLookupUntil(maxSchemaKey: SchemaKey, expected: List[RawSchema]) =
+  def testLookupUntil(maxSchemaKey: SchemaKey, expected: List[SelfDescribingSchema[Json]]) =
     for {
       resolver <- mkResolver
       result   <- resolver.lookupSchemasUntil(maxSchemaKey)

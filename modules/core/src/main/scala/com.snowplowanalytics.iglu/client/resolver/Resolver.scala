@@ -38,10 +38,9 @@ final case class Resolver[F[_]](repos: List[Registry], cache: Option[ResolverCac
   private[client] val allRepos: NonEmptyList[Registry] =
     NonEmptyList[Registry](Registry.EmbeddedRegistry, repos)
 
-  private val allIgluCentral = repos.collect {
+  private val allIgluCentral: Set[String] = repos.collect {
     case Registry.Http(config, connection)
-        if config.name.toLowerCase.matches(".*iglu[- ]?central.*") && connection.uri.toString
-          .contains("iglucentral") =>
+        if Option(connection).filter(_.uri.getHost.matches(""".*\biglucentral\b.*""")).isDefined =>
       config.name
   }.toSet
 
@@ -188,13 +187,22 @@ final case class Resolver[F[_]](repos: List[Registry], cache: Option[ResolverCac
   ): F[Either[ResolutionError, Json]] =
     lookupSchemaResult(schemaKey).map(_.map(_.value.schema))
 
+  /**
+   * Looks up all the schemas with the same model until `maxSchemaKey`.
+   * For the schemas of previous revisions, it starts with addition = 0
+   * and increments it until a NotFound.
+   *
+   * @param maxSchemaKey The SchemaKey until which schemas of the same model should get returned
+   * @return All the schemas if all went well, [[Resolver.SchemaResolutionError]] with the first error that happened
+   *         while looking up the schemas if something went wrong.
+   */
   def lookupSchemasUntil(
     maxSchemaKey: SchemaKey
   )(implicit
     F: Monad[F],
     L: RegistryLookup[F],
     C: Clock[F]
-  ): F[Either[SchemaResolutionError, List[RawSchema]]] = {
+  ): F[Either[SchemaResolutionError, List[SelfDescribingSchema[Json]]]] = {
 
     // If Iglu Central or any of its mirrors doesn't have a schema,
     // it should be considered NotFound, even if one of them returned an error
@@ -202,16 +210,15 @@ final case class Resolver[F[_]](repos: List[Registry], cache: Option[ResolverCac
       val (igluCentral, custom) = error.value.partition { case (repo, _) =>
         allIgluCentral.contains(repo)
       }
-      custom.values.flatMap(_.errors).forall(_ == RegistryError.NotFound) &&
       (igluCentral.isEmpty || igluCentral.values.exists(
         _.errors.forall(_ == RegistryError.NotFound)
-      ))
+      )) && custom.values.flatMap(_.errors).forall(_ == RegistryError.NotFound)
     }
 
     def go(
       current: SchemaVer.Full,
-      acc: List[RawSchema]
-    ): F[Either[SchemaResolutionError, List[RawSchema]]] = {
+      acc: List[SelfDescribingSchema[Json]]
+    ): F[Either[SchemaResolutionError, List[SelfDescribingSchema[Json]]]] = {
       val currentSchemaKey = maxSchemaKey.copy(version = current)
       lookupSchema(currentSchemaKey).flatMap {
         case Left(e) =>
@@ -225,15 +232,17 @@ final case class Resolver[F[_]](repos: List[Registry], cache: Option[ResolverCac
           if (current.revision < maxSchemaKey.version.revision)
             go(
               current.copy(addition = current.addition + 1),
-              RawSchema(currentSchemaKey, json) :: acc
+              SelfDescribingSchema(SchemaMap(currentSchemaKey), json) :: acc
             )
           else if (current.addition < maxSchemaKey.version.addition)
             go(
               current.copy(addition = current.addition + 1),
-              RawSchema(currentSchemaKey, json) :: acc
+              SelfDescribingSchema(SchemaMap(currentSchemaKey), json) :: acc
             )
           else
-            Monad[F].pure(Right((RawSchema(currentSchemaKey, json) :: acc).reverse))
+            Monad[F].pure(
+              Right((SelfDescribingSchema(SchemaMap(currentSchemaKey), json) :: acc).reverse)
+            )
       }
     }
 
@@ -438,8 +447,6 @@ object Resolver {
   type SchemaLookupResult     = ResolverResult[SchemaKey, SchemaItem]
   type SchemaListLookupResult = ResolverResult[SchemaListKey, SchemaList]
   type SupersededBy           = Option[SchemaVer.Full]
-
-  case class RawSchema(schemaKey: SchemaKey, json: Json)
 
   /**
    * The result of doing schema lookup

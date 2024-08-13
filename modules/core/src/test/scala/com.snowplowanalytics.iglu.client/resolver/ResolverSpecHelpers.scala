@@ -29,7 +29,13 @@ import io.circe.parser._
 
 // LRU Map
 import com.snowplowanalytics.iglu.core.circe.implicits._
-import com.snowplowanalytics.iglu.core.{SchemaKey, SchemaList, SchemaVer}
+import com.snowplowanalytics.iglu.core.{
+  SchemaKey,
+  SchemaList,
+  SchemaMap,
+  SchemaVer,
+  SelfDescribingSchema
+}
 import com.snowplowanalytics.lrumap.LruMap
 
 // This project
@@ -39,7 +45,6 @@ import com.snowplowanalytics.iglu.client.resolver.registries.{
   RegistryError,
   RegistryLookup
 }
-import com.snowplowanalytics.iglu.client.resolver.Resolver.RawSchema
 
 object ResolverSpecHelpers {
 
@@ -260,12 +265,13 @@ object ResolverSpecHelpers {
       revision: Int,
       addition: Int,
       embeddedFolder: String = "iglu-test-embedded"
-    ): RawSchema = {
+    ): SelfDescribingSchema[Json] = {
       val path =
         s"/$embeddedFolder/schemas/$vendor/$name/$format/$model-$revision-$addition"
       val content = Source.fromInputStream(getClass.getResourceAsStream(path)).mkString
       parse(content) match {
-        case Right(json) => RawSchema(getUntilSchemaKey(model, revision, addition), json)
+        case Right(json) =>
+          SelfDescribingSchema(SchemaMap(getUntilSchemaKey(model, revision, addition)), json)
         case Left(err) =>
           throw new IllegalArgumentException(s"$path can't be parsed as JSON : [$err]")
       }
