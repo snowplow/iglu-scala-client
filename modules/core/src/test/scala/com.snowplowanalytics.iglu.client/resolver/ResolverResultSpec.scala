@@ -44,7 +44,11 @@ import com.snowplowanalytics.iglu.client.resolver.registries.{
   RegistryError,
   RegistryLookup
 }
-import com.snowplowanalytics.iglu.client.resolver.Resolver.{SchemaItem, SchemaResolutionError}
+import com.snowplowanalytics.iglu.client.resolver.Resolver.{
+  RawSchema,
+  SchemaItem,
+  SchemaResolutionError
+}
 
 // Specs2
 import com.snowplowanalytics.iglu.client.SpecHelpers._
@@ -84,10 +88,12 @@ class ResolverResultSpec extends Specification with ValidatedMatchers with CatsE
     return 1-0-0, 1-1-0, 1-1-1, 1-1-2 and 1-2-0 $e24
     return 1-0-0, 1-1-0, 1-1-1, 1-1-2, 1-2-0 and 1-2-1 $e25
     return 1-0-0, 1-1-0, 1-1-1, 1-1-2, 1-2-0, 1-2-1 and 1-2-2 $e26
-    return an error if a schema is invalid in the deterministic fetch $e27
-    return an error if a schema is invalid in the indeterministic fetch $e28
-    return 2-0-0 (no 1-*-* schemas) $e29
-    return 2-0-0 from a registry and 2-1-0 from another one $e30
+    return an error if the first schema of current revision is invalid $e27
+    return an error if the first schema of previous revision is invalid $e28
+    return an error if the second schema of current revision is invalid $e29
+    return an error if the second schema of previous revision is invalid $e30
+    return 3-0-0 (no 1-*-* and 2-*-* schemas) $e31
+    return 3-0-0 from a registry and 3-1-0 from another one $e32
   """
 
   import ResolverSpec._
@@ -763,11 +769,11 @@ class ResolverResultSpec extends Specification with ValidatedMatchers with CatsE
 
   import ResolverSpecHelpers.LookupSchemasUntil._
 
-  def testLookupUntil(maxSchemaKey: SchemaKey, expected: List[Json]) =
+  def testLookupUntil(maxSchemaKey: SchemaKey, expected: List[RawSchema]) =
     for {
       resolver <- mkResolver
       result   <- resolver.lookupSchemasUntil(maxSchemaKey)
-    } yield result must beRight.like { case jsons => jsons must beEqualTo(expected) }
+    } yield result must beRight.like { case schemas => schemas must beEqualTo(expected) }
 
   def e20 = testLookupUntil(
     getUntilSchemaKey(1, 0, 0),
@@ -818,13 +824,27 @@ class ResolverResultSpec extends Specification with ValidatedMatchers with CatsE
     schemaKey must beEqualTo(getUntilSchemaKey(1, 3, 0))
   }
 
-  def e29 = testLookupUntil(
-    getUntilSchemaKey(2, 0, 0),
-    List(until200)
+  def e29 = for {
+    resolver <- mkResolver
+    result   <- resolver.lookupSchemasUntil(getUntilSchemaKey(2, 0, 1))
+  } yield result must beLeft.like { case SchemaResolutionError(schemaKey, _) =>
+    schemaKey must beEqualTo(getUntilSchemaKey(2, 0, 1))
+  }
+
+  def e30 = for {
+    resolver <- mkResolver
+    result   <- resolver.lookupSchemasUntil(getUntilSchemaKey(2, 1, 0))
+  } yield result must beLeft.like { case SchemaResolutionError(schemaKey, _) =>
+    schemaKey must beEqualTo(getUntilSchemaKey(2, 0, 1))
+  }
+
+  def e31 = testLookupUntil(
+    getUntilSchemaKey(3, 0, 0),
+    List(until300)
   )
 
-  def e30 = testLookupUntil(
-    getUntilSchemaKey(2, 1, 0),
-    List(until200, until210)
+  def e32 = testLookupUntil(
+    getUntilSchemaKey(3, 1, 0),
+    List(until300, until310)
   )
 }

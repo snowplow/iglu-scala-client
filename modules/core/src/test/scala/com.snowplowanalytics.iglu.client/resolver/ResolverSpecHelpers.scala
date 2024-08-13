@@ -39,6 +39,7 @@ import com.snowplowanalytics.iglu.client.resolver.registries.{
   RegistryError,
   RegistryLookup
 }
+import com.snowplowanalytics.iglu.client.resolver.Resolver.RawSchema
 
 object ResolverSpecHelpers {
 
@@ -229,33 +230,42 @@ object ResolverSpecHelpers {
     }
 
   object LookupSchemasUntil {
-    val until100 = parseSchemaUntil("1-0-0")
-    val until110 = parseSchemaUntil("1-1-0")
-    val until111 = parseSchemaUntil("1-1-1")
-    val until112 = parseSchemaUntil("1-1-2")
-    val until120 = parseSchemaUntil("1-2-0")
-    val until121 = parseSchemaUntil("1-2-1")
-    val until122 = parseSchemaUntil("1-2-2")
-    val until200 = parseSchemaUntil("2-0-0")
-    val until210 = parseSchemaUntil("2-1-0", "iglu-client-embedded")
+    val vendor = "com.snowplowanalytics.iglu-test"
+    val name   = "lookup-schemas-until"
+    val format = "jsonschema"
+
+    val until100 = parseSchemaUntil(1, 0, 0)
+    val until110 = parseSchemaUntil(1, 1, 0)
+    val until111 = parseSchemaUntil(1, 1, 1)
+    val until112 = parseSchemaUntil(1, 1, 2)
+    val until120 = parseSchemaUntil(1, 2, 0)
+    val until121 = parseSchemaUntil(1, 2, 1)
+    val until122 = parseSchemaUntil(1, 2, 2)
+    val until300 = parseSchemaUntil(3, 0, 0)
+    val until310 = parseSchemaUntil(3, 1, 0, "iglu-client-embedded")
 
     implicit val lookup: RegistryLookup[IO] = JavaNetRegistryLookup.ioLookupInstance[IO]
     def mkResolver                          = Resolver.init[IO](0, None, SpecHelpers.EmbeddedTest)
 
     def getUntilSchemaKey(model: Int, revision: Int, addition: Int): SchemaKey =
       SchemaKey(
-        "com.snowplowanalytics.iglu-test",
-        "lookup-schemas-until",
-        "jsonschema",
+        vendor,
+        name,
+        format,
         SchemaVer.Full(model, revision, addition)
       )
 
-    def parseSchemaUntil(version: String, embeddedFolder: String = "iglu-test-embedded"): Json = {
+    def parseSchemaUntil(
+      model: Int,
+      revision: Int,
+      addition: Int,
+      embeddedFolder: String = "iglu-test-embedded"
+    ): RawSchema = {
       val path =
-        s"/$embeddedFolder/schemas/com.snowplowanalytics.iglu-test/lookup-schemas-until/jsonschema/$version"
+        s"/$embeddedFolder/schemas/$vendor/$name/$format/$model-$revision-$addition"
       val content = Source.fromInputStream(getClass.getResourceAsStream(path)).mkString
       parse(content) match {
-        case Right(json) => json
+        case Right(json) => RawSchema(getUntilSchemaKey(model, revision, addition), json)
         case Left(err) =>
           throw new IllegalArgumentException(s"$path can't be parsed as JSON : [$err]")
       }

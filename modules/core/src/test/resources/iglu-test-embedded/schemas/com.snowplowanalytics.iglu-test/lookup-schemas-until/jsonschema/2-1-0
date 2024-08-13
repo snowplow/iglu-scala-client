@@ -14,6 +14,9 @@
 		},
 		"field__2": {
 			"type": ["string", "null"]
+		},
+		"field__3": {
+			"type": ["string", "null"]
 		}
 	},
 	"required": [
