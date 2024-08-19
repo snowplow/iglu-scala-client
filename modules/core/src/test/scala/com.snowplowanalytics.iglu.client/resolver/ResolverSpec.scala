@@ -56,6 +56,12 @@ object ResolverSpec {
     val one: Registry.Embedded   = embedRef("com.acme", 0)
     val two: Registry.Embedded   = embedRef("de.acompany.snowplow", 40)
     val three: Registry.Embedded = embedRef("de.acompany.snowplow", 100)
+
+    val custom: Registry =
+      Registry.Http(
+        Registry.Config("Iglu Custom Repo", 10, List("com.acme")),
+        Registry.HttpConnection(URI.create("http://iglu.acme.com"), None)
+      )
   }
 }
 
@@ -76,6 +82,14 @@ class ResolverSpec extends Specification with CatsEffect {
   a Resolver should cache SchemaLists with different models separately $e11
   a Resolver should use schemaKey provided in SchemaListLike for result validation $e12
   result from SchemaListLike should contain the exact schemaKey provided $e13
+  isNotFound should
+    return true if custom repo and Iglu Central repos don't have a schema $e14
+    return true if one Iglu Central repo returns an error and the other one NotFound $e15
+    return false if custom repo returns an error $e16
+    return true if there is no custom repo, one Iglu Central repo returns an error and the other one NotFound $e17
+    return false if there is no custom repo and Iglu Central ones return an error $e18
+    return true if there is just one custom repo that returns NotFound $e19
+    return false if there is just one custom repo that returns an error $e20
   """
 
   import ResolverSpec._
@@ -479,5 +493,155 @@ class ResolverSpec extends Specification with CatsEffect {
     val result = resolver.listSchemasLike(schema102)
 
     result must beRight(SchemaList.parseUnsafe(List(schema100, schema101, schema102)))
+  }
+
+  def e14 = {
+    val resolver: Resolver[Id] =
+      Resolver
+        .init[Id](0, None, SpecHelpers.IgluCentral, SpecHelpers.IgluCentralMirror, Repos.custom)
+
+    val resolutionError = ResolutionError(
+      SortedMap(
+        SpecHelpers.IgluCentral.config.name -> LookupHistory(
+          Set(RegistryError.NotFound),
+          1,
+          Instant.now()
+        ),
+        SpecHelpers.IgluCentralMirror.config.name -> LookupHistory(
+          Set(RegistryError.NotFound),
+          1,
+          Instant.now()
+        ),
+        Repos.custom.config.name -> LookupHistory(Set(RegistryError.NotFound), 1, Instant.now())
+      )
+    )
+
+    resolver.isNotFound(resolutionError) should beTrue
+  }
+
+  def e15 = {
+    val resolver: Resolver[Id] =
+      Resolver
+        .init[Id](0, None, SpecHelpers.IgluCentral, SpecHelpers.IgluCentralMirror, Repos.custom)
+
+    val resolutionError = ResolutionError(
+      SortedMap(
+        SpecHelpers.IgluCentral.config.name -> LookupHistory(
+          Set(RegistryError.RepoFailure("Problem")),
+          1,
+          Instant.now()
+        ),
+        SpecHelpers.IgluCentralMirror.config.name -> LookupHistory(
+          Set(RegistryError.NotFound),
+          1,
+          Instant.now()
+        ),
+        Repos.custom.config.name -> LookupHistory(Set(RegistryError.NotFound), 1, Instant.now())
+      )
+    )
+
+    resolver.isNotFound(resolutionError) should beTrue
+  }
+
+  def e16 = {
+    val resolver: Resolver[Id] =
+      Resolver
+        .init[Id](0, None, SpecHelpers.IgluCentral, SpecHelpers.IgluCentralMirror, Repos.custom)
+
+    val resolutionError = ResolutionError(
+      SortedMap(
+        SpecHelpers.IgluCentral.config.name -> LookupHistory(
+          Set(RegistryError.NotFound),
+          1,
+          Instant.now()
+        ),
+        SpecHelpers.IgluCentralMirror.config.name -> LookupHistory(
+          Set(RegistryError.NotFound),
+          1,
+          Instant.now()
+        ),
+        Repos.custom.config.name -> LookupHistory(
+          Set(RegistryError.ClientFailure("Something went wrong")),
+          1,
+          Instant.now()
+        )
+      )
+    )
+
+    resolver.isNotFound(resolutionError) should beFalse
+  }
+
+  def e17 = {
+    val resolver: Resolver[Id] =
+      Resolver.init[Id](0, None, SpecHelpers.IgluCentral, SpecHelpers.IgluCentralMirror)
+
+    val resolutionError = ResolutionError(
+      SortedMap(
+        SpecHelpers.IgluCentral.config.name -> LookupHistory(
+          Set(RegistryError.RepoFailure("Problem")),
+          1,
+          Instant.now()
+        ),
+        SpecHelpers.IgluCentralMirror.config.name -> LookupHistory(
+          Set(RegistryError.NotFound),
+          1,
+          Instant.now()
+        )
+      )
+    )
+
+    resolver.isNotFound(resolutionError) should beTrue
+  }
+
+  def e18 = {
+    val resolver: Resolver[Id] =
+      Resolver.init[Id](0, None, SpecHelpers.IgluCentral, SpecHelpers.IgluCentralMirror)
+
+    val resolutionError = ResolutionError(
+      SortedMap(
+        SpecHelpers.IgluCentral.config.name -> LookupHistory(
+          Set(RegistryError.RepoFailure("Problem")),
+          1,
+          Instant.now()
+        ),
+        SpecHelpers.IgluCentralMirror.config.name -> LookupHistory(
+          Set(RegistryError.ClientFailure("Network issue")),
+          1,
+          Instant.now()
+        )
+      )
+    )
+
+    resolver.isNotFound(resolutionError) should beFalse
+  }
+
+  def e19 = {
+    val resolver: Resolver[Id] =
+      Resolver.init[Id](0, None, Repos.custom)
+
+    val resolutionError = ResolutionError(
+      SortedMap(
+        Repos.custom.config.name -> LookupHistory(Set(RegistryError.NotFound), 1, Instant.now())
+      )
+    )
+
+    resolver.isNotFound(resolutionError) should beTrue
+  }
+
+  def e20 = {
+    val resolver: Resolver[Id] =
+      Resolver.init[Id](0, None, Repos.custom)
+
+    val resolutionError = ResolutionError(
+      SortedMap(
+        Repos.custom.config.name -> LookupHistory(
+          Set(RegistryError.ClientFailure("Boom")),
+          1,
+          Instant.now()
+        )
+      )
+    )
+
+    resolver.isNotFound(resolutionError) should beFalse
   }
 }

@@ -188,6 +188,19 @@ final case class Resolver[F[_]](repos: List[Registry], cache: Option[ResolverCac
     lookupSchemaResult(schemaKey).map(_.map(_.value.schema))
 
   /**
+   * If Iglu Central or any of its mirrors doesn't have a schema,
+   * it should be considered NotFound, even if one of them returned an error.
+   */
+  private[resolver] def isNotFound(error: ResolutionError): Boolean = {
+    val (igluCentral, custom) = error.value.partition { case (repo, _) =>
+      allIgluCentral.contains(repo)
+    }
+    (igluCentral.isEmpty || igluCentral.values.exists(
+      _.errors.forall(_ == RegistryError.NotFound)
+    )) && custom.values.flatMap(_.errors).forall(_ == RegistryError.NotFound)
+  }
+
+  /**
    * Looks up all the schemas with the same model until `maxSchemaKey`.
    * For the schemas of previous revisions, it starts with addition = 0
    * and increments it until a NotFound.
@@ -203,18 +216,6 @@ final case class Resolver[F[_]](repos: List[Registry], cache: Option[ResolverCac
     L: RegistryLookup[F],
     C: Clock[F]
   ): F[Either[SchemaResolutionError, List[SelfDescribingSchema[Json]]]] = {
-
-    // If Iglu Central or any of its mirrors doesn't have a schema,
-    // it should be considered NotFound, even if one of them returned an error
-    def isNotFound(error: ResolutionError): Boolean = {
-      val (igluCentral, custom) = error.value.partition { case (repo, _) =>
-        allIgluCentral.contains(repo)
-      }
-      (igluCentral.isEmpty || igluCentral.values.exists(
-        _.errors.forall(_ == RegistryError.NotFound)
-      )) && custom.values.flatMap(_.errors).forall(_ == RegistryError.NotFound)
-    }
-
     def go(
       current: SchemaVer.Full,
       acc: List[SelfDescribingSchema[Json]]
