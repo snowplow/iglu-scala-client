@@ -40,7 +40,7 @@ final case class Resolver[F[_]](repos: List[Registry], cache: Option[ResolverCac
 
   private val allIgluCentral: Set[String] = repos.collect {
     case Registry.Http(config, connection)
-        if Option(connection).filter(_.uri.getHost.matches(""".*\biglucentral\b.*""")).isDefined =>
+        if connection.uri.getHost.matches(""".*\biglucentral\b.*""") =>
       config.name
   }.toSet
 
@@ -196,7 +196,7 @@ final case class Resolver[F[_]](repos: List[Registry], cache: Option[ResolverCac
       allIgluCentral.contains(repo)
     }
     (igluCentral.isEmpty || igluCentral.values.exists(
-      _.errors.forall(_ == RegistryError.NotFound)
+      _.errors.exists(_ == RegistryError.NotFound)
     )) && custom.values.flatMap(_.errors).forall(_ == RegistryError.NotFound)
   }
 
@@ -215,11 +215,11 @@ final case class Resolver[F[_]](repos: List[Registry], cache: Option[ResolverCac
     F: Monad[F],
     L: RegistryLookup[F],
     C: Clock[F]
-  ): F[Either[SchemaResolutionError, List[SelfDescribingSchema[Json]]]] = {
+  ): F[Either[SchemaResolutionError, NonEmptyList[SelfDescribingSchema[Json]]]] = {
     def go(
       current: SchemaVer.Full,
-      acc: List[SelfDescribingSchema[Json]]
-    ): F[Either[SchemaResolutionError, List[SelfDescribingSchema[Json]]]] = {
+      acc: NonEmptyList[SelfDescribingSchema[Json]]
+    ): F[Either[SchemaResolutionError, NonEmptyList[SelfDescribingSchema[Json]]]] = {
       val currentSchemaKey = maxSchemaKey.copy(version = current)
       lookupSchema(currentSchemaKey).flatMap {
         case Left(e) =>
@@ -247,7 +247,20 @@ final case class Resolver[F[_]](repos: List[Registry], cache: Option[ResolverCac
       }
     }
 
-    go(SchemaVer.Full(maxSchemaKey.version.model, 0, 0), Nil)
+    val firstSchemaKey =
+      maxSchemaKey.copy(version = SchemaVer.Full(maxSchemaKey.version.model, 0, 0))
+
+    EitherT(lookupSchema(firstSchemaKey))
+      .leftMap(SchemaResolutionError(firstSchemaKey, _))
+      .flatMap { firstJson =>
+        val acc = NonEmptyList.one(SelfDescribingSchema(SchemaMap(firstSchemaKey), firstJson))
+
+        if (maxSchemaKey.version.addition == 0 && maxSchemaKey.version.revision == 0)
+          EitherT.rightT[F, SchemaResolutionError](acc)
+        else
+          EitherT(go(SchemaVer.Full(maxSchemaKey.version.model, 0, 1), acc))
+      }
+      .value
   }
 
   /**

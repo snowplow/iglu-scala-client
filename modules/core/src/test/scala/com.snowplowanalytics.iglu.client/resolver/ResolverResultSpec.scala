@@ -23,6 +23,7 @@ import scala.concurrent.duration._
 
 // Cats
 import cats.Id
+import cats.data.NonEmptyList
 import cats.effect.IO
 import cats.effect.implicits._
 import cats.implicits._
@@ -228,16 +229,13 @@ class ResolverResultSpec extends Specification with ValidatedMatchers with CatsE
     val time      = Instant.ofEpochMilli(3L)
     val responses = List(timeoutError, correctResult)
 
-    val httpRep =
-      Registry.Http(Registry.Config("Mock Repo", 1, List("com.snowplowanalytics.iglu-test")), null)
-
     implicit val cache = ResolverSpecHelpers.staticResolverCache
     implicit val clock = ResolverSpecHelpers.staticClock
     implicit val registryLookup: RegistryLookup[StaticLookup] =
       ResolverSpecHelpers.getLookup(responses, Nil)
 
     val result = for {
-      resolver  <- Resolver.init[StaticLookup](10, None, httpRep)
+      resolver  <- Resolver.init[StaticLookup](10, None, Repos.httpRep)
       response1 <- resolver.lookupSchemaResult(schemaKey)
       response2 <- resolver.lookupSchemaResult(schemaKey)
       _         <- StaticLookup.addTime(600.milliseconds)
@@ -284,9 +282,6 @@ class ResolverResultSpec extends Specification with ValidatedMatchers with CatsE
       RegistryError.RepoFailure("Should never be reached").asLeft
     )
 
-    val httpRep =
-      Registry.Http(Registry.Config("Mock Repo", 1, List("com.snowplowanalytics.iglu-test")), null)
-
     implicit val cache = ResolverSpecHelpers.staticResolverCache
     implicit val clock = ResolverSpecHelpers.staticClock
     implicit val registryLookup: RegistryLookup[StaticLookup] =
@@ -298,7 +293,7 @@ class ResolverResultSpec extends Specification with ValidatedMatchers with CatsE
           .init[StaticLookup](
             10,
             Some(1.seconds),
-            httpRep
+            Repos.httpRep
           )
       _      <- resolver.lookupSchemaResult(schemaKey)
       _      <- StaticLookup.addTime(2.seconds)
@@ -337,14 +332,8 @@ class ResolverResultSpec extends Specification with ValidatedMatchers with CatsE
     val error4 = RegistryError.RepoFailure("Server segfault")
 
     // Mocking repositories
-    val httpRep1 = Registry.Http(
-      Registry.Config("Mock Repo 1", 1, List("com.snowplowanalytics.iglu-test")),
-      null
-    )
-    val httpRep2 = Registry.Http(
-      Registry.Config("Mock Repo 2", 1, List("com.snowplowanalytics.iglu-test")),
-      null
-    )
+    val httpRep1 = Repos.httpRep.copy(config = Repos.httpRep.config.copy(name = "Mock Repo 1"))
+    val httpRep2 = Repos.httpRep.copy(config = Repos.httpRep.config.copy(name = "Mock Repo 2"))
 
     implicit val cache = ResolverSpecHelpers.staticResolverCache
     implicit val clock = ResolverSpecHelpers.staticClock
@@ -479,16 +468,13 @@ class ResolverResultSpec extends Specification with ValidatedMatchers with CatsE
       Json.Null.asRight[RegistryError]
     val responses = List(schema, schema)
 
-    val httpRep =
-      Registry.Http(Registry.Config("Mock Repo", 1, List("com.snowplowanalytics.iglu-test")), null)
-
     implicit val cache = ResolverSpecHelpers.staticResolverCache
     implicit val clock = ResolverSpecHelpers.staticClock
     implicit val registryLookup: RegistryLookup[StaticLookup] =
       ResolverSpecHelpers.getLookup(responses, Nil)
 
     val result = for {
-      resolver  <- Resolver.init[StaticLookup](10, Some(200.seconds), httpRep)
+      resolver  <- Resolver.init[StaticLookup](10, Some(200.seconds), Repos.httpRep)
       response1 <- resolver.lookupSchemaResult(schemaKey)
       _         <- StaticLookup.addTime(150.seconds) // ttl 200, delay 150
       response2 <- resolver.lookupSchemaResult(schemaKey)
@@ -517,16 +503,13 @@ class ResolverResultSpec extends Specification with ValidatedMatchers with CatsE
       Json.Null.asRight[RegistryError]
     val responses = List(schema, schema)
 
-    val httpRep =
-      Registry.Http(Registry.Config("Mock Repo", 1, List("com.snowplowanalytics.iglu-test")), null)
-
     implicit val cache = ResolverSpecHelpers.staticResolverCache
     implicit val clock = ResolverSpecHelpers.staticClock
     implicit val registryLookup: RegistryLookup[StaticLookup] =
       ResolverSpecHelpers.getLookup(responses, Nil)
 
     val result = for {
-      resolver  <- Resolver.init[StaticLookup](10, Some(200.seconds), httpRep)
+      resolver  <- Resolver.init[StaticLookup](10, Some(200.seconds), Repos.httpRep)
       response1 <- resolver.lookupSchemaResult(schemaKey)
       _         <- StaticLookup.addTime(250.seconds) // ttl 200, delay 250
       response2 <- resolver.lookupSchemaResult(schemaKey)
@@ -668,16 +651,13 @@ class ResolverResultSpec extends Specification with ValidatedMatchers with CatsE
     val notFound  = RegistryError.NotFound.asLeft[Json]
     val responses = List(notFound, schema)
 
-    val httpRep =
-      Registry.Http(Registry.Config("Mock Repo", 1, List("com.snowplowanalytics.iglu-test")), null)
-
     implicit val cache = ResolverSpecHelpers.staticResolverCache
     implicit val clock = ResolverSpecHelpers.staticClock
     implicit val registryLookup: RegistryLookup[StaticLookup] =
       ResolverSpecHelpers.getLookup(responses, Nil)
 
     val result = for {
-      resolver  <- Resolver.init[StaticLookup](10, Some(200.seconds), httpRep)
+      resolver  <- Resolver.init[StaticLookup](10, Some(200.seconds), Repos.httpRep)
       response1 <- resolver.lookupSchemaResult(schemaKey)
       _         <- StaticLookup.addTime(150.seconds) // ttl 200, delay 150
       response2 <- resolver.lookupSchemaResult(schemaKey)
@@ -719,9 +699,7 @@ class ResolverResultSpec extends Specification with ValidatedMatchers with CatsE
     val notFound  = RegistryError.NotFound.asLeft[Json]
     val responses = List(notFound, notFound, schema)
 
-    val repoName = "Mock Repo"
-    val httpRep =
-      Registry.Http(Registry.Config(repoName, 1, List("com.snowplowanalytics.iglu-test")), null)
+    val repoName = Repos.httpRep.config.name
 
     implicit val cache = ResolverSpecHelpers.staticResolverCache
     implicit val clock = ResolverSpecHelpers.staticClock
@@ -729,7 +707,7 @@ class ResolverResultSpec extends Specification with ValidatedMatchers with CatsE
       ResolverSpecHelpers.getLookup(responses, Nil)
 
     val result = for {
-      resolver  <- Resolver.init[StaticLookup](10, Some(200.seconds), httpRep)
+      resolver  <- Resolver.init[StaticLookup](10, Some(200.seconds), Repos.httpRep)
       response1 <- resolver.lookupSchemaResult(schemaKey)
       _         <- StaticLookup.addTime(250.seconds) // ttl 200, delay 250
       response2 <- resolver.lookupSchemaResult(schemaKey)
@@ -765,7 +743,7 @@ class ResolverResultSpec extends Specification with ValidatedMatchers with CatsE
 
   import ResolverSpecHelpers.LookupSchemasUntil._
 
-  def testLookupUntil(maxSchemaKey: SchemaKey, expected: List[SelfDescribingSchema[Json]]) =
+  def testLookupUntil(maxSchemaKey: SchemaKey, expected: NonEmptyList[SelfDescribingSchema[Json]]) =
     for {
       resolver <- mkResolver
       result   <- resolver.lookupSchemasUntil(maxSchemaKey)
@@ -773,37 +751,37 @@ class ResolverResultSpec extends Specification with ValidatedMatchers with CatsE
 
   def e20 = testLookupUntil(
     getUntilSchemaKey(1, 0, 0),
-    List(until100)
+    NonEmptyList.one(until100)
   )
 
   def e21 = testLookupUntil(
     getUntilSchemaKey(1, 1, 0),
-    List(until100, until110)
+    NonEmptyList.of(until100, until110)
   )
 
   def e22 = testLookupUntil(
     getUntilSchemaKey(1, 1, 1),
-    List(until100, until110, until111)
+    NonEmptyList.of(until100, until110, until111)
   )
 
   def e23 = testLookupUntil(
     getUntilSchemaKey(1, 1, 2),
-    List(until100, until110, until111, until112)
+    NonEmptyList.of(until100, until110, until111, until112)
   )
 
   def e24 = testLookupUntil(
     getUntilSchemaKey(1, 2, 0),
-    List(until100, until110, until111, until112, until120)
+    NonEmptyList.of(until100, until110, until111, until112, until120)
   )
 
   def e25 = testLookupUntil(
     getUntilSchemaKey(1, 2, 1),
-    List(until100, until110, until111, until112, until120, until121)
+    NonEmptyList.of(until100, until110, until111, until112, until120, until121)
   )
 
   def e26 = testLookupUntil(
     getUntilSchemaKey(1, 2, 2),
-    List(until100, until110, until111, until112, until120, until121, until122)
+    NonEmptyList.of(until100, until110, until111, until112, until120, until121, until122)
   )
 
   def e27 = for {
@@ -836,11 +814,11 @@ class ResolverResultSpec extends Specification with ValidatedMatchers with CatsE
 
   def e31 = testLookupUntil(
     getUntilSchemaKey(3, 0, 0),
-    List(until300)
+    NonEmptyList.one(until300)
   )
 
   def e32 = testLookupUntil(
     getUntilSchemaKey(3, 1, 0),
-    List(until300, until310)
+    NonEmptyList.of(until300, until310)
   )
 }
