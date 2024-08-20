@@ -218,7 +218,7 @@ final case class Resolver[F[_]](repos: List[Registry], cache: Option[ResolverCac
   ): F[Either[SchemaResolutionError, NonEmptyList[SelfDescribingSchema[Json]]]] = {
     def go(
       current: SchemaVer.Full,
-      acc: NonEmptyList[SelfDescribingSchema[Json]]
+      acc: List[SelfDescribingSchema[Json]]
     ): F[Either[SchemaResolutionError, NonEmptyList[SelfDescribingSchema[Json]]]] = {
       val currentSchemaKey = maxSchemaKey.copy(version = current)
       lookupSchema(currentSchemaKey).flatMap {
@@ -242,25 +242,14 @@ final case class Resolver[F[_]](repos: List[Registry], cache: Option[ResolverCac
             )
           else
             Monad[F].pure(
-              Right((SelfDescribingSchema(SchemaMap(currentSchemaKey), json) :: acc).reverse)
+              Right(
+                NonEmptyList(SelfDescribingSchema(SchemaMap(currentSchemaKey), json), acc).reverse
+              )
             )
       }
     }
 
-    val firstSchemaKey =
-      maxSchemaKey.copy(version = SchemaVer.Full(maxSchemaKey.version.model, 0, 0))
-
-    EitherT(lookupSchema(firstSchemaKey))
-      .leftMap(SchemaResolutionError(firstSchemaKey, _))
-      .flatMap { firstJson =>
-        val acc = NonEmptyList.one(SelfDescribingSchema(SchemaMap(firstSchemaKey), firstJson))
-
-        if (maxSchemaKey.version.addition == 0 && maxSchemaKey.version.revision == 0)
-          EitherT.rightT[F, SchemaResolutionError](acc)
-        else
-          EitherT(go(SchemaVer.Full(maxSchemaKey.version.model, 0, 1), acc))
-      }
-      .value
+    go(SchemaVer.Full(maxSchemaKey.version.model, 0, 0), Nil)
   }
 
   /**
