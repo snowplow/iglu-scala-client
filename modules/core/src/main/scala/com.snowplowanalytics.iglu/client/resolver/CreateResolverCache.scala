@@ -25,6 +25,8 @@ trait CreateResolverCache[F[_]] {
 
   def createSchemaListCache(size: Int): F[LruMap[F, ListCacheKey, ListCacheEntry]]
 
+  def createSchemaContentListCache(size: Int): F[LruMap[F, SchemaKey, SchemaContentListCacheEntry]]
+
   def createMutex[K]: F[ResolverMutex[F, K]]
 
 }
@@ -43,6 +45,10 @@ object CreateResolverCache {
     override def createSchemaListCache(size: Int): F[LruMap[F, ListCacheKey, ListCacheEntry]] =
       createLruMap(size)
 
+    override def createSchemaContentListCache(
+      size: Int
+    ): F[LruMap[F, SchemaKey, SchemaContentListCacheEntry]] =
+      createLruMap(size)
   }
 
   implicit def idCreateResolverCache: CreateResolverCache[Id] =

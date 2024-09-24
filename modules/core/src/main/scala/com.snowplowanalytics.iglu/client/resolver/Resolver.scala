@@ -201,6 +201,19 @@ final case class Resolver[F[_]](repos: List[Registry], cache: Option[ResolverCac
   }
 
   /**
+   * The variant of lookupSchemasUntilResult that returns the result
+   * that isn't wrapped with ResolverResult
+   */
+  def lookupSchemasUntil(
+    maxSchemaKey: SchemaKey
+  )(implicit
+    F: Monad[F],
+    L: RegistryLookup[F],
+    C: Clock[F]
+  ): F[Either[SchemaResolutionError, NonEmptyList[SelfDescribingSchema[Json]]]] =
+    lookupSchemasUntilResult(maxSchemaKey).map(_.map(_.value))
+
+  /**
    * Looks up all the schemas with the same model until `maxSchemaKey`.
    * For the schemas of previous revisions, it starts with addition = 0
    * and increments it until a NotFound.
@@ -209,48 +222,94 @@ final case class Resolver[F[_]](repos: List[Registry], cache: Option[ResolverCac
    * @return All the schemas if all went well, [[Resolver.SchemaResolutionError]] with the first error that happened
    *         while looking up the schemas if something went wrong.
    */
-  def lookupSchemasUntil(
+  def lookupSchemasUntilResult(
     maxSchemaKey: SchemaKey
   )(implicit
     F: Monad[F],
     L: RegistryLookup[F],
     C: Clock[F]
-  ): F[Either[SchemaResolutionError, NonEmptyList[SelfDescribingSchema[Json]]]] = {
-    def go(
-      current: SchemaVer.Full,
-      acc: List[SelfDescribingSchema[Json]]
-    ): F[Either[SchemaResolutionError, NonEmptyList[SelfDescribingSchema[Json]]]] = {
-      val currentSchemaKey = maxSchemaKey.copy(version = current)
-      lookupSchema(currentSchemaKey).flatMap {
-        case Left(e) =>
-          if (current.addition === 0)
-            Monad[F].pure(Left(SchemaResolutionError(currentSchemaKey, e)))
-          else if (current.revision < maxSchemaKey.version.revision && isNotFound(e))
-            go(current.copy(revision = current.revision + 1, addition = 0), acc)
-          else
-            Monad[F].pure(Left(SchemaResolutionError(currentSchemaKey, e)))
-        case Right(json) =>
-          if (current.revision < maxSchemaKey.version.revision)
-            go(
-              current.copy(addition = current.addition + 1),
-              SelfDescribingSchema(SchemaMap(currentSchemaKey), json) :: acc
-            )
-          else if (current.addition < maxSchemaKey.version.addition)
-            go(
-              current.copy(addition = current.addition + 1),
-              SelfDescribingSchema(SchemaMap(currentSchemaKey), json) :: acc
-            )
-          else
-            Monad[F].pure(
-              Right(
-                NonEmptyList(SelfDescribingSchema(SchemaMap(currentSchemaKey), json), acc).reverse
+  ): F[Either[SchemaResolutionError, SchemaContentListLookupResult]] = {
+    def get(): F[Either[SchemaResolutionError, SchemaContentList]] = {
+      def go(
+        current: SchemaVer.Full,
+        acc: List[SelfDescribingSchema[Json]]
+      ): F[Either[SchemaResolutionError, NonEmptyList[SelfDescribingSchema[Json]]]] = {
+        val currentSchemaKey = maxSchemaKey.copy(version = current)
+        lookupSchema(currentSchemaKey).flatMap {
+          case Left(e) =>
+            if (current.addition === 0)
+              Monad[F].pure(Left(SchemaResolutionError(currentSchemaKey, e)))
+            else if (current.revision < maxSchemaKey.version.revision && isNotFound(e))
+              go(current.copy(revision = current.revision + 1, addition = 0), acc)
+            else
+              Monad[F].pure(Left(SchemaResolutionError(currentSchemaKey, e)))
+          case Right(json) =>
+            if (current.revision < maxSchemaKey.version.revision)
+              go(
+                current.copy(addition = current.addition + 1),
+                SelfDescribingSchema(SchemaMap(currentSchemaKey), json) :: acc
               )
-            )
+            else if (current.addition < maxSchemaKey.version.addition)
+              go(
+                current.copy(addition = current.addition + 1),
+                SelfDescribingSchema(SchemaMap(currentSchemaKey), json) :: acc
+              )
+            else
+              Monad[F].pure(
+                Right(
+                  NonEmptyList(SelfDescribingSchema(SchemaMap(currentSchemaKey), json), acc).reverse
+                )
+              )
+        }
       }
+
+      go(SchemaVer.Full(maxSchemaKey.version.model, 0, 0), Nil)
     }
 
-    go(SchemaVer.Full(maxSchemaKey.version.model, 0, 0), Nil)
+    def handleAfterFetch(
+      result: Either[SchemaResolutionError, SchemaContentList]
+    ): F[Either[SchemaResolutionError, SchemaContentListLookupResult]] =
+      cache match {
+        case Some(c) =>
+          val updated = result.leftMap(e => resolutionErrorToFailureMap(e))
+          c.putSchemaContentListResult(maxSchemaKey, updated).map {
+            case Right(ResolverCache.TimestampedItem(i, t)) =>
+              Right(ResolverResult.Cached(maxSchemaKey, i, t))
+            case Left(failure) =>
+              val schemaKey = result.leftMap(_.schemaKey).left.getOrElse(maxSchemaKey)
+              Left(SchemaResolutionError(schemaKey, resolutionError(failure)))
+          }
+        case None =>
+          result
+            .map[SchemaContentListLookupResult](ResolverResult.NotCached(_))
+            .pure[F]
+      }
+
+    def lockAndLookup: F[Either[SchemaResolutionError, SchemaContentListLookupResult]] =
+      withLockOnSchemaContentList(maxSchemaKey) {
+        getSchemaContentListFromCache(maxSchemaKey).flatMap {
+          case Some(TimestampedItem(Right(i), t)) =>
+            Monad[F].pure(Right(ResolverResult.Cached(maxSchemaKey, i, t)))
+          case Some(TimestampedItem(Left(_), _)) | None =>
+            for {
+              result <- get()
+              fixed  <- handleAfterFetch(result)
+            } yield fixed
+        }
+      }
+
+    getSchemaContentListFromCache(maxSchemaKey).flatMap {
+      case Some(TimestampedItem(Right(i), t)) =>
+        Monad[F].pure(Right(ResolverResult.Cached(maxSchemaKey, i, t)))
+      case Some(TimestampedItem(Left(_), _)) | None =>
+        lockAndLookup
+    }
   }
+
+  def resolutionErrorToFailureMap(resolutionError: SchemaResolutionError): LookupFailureMap =
+    resolutionError.error.value.toMap.flatMap { case (key, value) =>
+      allRepos.find(_.config.name == key).map((_, value))
+    }
 
   /**
    * Get list of available schemas for particular vendor and name part
@@ -428,6 +487,12 @@ final case class Resolver[F[_]](repos: List[Registry], cache: Option[ResolverCac
       case None    => f
     }
 
+  private def withLockOnSchemaContentList[A](schemaKey: SchemaKey)(f: => F[A]): F[A] =
+    cache match {
+      case Some(c) => c.withLockOnSchemaContentList(schemaKey)(f)
+      case None    => f
+    }
+
   private def getSchemaListFromCache(
     vendor: Vendor,
     name: Name,
@@ -441,15 +506,26 @@ final case class Resolver[F[_]](repos: List[Registry], cache: Option[ResolverCac
       case None    => Monad[F].pure(None)
     }
 
+  private def getSchemaContentListFromCache(
+    schemaKey: SchemaKey
+  )(implicit
+    F: Monad[F],
+    C: Clock[F]
+  ): F[Option[ResolverCache.TimestampedItem[SchemaContentListLookup]]] =
+    cache match {
+      case Some(c) => c.getTimestampedSchemaContentList(schemaKey)
+      case None    => Monad[F].pure(None)
+    }
 }
 
 /** Companion object. Lets us create a Resolver from a Json */
 object Resolver {
 
-  type SchemaListKey          = (Vendor, Name, Model)
-  type SchemaLookupResult     = ResolverResult[SchemaKey, SchemaItem]
-  type SchemaListLookupResult = ResolverResult[SchemaListKey, SchemaList]
-  type SupersededBy           = Option[SchemaVer.Full]
+  type SchemaListKey                 = (Vendor, Name, Model)
+  type SchemaLookupResult            = ResolverResult[SchemaKey, SchemaItem]
+  type SchemaListLookupResult        = ResolverResult[SchemaListKey, SchemaList]
+  type SchemaContentListLookupResult = ResolverResult[SchemaKey, SchemaContentList]
+  type SupersededBy                  = Option[SchemaVer.Full]
 
   /**
    * The result of doing schema lookup

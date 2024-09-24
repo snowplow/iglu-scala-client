@@ -13,7 +13,11 @@
 package com.snowplowanalytics.iglu.client.resolver
 
 import cats.effect.testing.specs2.CatsEffect
-import com.snowplowanalytics.iglu.client.resolver.Resolver.{ResolverResult, SchemaLookupResult}
+import com.snowplowanalytics.iglu.client.resolver.Resolver.{
+  ResolverResult,
+  SchemaContentListLookupResult,
+  SchemaLookupResult
+}
 import io.circe.parser.parse
 
 import java.net.URI
@@ -91,6 +95,11 @@ class ResolverResultSpec extends Specification with ValidatedMatchers with CatsE
     return an error if the second schema of previous revision is invalid $e30
     return 3-0-0 (no 1-*-* and 2-*-* schemas) $e31
     return 3-0-0 from a registry and 3-1-0 from another one $e32
+    return cached schema when ttl not exceeded $e33
+    refetch the schema from registry when ttl exceeded  $e34
+    not cache schema if cache is disabled $e35
+    cache errors $e36
+    return expected results when called multiple times $e37
   """
 
   import ResolverSpec._
@@ -821,4 +830,265 @@ class ResolverResultSpec extends Specification with ValidatedMatchers with CatsE
     getUntilSchemaKey(3, 1, 0),
     NonEmptyList.of(until300, until310)
   )
+
+  def e33 = {
+    val schemaKey =
+      SchemaKey(
+        "com.snowplowanalytics.iglu-test",
+        "mock_schema",
+        "jsonschema",
+        SchemaVer.Full(1, 0, 0)
+      )
+    val schema1   = Json.fromInt(1)
+    val schema2   = Json.fromInt(2)
+    val responses = List(schema1, schema2).map(_.asRight[RegistryError])
+
+    implicit val cache = ResolverSpecHelpers.staticResolverCache
+    implicit val clock = ResolverSpecHelpers.staticClock
+    implicit val registryLookup: RegistryLookup[StaticLookup] =
+      ResolverSpecHelpers.getLookup(responses, Nil)
+
+    val result = for {
+      resolver  <- Resolver.init[StaticLookup](10, Some(200.seconds), Repos.httpRep)
+      response1 <- resolver.lookupSchemasUntilResult(schemaKey)
+      _         <- StaticLookup.addTime(150.seconds) // ttl 200, delay 150
+      response2 <- resolver.lookupSchemasUntilResult(schemaKey)
+    } yield (response1, response2)
+
+    val (_, (response1, response2)) =
+      result.run(ResolverSpecHelpers.RegistryState.init).value
+
+    response1 must beRight[SchemaContentListLookupResult].like {
+      case ResolverResult.Cached(_, value1, _) =>
+        (response1 mustEqual response2) and // same cached (including timestamps) item because it didn't expire
+          (value1.head.schema mustEqual schema1)
+    }
+  }
+
+  def e34 = {
+    val schemaKey =
+      SchemaKey(
+        "com.snowplowanalytics.iglu-test",
+        "mock_schema",
+        "jsonschema",
+        SchemaVer.Full(1, 0, 0)
+      )
+    val schema1   = Json.fromInt(1)
+    val schema2   = Json.fromInt(2)
+    val responses = List(schema1, schema2).map(_.asRight[RegistryError])
+
+    implicit val cache = ResolverSpecHelpers.staticResolverCache
+    implicit val clock = ResolverSpecHelpers.staticClock
+    implicit val registryLookup: RegistryLookup[StaticLookup] =
+      ResolverSpecHelpers.getLookup(responses, Nil)
+
+    val result = for {
+      resolver  <- Resolver.init[StaticLookup](10, Some(200.seconds), Repos.httpRep)
+      response1 <- resolver.lookupSchemasUntilResult(schemaKey)
+      _         <- StaticLookup.addTime(250.seconds) // ttl 200, delay 250
+      response2 <- resolver.lookupSchemasUntilResult(schemaKey)
+    } yield (response1, response2)
+
+    val (_, (response1, response2)) =
+      result.run(ResolverSpecHelpers.RegistryState.init).value
+
+    response1 must beRight[SchemaContentListLookupResult].like {
+      case ResolverResult.Cached(_, value1, timestamp1) =>
+        response2 must beRight[SchemaContentListLookupResult].like {
+          case ResolverResult.Cached(_, value2, timestamp2) =>
+            (value1.head.self.schemaKey mustEqual schemaKey) and
+              (value1.head.schema mustEqual schema1) and
+              (value2.head.self.schemaKey mustEqual schemaKey) and
+              (value2.head.schema mustEqual schema2) and
+              (timestamp1 mustNotEqual timestamp2)
+        }
+    }
+  }
+
+  def e35 = {
+    val schemaKey =
+      SchemaKey(
+        "com.snowplowanalytics.iglu-test",
+        "mock_schema",
+        "jsonschema",
+        SchemaVer.Full(1, 0, 0)
+      )
+    val schema1   = Json.fromInt(1)
+    val schema2   = Json.fromInt(2)
+    val responses = List(schema1, schema2).map(_.asRight[RegistryError])
+
+    implicit val cache = ResolverSpecHelpers.staticResolverCache
+    implicit val clock = ResolverSpecHelpers.staticClock
+    implicit val registryLookup: RegistryLookup[StaticLookup] =
+      ResolverSpecHelpers.getLookup(responses, Nil)
+
+    val result = for {
+      resolver  <- Resolver.init[StaticLookup](0, None, Repos.httpRep)
+      response1 <- resolver.lookupSchemasUntilResult(schemaKey)
+      response2 <- resolver.lookupSchemasUntilResult(schemaKey)
+    } yield (response1, response2)
+
+    val (_, (response1, response2)) =
+      result.run(ResolverSpecHelpers.RegistryState.init).value
+
+    response1 must beRight[SchemaContentListLookupResult].like {
+      case ResolverResult.NotCached(value1) =>
+        response2 must beRight[SchemaContentListLookupResult].like {
+          case ResolverResult.NotCached(value2) =>
+            (value1.head.self.schemaKey mustEqual schemaKey) and
+              (value1.head.schema mustEqual schema1) and
+              (value2.head.self.schemaKey mustEqual schemaKey) and
+              (value2.head.schema mustEqual schema2)
+        }
+    }
+  }
+
+  def e36 = {
+    val schemaKey =
+      SchemaKey(
+        "com.snowplowanalytics.iglu-test",
+        "mock_schema",
+        "jsonschema",
+        SchemaVer.Full(1, 0, 0)
+      )
+    val schema1   = Json.fromInt(1).asRight[RegistryError]
+    val error1    = RegistryError.NotFound.asLeft[Json]
+    val responses = List(error1, schema1)
+
+    implicit val cache = ResolverSpecHelpers.staticResolverCache
+    implicit val clock = ResolverSpecHelpers.staticClock
+    implicit val registryLookup: RegistryLookup[StaticLookup] =
+      ResolverSpecHelpers.getLookup(responses, Nil)
+
+    val result = for {
+      resolver  <- Resolver.init[StaticLookup](10, Some(200.seconds), Repos.httpRep)
+      response1 <- resolver.lookupSchemasUntilResult(schemaKey)
+      _         <- StaticLookup.addTime(150.seconds) // ttl 200, delay 150
+      response2 <- resolver.lookupSchemasUntilResult(schemaKey)
+    } yield (response1, response2)
+
+    val (_, (response1, response2)) =
+      result.run(ResolverSpecHelpers.RegistryState.init).value
+
+    response1 must beLeft[SchemaResolutionError].like { case value1 =>
+      response2 must beLeft[SchemaResolutionError].like { case value2 =>
+        value1 mustEqual value2
+      }
+    }
+  }
+
+  def e37 = {
+    val schemaKey100 =
+      SchemaKey(
+        "com.snowplowanalytics.iglu-test",
+        "mock_schema",
+        "jsonschema",
+        SchemaVer.Full(1, 0, 0)
+      )
+    val schemaKey102 = schemaKey100.copy(version = SchemaVer.Full(1, 0, 2))
+    val schemaKey103 = schemaKey100.copy(version = SchemaVer.Full(1, 0, 3))
+    val schemaKey200 = schemaKey100.copy(version = SchemaVer.Full(2, 0, 0))
+    val schemaKey214 = schemaKey100.copy(version = SchemaVer.Full(2, 1, 4))
+
+    val response100_1 = List(
+      (schemaKey100, Json.fromString("1-0-0_1").asRight)
+    )
+
+    val response102 = List(
+      (schemaKey100.copy(version = SchemaVer.Full(1, 0, 1)), Json.fromString("1-0-1").asRight),
+      (schemaKey100.copy(version = SchemaVer.Full(1, 0, 2)), Json.fromString("1-0-2").asRight)
+    )
+
+    val response100_2 = List(
+      (schemaKey100, Json.fromString("1-0-0_2").asRight)
+    )
+
+    val response200 = List(
+      (schemaKey200, Json.fromString("2-0-0").asRight)
+    )
+
+    val response214 = List(
+      (schemaKey200, Json.fromString("2-0-0").asRight),
+      (schemaKey200.copy(version = SchemaVer.Full(2, 0, 1)), Json.fromString("2-0-1").asRight),
+      (schemaKey200.copy(version = SchemaVer.Full(2, 0, 2)), Json.fromString("2-0-2").asRight),
+      (schemaKey200, RegistryError.NotFound.asLeft),
+      (schemaKey200.copy(version = SchemaVer.Full(2, 1, 0)), Json.fromString("2-1-0").asRight),
+      (schemaKey200.copy(version = SchemaVer.Full(2, 1, 1)), Json.fromString("2-1-1").asRight),
+      (schemaKey200.copy(version = SchemaVer.Full(2, 1, 2)), Json.fromString("2-1-2").asRight),
+      (schemaKey200.copy(version = SchemaVer.Full(2, 1, 3)), Json.fromString("2-1-3").asRight),
+      (schemaKey200.copy(version = SchemaVer.Full(2, 1, 4)), Json.fromString("2-1-4").asRight)
+    )
+
+    val response103_1 = List(
+      (schemaKey100, Json.fromString("1-0-0_1").asRight),
+      (schemaKey100.copy(version = SchemaVer.Full(1, 0, 1)), Json.fromString("1-0-1_1").asRight),
+      (schemaKey100.copy(version = SchemaVer.Full(1, 0, 2)), Json.fromString("1-0-2_1").asRight),
+      (schemaKey100.copy(version = SchemaVer.Full(1, 0, 3)), Json.fromString("1-0-3_1").asRight)
+    )
+
+    val response103_2 = List(
+      (schemaKey100, Json.fromString("1-0-0_1").asRight),
+      (schemaKey100.copy(version = SchemaVer.Full(1, 0, 1)), Json.fromString("1-0-1_2").asRight),
+      (schemaKey100.copy(version = SchemaVer.Full(1, 0, 2)), Json.fromString("1-0-2_2").asRight),
+      (schemaKey100.copy(version = SchemaVer.Full(1, 0, 3)), Json.fromString("1-0-3_2").asRight)
+    )
+
+    val responses =
+      response100_1 ++ response102 ++ response100_2 ++ response200 ++ response214 ++ response103_1 ++ response103_2
+
+    implicit val cache = ResolverSpecHelpers.staticResolverCache
+    implicit val clock = ResolverSpecHelpers.staticClock
+    implicit val registryLookup: RegistryLookup[StaticLookup] =
+      ResolverSpecHelpers.getLookup(responses.map(_._2), Nil)
+
+    def checkResult(
+      result: Either[SchemaResolutionError, SchemaContentListLookupResult],
+      expected: List[(SchemaKey, Either[RegistryError, Json])],
+      expectedCacheKey: SchemaKey
+    ) = {
+      val extractedResult = result.toOption.collect { case ResolverResult.Cached(k, v, _) =>
+        (k, v.toList.map(s => (s.self.schemaKey, s.schema)))
+      }
+      val extractedExpected = expected.collect { case (k, Right(j)) => (k, j) }
+      extractedResult must beSome((expectedCacheKey, extractedExpected))
+    }
+
+    val result = for {
+      resolver       <- Resolver.init[StaticLookup](10, Some(200.seconds), Repos.httpRep)
+      notCached100_1 <- resolver.lookupSchemasUntilResult(schemaKey100)
+      notCached102   <- resolver.lookupSchemasUntilResult(schemaKey102)
+      _              <- StaticLookup.addTime(100.seconds)
+      cached100      <- resolver.lookupSchemasUntilResult(schemaKey100)
+      cached102      <- resolver.lookupSchemasUntilResult(schemaKey102)
+      _              <- StaticLookup.addTime(200.seconds)
+      notCached100_2 <- resolver.lookupSchemasUntilResult(schemaKey100)
+      _              <- StaticLookup.addTime(300.seconds)
+      notCached200   <- resolver.lookupSchemasUntilResult(schemaKey200)
+      _              <- StaticLookup.addTime(100.seconds)
+      cached200      <- resolver.lookupSchemasUntilResult(schemaKey200)
+      _              <- StaticLookup.addTime(300.seconds)
+      notCached214   <- resolver.lookupSchemasUntilResult(schemaKey214)
+      _              <- StaticLookup.addTime(100.seconds)
+      cached214      <- resolver.lookupSchemasUntilResult(schemaKey214)
+      _              <- StaticLookup.addTime(300.seconds)
+      notCached103_1 <- resolver.lookupSchemasUntilResult(schemaKey103)
+      _              <- StaticLookup.addTime(100.seconds)
+      cached103      <- resolver.lookupSchemasUntilResult(schemaKey103)
+      _              <- StaticLookup.addTime(200.seconds)
+      notCached103_2 <- resolver.lookupSchemasUntilResult(schemaKey103)
+    } yield checkResult(notCached100_1, response100_1, schemaKey100) and
+      checkResult(notCached100_2, response100_2, schemaKey100) and
+      checkResult(notCached102, response100_1 ++ response102, schemaKey102) and
+      checkResult(notCached200, response200, schemaKey200) and
+      checkResult(notCached214, response214, schemaKey214) and
+      checkResult(notCached103_1, response103_1, schemaKey103) and
+      checkResult(notCached103_2, response103_2, schemaKey103) and
+      (cached100 mustEqual notCached100_1) and
+      (cached102 mustEqual notCached102) and
+      (cached200 mustEqual notCached200) and
+      (cached214 mustEqual notCached214) and
+      (cached103 mustEqual notCached103_1)
+
+    result.run(ResolverSpecHelpers.RegistryState.init).value._2
+  }
 }

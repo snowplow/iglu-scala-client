@@ -14,8 +14,12 @@ package com.snowplowanalytics.iglu.client
 
 import scala.concurrent.duration.FiniteDuration
 
+import cats.data.NonEmptyList
+
+import io.circe.Json
+
 // Iglu Core
-import com.snowplowanalytics.iglu.core.SchemaList
+import com.snowplowanalytics.iglu.core.{SchemaList, SelfDescribingSchema}
 
 // This project
 import resolver.registries.Registry
@@ -31,6 +35,8 @@ package object resolver {
 
   /** Schema's model */
   type Model = Int
+
+  type SchemaContentList = NonEmptyList[SelfDescribingSchema[Json]]
 
   /**
    * Map of all repositories to its aggregated state of failure
@@ -52,6 +58,13 @@ package object resolver {
    * in case of failure
    */
   type ListLookup = Either[LookupFailureMap, SchemaList]
+
+  /**
+   * Validated schema content list lookup result containing, cache result
+   * which is list of self describing schemas in case of success or
+   * Map of all currently failed repositories in case of failure
+   */
+  type SchemaContentListLookup = Either[LookupFailureMap, SchemaContentList]
 
   /** Time to live for cached items */
   type TTL = FiniteDuration
@@ -76,5 +89,8 @@ package object resolver {
 
   /** Cache entry for schema list lookup results */
   type ListCacheEntry = CacheEntry[ListLookup]
+
+  /** Cache entry for schema content list lookup results */
+  type SchemaContentListCacheEntry = CacheEntry[SchemaContentListLookup]
 
 }

@@ -46,7 +46,8 @@ class ResolverCacheSpec extends Specification {
         4.millis,
         List((key, (2.millis, Right(SchemaItem(Json.Null, None))))),
         5,
-        List()
+        List(),
+        Map.empty
       )
 
     val test = for {

@@ -40,8 +40,10 @@ import Resolver.SchemaItem
 class ResolverCache[F[_]] private (
   schemas: LruMap[F, SchemaKey, SchemaCacheEntry],
   schemaLists: LruMap[F, ListCacheKey, ListCacheEntry],
+  schemaContentLists: LruMap[F, SchemaKey, SchemaContentListCacheEntry],
   schemaMutex: ResolverMutex[F, SchemaKey],
   schemaListMutex: ResolverMutex[F, ListCacheKey],
+  schemaContentListMutex: ResolverMutex[F, SchemaKey],
   val ttl: Option[TTL]
 ) {
 
@@ -144,6 +146,23 @@ class ResolverCache[F[_]] private (
     f: => F[A]
   ): F[A] =
     schemaListMutex.withLockOn((vendor, name, model))(f)
+
+  private[resolver] def getTimestampedSchemaContentList(
+    schemaKey: SchemaKey
+  )(implicit F: Monad[F], C: Clock[F]): F[Option[TimestampedItem[SchemaContentListLookup]]] =
+    getTimestampedItem(ttl, schemaContentLists, schemaKey)
+
+  private[resolver] def putSchemaContentListResult(
+    schemaKey: SchemaKey,
+    schemas: SchemaContentListLookup
+  )(implicit
+    F: Monad[F],
+    C: Clock[F]
+  ): F[Either[LookupFailureMap, TimestampedItem[SchemaContentList]]] =
+    putItemResult(schemaContentLists, schemaKey, schemas)
+
+  private[resolver] def withLockOnSchemaContentList[A](key: SchemaKey)(f: => F[A]): F[A] =
+    schemaContentListMutex.withLockOn(key)(f)
 }
 
 object ResolverCache {
@@ -159,11 +178,21 @@ object ResolverCache {
   ): F[Option[ResolverCache[F]]] = {
     if (shouldCreateResolverCache(size, ttl)) {
       for {
-        schemas     <- C.createSchemaCache(size)
-        schemaLists <- C.createSchemaListCache(size)
-        schemaMutex <- C.createMutex[SchemaKey]
-        listMutex   <- C.createMutex[ListCacheKey]
-      } yield new ResolverCache[F](schemas, schemaLists, schemaMutex, listMutex, ttl).some
+        schemas                <- C.createSchemaCache(size)
+        schemaLists            <- C.createSchemaListCache(size)
+        schemaContentLists     <- C.createSchemaContentListCache(size)
+        schemaMutex            <- C.createMutex[SchemaKey]
+        listMutex              <- C.createMutex[ListCacheKey]
+        schemaContentListMutex <- C.createMutex[SchemaKey]
+      } yield new ResolverCache[F](
+        schemas,
+        schemaLists,
+        schemaContentLists,
+        schemaMutex,
+        listMutex,
+        schemaContentListMutex,
+        ttl
+      ).some
     } else
       Applicative[F].pure(none)
   }

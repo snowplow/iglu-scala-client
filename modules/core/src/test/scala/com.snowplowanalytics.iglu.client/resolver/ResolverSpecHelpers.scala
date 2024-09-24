@@ -64,16 +64,31 @@ object ResolverSpecHelpers {
     time: FiniteDuration,
     cache: List[(SchemaKey, SchemaCacheEntry)],
     cacheSize: Int,
-    schemaLists: List[ListCacheEntry]
+    schemaLists: List[ListCacheEntry],
+    schemaContentLists: Map[SchemaKey, SchemaContentListCacheEntry]
   ) {
 
     /** Perform a request and write it to [[requestsCounter]] */
     def request(name: String): RegistryState = {
       val i = requestsCounter.getOrElse(name, 0) + 1
-      RegistryState(requestsCounter.updated(name, i), time, cache, cacheSize, schemaLists)
+      RegistryState(
+        requestsCounter.updated(name, i),
+        time,
+        cache,
+        cacheSize,
+        schemaLists,
+        schemaContentLists
+      )
     }
 
-    def tick = RegistryState(requestsCounter, time + 1.milli, cache, cacheSize, schemaLists)
+    def tick = RegistryState(
+      requestsCounter,
+      time + 1.milli,
+      cache,
+      cacheSize,
+      schemaLists,
+      schemaContentLists
+    )
 
     def req: Int = requestsCounter.values.sum
 
@@ -87,7 +102,7 @@ object ResolverSpecHelpers {
   }
 
   object RegistryState {
-    val init = RegistryState(Map.empty, 0.seconds, Nil, 0, Nil)
+    val init = RegistryState(Map.empty, 0.seconds, Nil, 0, Nil, Map.empty)
   }
 
   type StaticLookup[A] = State[RegistryState, A]
@@ -112,6 +127,16 @@ object ResolverSpecHelpers {
         State { s =>
           val cache: LruMap[StaticLookup, ListCacheKey, ListCacheEntry] = StateCacheList
           val state                                                     = s.copy(cacheSize = size)
+          (state, cache)
+        }
+
+      def createSchemaContentListCache(
+        size: Int
+      ): StaticLookup[LruMap[StaticLookup, SchemaKey, SchemaContentListCacheEntry]] =
+        State { s =>
+          val cache: LruMap[StaticLookup, SchemaKey, SchemaContentListCacheEntry] =
+            StataCacheSchemaContentList
+          val state = s.copy(cacheSize = size)
           (state, cache)
         }
 
@@ -225,6 +250,20 @@ object ResolverSpecHelpers {
     def put(key: ListCacheKey, value: ListCacheEntry): StaticLookup[Unit] =
       State { state =>
         (state.copy(schemaLists = value :: state.schemaLists).tick, ())
+      }
+  }
+
+  private object StataCacheSchemaContentList
+      extends LruMap[StaticLookup, SchemaKey, SchemaContentListCacheEntry] {
+    def get(key: SchemaKey): StaticLookup[Option[SchemaContentListCacheEntry]] =
+      State.apply[RegistryState, Option[SchemaContentListCacheEntry]] { state =>
+        val result = state.schemaContentLists.get(key)
+        (state.tick, result)
+      }
+
+    def put(key: SchemaKey, value: SchemaContentListCacheEntry): StaticLookup[Unit] =
+      State { state =>
+        (state.copy(schemaContentLists = state.schemaContentLists + (key -> value)).tick, ())
       }
   }
 
