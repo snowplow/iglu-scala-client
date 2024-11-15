@@ -190,14 +190,19 @@ final case class Resolver[F[_]](repos: List[Registry], cache: Option[ResolverCac
   /**
    * If Iglu Central or any of its mirrors doesn't have a schema,
    * it should be considered NotFound, even if one of them returned an error.
+   * All 4xx (`ClientFailure`) are also considered NotFound.
    */
   private[resolver] def isNotFound(error: ResolutionError): Boolean = {
     val (igluCentral, custom) = error.value.partition { case (repo, _) =>
       allIgluCentral.contains(repo)
     }
     (igluCentral.isEmpty || igluCentral.values.exists(
-      _.errors.exists(_ == RegistryError.NotFound)
-    )) && custom.values.flatMap(_.errors).forall(_ == RegistryError.NotFound)
+      _.errors.exists(e =>
+        e == RegistryError.NotFound || e.isInstanceOf[RegistryError.ClientFailure]
+      )
+    )) && custom.values
+      .flatMap(_.errors)
+      .forall(e => e == RegistryError.NotFound || e.isInstanceOf[RegistryError.ClientFailure])
   }
 
   /**

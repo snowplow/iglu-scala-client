@@ -90,13 +90,16 @@ class ResolverSpec extends Specification with CatsEffect {
   result from SchemaListLike should contain the exact schemaKey provided $e13
   isNotFound should
     return true if custom repo and Iglu Central repos don't have a schema $e14
-    return true if one Iglu Central repo returns an error and the other one NotFound $e15
-    return false if custom repo returns an error $e16
-    return true if there is no custom repo, one Iglu Central repo returns an error and the other one NotFound $e17
-    return false if there is no custom repo and Iglu Central ones return an error $e18
-    return true if there is just one custom repo that returns NotFound $e19
-    return false if there is just one custom repo that returns an error $e20
-    return true if one Iglu Central repo returns 2 errors and the other one returns one error and one NotFound $e21
+    return true if one Iglu Central repo returns a RepoFailure and the other one NotFound $e15
+    return false if custom repo returns a RepoFailure $e16
+    return true if custom repo returns a ClientFailure $e17
+    return true if there is no custom repo, one Iglu Central repo returns an error and the other one NotFound $e18
+    return false if there is no custom repo and Iglu Central ones return a RepoFailure $e19
+    return true if there is no custom repo and Iglu Central ones return a ClientFailure $e20
+    return true if there is just one custom repo that returns NotFound $e21
+    return false if there is just one custom repo that returns a RepoFailure $e22
+    return true if there is just one custom repo that returns a ClientFailure $e23
+    return true if one Iglu Central repo returns 2 errors and the other one returns one error and one NotFound $e24
   """
 
   import ResolverSpec._
@@ -556,7 +559,7 @@ class ResolverSpec extends Specification with CatsEffect {
           Instant.now()
         ),
         Repos.custom.config.name -> LookupHistory(
-          Set(RegistryError.ClientFailure("Something went wrong")),
+          Set(RegistryError.RepoFailure("Something went wrong")),
           1,
           Instant.now()
         )
@@ -568,17 +571,23 @@ class ResolverSpec extends Specification with CatsEffect {
 
   def e17 = {
     val resolver: Resolver[Id] =
-      Resolver.init[Id](0, None, SpecHelpers.IgluCentral, SpecHelpers.IgluCentralMirror)
+      Resolver
+        .init[Id](0, None, SpecHelpers.IgluCentral, SpecHelpers.IgluCentralMirror, Repos.custom)
 
     val resolutionError = ResolutionError(
       SortedMap(
         SpecHelpers.IgluCentral.config.name -> LookupHistory(
-          Set(RegistryError.RepoFailure("Problem")),
+          Set(RegistryError.NotFound),
           1,
           Instant.now()
         ),
         SpecHelpers.IgluCentralMirror.config.name -> LookupHistory(
           Set(RegistryError.NotFound),
+          1,
+          Instant.now()
+        ),
+        Repos.custom.config.name -> LookupHistory(
+          Set(RegistryError.ClientFailure("402")),
           1,
           Instant.now()
         )
@@ -600,7 +609,29 @@ class ResolverSpec extends Specification with CatsEffect {
           Instant.now()
         ),
         SpecHelpers.IgluCentralMirror.config.name -> LookupHistory(
-          Set(RegistryError.ClientFailure("Network issue")),
+          Set(RegistryError.NotFound),
+          1,
+          Instant.now()
+        )
+      )
+    )
+
+    resolver.isNotFound(resolutionError) should beTrue
+  }
+
+  def e19 = {
+    val resolver: Resolver[Id] =
+      Resolver.init[Id](0, None, SpecHelpers.IgluCentral, SpecHelpers.IgluCentralMirror)
+
+    val resolutionError = ResolutionError(
+      SortedMap(
+        SpecHelpers.IgluCentral.config.name -> LookupHistory(
+          Set(RegistryError.RepoFailure("Problem")),
+          1,
+          Instant.now()
+        ),
+        SpecHelpers.IgluCentralMirror.config.name -> LookupHistory(
+          Set(RegistryError.RepoFailure("Network issue")),
           1,
           Instant.now()
         )
@@ -610,7 +641,29 @@ class ResolverSpec extends Specification with CatsEffect {
     resolver.isNotFound(resolutionError) should beFalse
   }
 
-  def e19 = {
+  def e20 = {
+    val resolver: Resolver[Id] =
+      Resolver.init[Id](0, None, SpecHelpers.IgluCentral, SpecHelpers.IgluCentralMirror)
+
+    val resolutionError = ResolutionError(
+      SortedMap(
+        SpecHelpers.IgluCentral.config.name -> LookupHistory(
+          Set(RegistryError.RepoFailure("Problem")),
+          1,
+          Instant.now()
+        ),
+        SpecHelpers.IgluCentralMirror.config.name -> LookupHistory(
+          Set(RegistryError.ClientFailure("403 Forbidden")),
+          1,
+          Instant.now()
+        )
+      )
+    )
+
+    resolver.isNotFound(resolutionError) should beTrue
+  }
+
+  def e21 = {
     val resolver: Resolver[Id] =
       Resolver.init[Id](0, None, Repos.custom)
 
@@ -623,14 +676,14 @@ class ResolverSpec extends Specification with CatsEffect {
     resolver.isNotFound(resolutionError) should beTrue
   }
 
-  def e20 = {
+  def e22 = {
     val resolver: Resolver[Id] =
       Resolver.init[Id](0, None, Repos.custom)
 
     val resolutionError = ResolutionError(
       SortedMap(
         Repos.custom.config.name -> LookupHistory(
-          Set(RegistryError.ClientFailure("Boom")),
+          Set(RegistryError.RepoFailure("Boom")),
           1,
           Instant.now()
         )
@@ -640,7 +693,24 @@ class ResolverSpec extends Specification with CatsEffect {
     resolver.isNotFound(resolutionError) should beFalse
   }
 
-  def e21 = {
+  def e23 = {
+    val resolver: Resolver[Id] =
+      Resolver.init[Id](0, None, Repos.custom)
+
+    val resolutionError = ResolutionError(
+      SortedMap(
+        Repos.custom.config.name -> LookupHistory(
+          Set(RegistryError.ClientFailure("401")),
+          1,
+          Instant.now()
+        )
+      )
+    )
+
+    resolver.isNotFound(resolutionError) should beTrue
+  }
+
+  def e24 = {
     val resolver: Resolver[Id] =
       Resolver
         .init[Id](0, None, SpecHelpers.IgluCentral, SpecHelpers.IgluCentralMirror, Repos.custom)
