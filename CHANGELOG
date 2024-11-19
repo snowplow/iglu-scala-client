@@ -1,3 +1,7 @@
+Version 4.0.1 (2024-11-19)
+--------------------------
+Consider all `ClientFailure`s as not found in `lookupSchemasUntil` (#260)
+
 Version 4.0.0 (2024-09-30)
 --------------------------
 Add caching to lookupSchemasUntil function (#258)
