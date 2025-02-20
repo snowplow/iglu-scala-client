@@ -20,7 +20,6 @@ import io.circe.Json
 import org.http4s.client.{Client => HttpClient}
 import org.http4s.dsl.Http4sDsl
 import org.http4s.implicits._
-import org.http4s.Status._
 import org.specs2.mutable.Specification
 
 import java.net.URI
@@ -102,7 +101,7 @@ class Http4sRegistryLookupSpec extends Specification with CatsEffect {
       }
 
       Http4sRegistryLookup(client).lookup(repositoryRef, schemaKey).map { result =>
-        result should beLeft(ClientFailure(s"Unexpected response code: ${Forbidden.code}"))
+        result should beLeft(ClientFailure("Unexpected response code: 403"))
       }
     }
 
@@ -121,7 +120,7 @@ class Http4sRegistryLookupSpec extends Specification with CatsEffect {
       }
 
       Http4sRegistryLookup(client).lookup(repositoryRef, schemaKey).map { result =>
-        result should beLeft(ClientFailure(s"Unexpected response code: ${RequestTimeout.code}"))
+        result should beLeft(ClientFailure("Unexpected response code: 408"))
       }
     }
   }
