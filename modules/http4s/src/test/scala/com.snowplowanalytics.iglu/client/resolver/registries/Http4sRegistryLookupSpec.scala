@@ -102,7 +102,7 @@ class Http4sRegistryLookupSpec extends Specification with CatsEffect {
       }
 
       Http4sRegistryLookup(client).lookup(repositoryRef, schemaKey).map { result =>
-        result should beLeft(ClientFailure(s"Unexpected server response: ${Forbidden.code}"))
+        result should beLeft(ClientFailure(s"Unexpected response code: ${Forbidden.code}"))
       }
     }
 
@@ -121,7 +121,7 @@ class Http4sRegistryLookupSpec extends Specification with CatsEffect {
       }
 
       Http4sRegistryLookup(client).lookup(repositoryRef, schemaKey).map { result =>
-        result should beLeft(ClientFailure(s"Unexpected server response: ${RequestTimeout.code}"))
+        result should beLeft(ClientFailure(s"Unexpected response code: ${RequestTimeout.code}"))
       }
     }
   }

@@ -134,7 +134,7 @@ object Http4sRegistryLookup {
           RegistryError.RepoFailure(error).asLeft
         }
       case Status.ClientError(response) =>
-        val error = s"Unexpected server response: ${response.status.code}"
+        val error = s"Unexpected response code: ${response.status.code}"
         (RegistryError.ClientFailure(error): RegistryError).asLeft[A].pure[F]
       case response =>
         response.bodyText.compile.string.map { body =>
