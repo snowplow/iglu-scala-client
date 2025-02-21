@@ -1,3 +1,8 @@
+Version 4.0.2 (2025-02-21)
+--------------------------
+Remove entropy from client failures (#262)
+Install sbt in github actions
+
 Version 4.0.1 (2024-11-19)
 --------------------------
 Consider all `ClientFailure`s as not found in `lookupSchemasUntil` (#260)
