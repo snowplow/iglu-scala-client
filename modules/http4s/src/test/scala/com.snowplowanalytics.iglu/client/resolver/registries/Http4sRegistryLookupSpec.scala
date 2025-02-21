@@ -14,6 +14,7 @@ package com.snowplowanalytics.iglu.client.resolver.registries
 
 import cats.effect.testing.specs2.CatsEffect
 import cats.effect.{IO, Resource}
+import com.snowplowanalytics.iglu.client.resolver.registries.RegistryError.ClientFailure
 import com.snowplowanalytics.iglu.core.{SchemaKey, SchemaList, SchemaVer}
 import io.circe.Json
 import org.http4s.client.{Client => HttpClient}
@@ -82,6 +83,44 @@ class Http4sRegistryLookupSpec extends Specification with CatsEffect {
 
       Http4sRegistryLookup(client).lookup(repositoryRef, schemaKey).map { result =>
         result should beLeft
+      }
+    }
+
+    "return a registry error with status code only for a client failure - Forbidden" in {
+
+      val repositoryRef =
+        Registry.Http(
+          Registry.Config("name", 1, Nil),
+          Registry.HttpConnection(URI.create("http://custom-iglu.com"), None)
+        )
+      val schemaKey = SchemaKey("com.myvendor", "status", "jsonschema", SchemaVer.Full(42, 42, 42))
+
+      val client = HttpClient[IO] { _ =>
+        val dsl = new Http4sDsl[IO] {}; import dsl._
+        Resource.eval(Forbidden("forbidden"))
+      }
+
+      Http4sRegistryLookup(client).lookup(repositoryRef, schemaKey).map { result =>
+        result should beLeft(ClientFailure("Unexpected response code: 403"))
+      }
+    }
+
+    "return a registry error with status code only for a client failure - RequestTimeout" in {
+
+      val repositoryRef =
+        Registry.Http(
+          Registry.Config("name", 1, Nil),
+          Registry.HttpConnection(URI.create("http://custom-iglu.com"), None)
+        )
+      val schemaKey = SchemaKey("com.myvendor", "status", "jsonschema", SchemaVer.Full(42, 42, 42))
+
+      val client = HttpClient[IO] { _ =>
+        val dsl = new Http4sDsl[IO] {}; import dsl._
+        Resource.eval(RequestTimeout("timeout"))
+      }
+
+      Http4sRegistryLookup(client).lookup(repositoryRef, schemaKey).map { result =>
+        result should beLeft(ClientFailure("Unexpected response code: 408"))
       }
     }
   }
