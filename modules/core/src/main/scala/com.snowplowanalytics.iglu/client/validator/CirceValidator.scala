@@ -19,10 +19,10 @@ import com.snowplowanalytics.iglu.client.resolver.StorageTime
 import com.snowplowanalytics.iglu.core.circe.MetaSchemas
 // Scala
 import com.fasterxml.jackson.databind.JsonNode
-import com.networknt.schema.uri.URIFetcher
+import com.networknt.schema.resource.{InputStreamSource, SchemaLoader}
+import com.networknt.schema.AbsoluteIri
 import com.snowplowanalytics.iglu.client.resolver.Resolver.{SchemaItem, SchemaLookupResult}
-import java.io.{ByteArrayInputStream, InputStream}
-import java.net.URI
+import java.io.ByteArrayInputStream
 import java.nio.charset.StandardCharsets
 import scala.jdk.CollectionConverters._
 
@@ -48,41 +48,41 @@ import io.circe.jackson.snowplow.circeToJackson
 
 object CirceValidator extends Validator[Json] {
 
+  // SchemaLoader that returns empty JSON for any external reference
+  // This prevents the validator from making network calls
+  private val noOpSchemaLoader = new SchemaLoader {
+    override def getSchema(iri: AbsoluteIri): InputStreamSource = {
+      // Return empty JSON object which matches any data
+      val emptyJsonObject = "{}"
+      val bytes           = emptyJsonObject.getBytes(StandardCharsets.UTF_8)
+      () => new ByteArrayInputStream(bytes)
+    }
+  }
+
   // These constructors are non-RT because of logging
   private val IgluMetaschema = JsonMetaSchema
     .builder(
       "http://iglucentral.com/schemas/com.snowplowanalytics.self-desc/schema/jsonschema/1-0-0#",
       JsonMetaSchema.getV4
     )
-    .addKeyword(new NonValidationKeyword("self"))
+    .keyword(new NonValidationKeyword("self"))
     .build()
 
   private val V4SchemaInstance = JsonSchemaFactory.getInstance(SpecVersion.VersionFlag.V4)
 
-  private val fakeUrlFetcher = new URIFetcher {
-    override def fetch(uri: URI): InputStream = {
-      // No effect on validation, because we return empty JSON Schema which matches any data.
-      val emptyJsonObject = Json.obj()
-      new ByteArrayInputStream(emptyJsonObject.toString().getBytes(StandardCharsets.UTF_8))
-    }
-  }
-
   private val IgluMetaschemaFactory =
     JsonSchemaFactory
       .builder(V4SchemaInstance)
-      .addMetaSchema(IgluMetaschema)
-      .forceHttps(false)
-      .removeEmptyFragmentSuffix(false)
-      .uriFetcher(fakeUrlFetcher, "http", "https")
+      .metaSchema(IgluMetaschema)
+      .schemaLoaders { loaders => loaders.add(noOpSchemaLoader); () }
       .build()
 
-  private val SchemaValidatorsConfig: SchemaValidatorsConfig = {
-    val config = new SchemaValidatorsConfig()
-    // typeLoose is OpenAPI workaround to cast stringly typed properties
-    // e.g, with default true "5" string would validate against integer type
-    config.setTypeLoose(false)
-    config
-  }
+  private val ValidatorsConfig: SchemaValidatorsConfig =
+    SchemaValidatorsConfig
+      .builder()
+      .typeLoose(false) // typeLoose is OpenAPI workaround to cast stringly typed properties
+      // e.g, with default true "5" string would validate against integer type
+      .build()
 
   private lazy val V4Schema =
     V4SchemaInstance.getSchema(new ObjectMapper().readTree(MetaSchemas.JsonSchemaV4Text))
@@ -120,7 +120,12 @@ object CirceValidator extends Validator[Json] {
     } yield ()
 
   private def fromValidationMessage(m: ValidationMessage): ValidatorReport =
-    ValidatorReport(m.getMessage, m.getPath.some, m.getArguments.toList, m.getType.some)
+    ValidatorReport(
+      m.getMessage,
+      Option(m.getInstanceLocation()).map(_.toString),
+      m.getArguments.toList.map(_.toString),
+      m.getType.some
+    )
 
   private def evaluateSchema(
     schemaAsNode: JsonNode
@@ -128,7 +133,7 @@ object CirceValidator extends Validator[Json] {
     Either
       .catchNonFatal(
         IgluMetaschemaFactory
-          .getSchema(schemaAsNode, SchemaValidatorsConfig)
+          .getSchema(schemaAsNode, ValidatorsConfig)
       )
       .leftMap(ValidatorError.schemaIssue)
   }
@@ -138,7 +143,10 @@ object CirceValidator extends Validator[Json] {
       .validate(schema)
       .asScala
       .toList
-      .map(m => ValidatorError.SchemaIssue(m.getPath, m.getMessage))
+      .map(m =>
+        ValidatorError
+          .SchemaIssue(Option(m.getInstanceLocation()).map(_.toString).getOrElse(""), m.getMessage)
+      )
   }
 
   private[client] object WithCaching {
@@ -206,7 +214,12 @@ object CirceValidator extends Validator[Json] {
         .validate(schema)
         .asScala
         .toList
-        .map(m => ValidatorError.SchemaIssue(m.getPath, m.getMessage))
+        .map(m =>
+          ValidatorError.SchemaIssue(
+            Option(m.getInstanceLocation()).map(_.toString).getOrElse(""),
+            m.getMessage
+          )
+        )
 
       issues match {
         case Nil          => Right(())
