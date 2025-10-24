@@ -81,9 +81,7 @@ object CirceValidator extends Validator[Json] {
   private val ValidatorsConfig: SchemaValidatorsConfig =
     SchemaValidatorsConfig
       .builder()
-      .pathType(
-        PathType.JSON_PATH
-      ) // Use JSONPath format ($.field) instead of JSON Pointer (/field) for backward compatibility
+      .pathType(PathType.LEGACY) // Use LEGACY format to match 1.0.76 behavior exactly
       .typeLoose(false) // typeLoose is OpenAPI workaround to cast stringly typed properties
       // e.g, with default true "5" string would validate against integer type
       .build()
