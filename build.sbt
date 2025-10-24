@@ -13,7 +13,7 @@
 
 lazy val data = (project in file("modules/data"))
   .settings(
-    name := "iglu-scala-client-data",
+    name        := "iglu-scala-client-data",
     description := "Core iglu data"
   )
   .settings(BuildSettings.buildSettings)
@@ -27,13 +27,13 @@ lazy val data = (project in file("modules/data"))
       // Scala (test only)
       Dependencies.Libraries.circeLiteral,
       Dependencies.Libraries.circeJawn,
-      Dependencies.Libraries.specs2,
+      Dependencies.Libraries.specs2
     )
   )
 
 lazy val core = (project in file("modules/core"))
   .settings(
-    name := "iglu-scala-client",
+    name        := "iglu-scala-client",
     description := "Scala client and resolver for Iglu schema repositories"
   )
   .enablePlugins(SiteScaladocPlugin, PreprocessPlugin)
@@ -47,6 +47,7 @@ lazy val core = (project in file("modules/core"))
       // Java
       Dependencies.Libraries.validator,
       Dependencies.Libraries.jackson,
+      Dependencies.Libraries.commonsLang3,
       // Scala
       Dependencies.Libraries.igluCore,
       Dependencies.Libraries.igluCoreCirce,
@@ -65,10 +66,9 @@ lazy val core = (project in file("modules/core"))
   )
   .dependsOn(data)
 
-
 lazy val http4s = (project in file("modules/http4s"))
   .settings(
-    name := "iglu-scala-client-http4s",
+    name        := "iglu-scala-client-http4s",
     description := "Resolver for Iglu schema repositories backed by a http4s client"
   )
   .settings(BuildSettings.buildSettings)

@@ -14,9 +14,10 @@ import sbt._
 object Dependencies {
   object V {
     // Java
-    val validator = "1.0.76"
-    val slf4j     = "1.7.30"
-    val jackson   = "2.14.1"
+    val validator    = "1.5.8"
+    val slf4j        = "1.7.30"
+    val jackson      = "2.18.3"
+    val commonsLang3 = "3.17.0"
 
     // Scala
     val igluCore         = "1.1.3"
@@ -34,28 +35,31 @@ object Dependencies {
 
   object Libraries {
     // Java
-    val validator = "com.networknt"              % "json-schema-validator" % V.validator
-    val jackson   = "com.fasterxml.jackson.core" % "jackson-databind"      % V.jackson
+    val validator    = "com.networknt"              % "json-schema-validator" % V.validator
+    val jackson      = "com.fasterxml.jackson.core" % "jackson-databind"      % V.jackson
+    val commonsLang3 = "org.apache.commons"         % "commons-lang3"         % V.commonsLang3
 
     // Scala
-    val igluCore         = "com.snowplowanalytics"  %% "iglu-core"               % V.igluCore
-    val igluCoreCirce    = "com.snowplowanalytics"  %% "iglu-core-circe"         % V.igluCore
-    val cats             = "org.typelevel"          %% "cats-core"               % V.cats
-    val catsEffect       = "org.typelevel"          %% "cats-effect"             % V.catsEffect
-    val circeCore        = "io.circe"               %% "circe-core"              % V.circe       
-    val circeParser      = "io.circe"               %% "circe-parser"            % V.circe
-    val lruMap           = "com.snowplowanalytics"  %% "scala-lru-map"           % V.lruMap
-    val collectionCompat = "org.scala-lang.modules" %% "scala-collection-compat" % V.collectionCompat
-    val http4sClient     = "org.http4s"             %% "http4s-client"           % V.http4s
-    val http4sCirce      = "org.http4s"             %% "http4s-circe"            % V.http4s
+    val igluCore      = "com.snowplowanalytics" %% "iglu-core"       % V.igluCore
+    val igluCoreCirce = "com.snowplowanalytics" %% "iglu-core-circe" % V.igluCore
+    val cats          = "org.typelevel"         %% "cats-core"       % V.cats
+    val catsEffect    = "org.typelevel"         %% "cats-effect"     % V.catsEffect
+    val circeCore     = "io.circe"              %% "circe-core"      % V.circe
+    val circeParser   = "io.circe"              %% "circe-parser"    % V.circe
+    val lruMap        = "com.snowplowanalytics" %% "scala-lru-map"   % V.lruMap
+    val collectionCompat =
+      "org.scala-lang.modules" %% "scala-collection-compat" % V.collectionCompat
+    val http4sClient = "org.http4s" %% "http4s-client" % V.http4s
+    val http4sCirce  = "org.http4s" %% "http4s-circe"  % V.http4s
 
     // Scala (test only)
-    val circeLiteral     = "io.circe"      %% "circe-literal"              % V.circe            % Test
-    val circeJawn        = "io.circe"      %% "circe-jawn"                 % V.circe            % Test
-    val specs2           = "org.specs2"    %% "specs2-core"                % V.specs2           % Test
-    val specs2Cats       = "org.specs2"    %% "specs2-cats"                % V.specs2           % Test
-    val specs2CatsEffect = "org.typelevel" %% "cats-effect-testing-specs2" % V.specs2CatsEffect % Test
-    val http4sDsl        = "org.http4s"    %% "http4s-dsl"                 % V.http4s           % Test
+    val circeLiteral = "io.circe"   %% "circe-literal" % V.circe  % Test
+    val circeJawn    = "io.circe"   %% "circe-jawn"    % V.circe  % Test
+    val specs2       = "org.specs2" %% "specs2-core"   % V.specs2 % Test
+    val specs2Cats   = "org.specs2" %% "specs2-cats"   % V.specs2 % Test
+    val specs2CatsEffect =
+      "org.typelevel" %% "cats-effect-testing-specs2" % V.specs2CatsEffect % Test
+    val http4sDsl = "org.http4s" %% "http4s-dsl" % V.http4s % Test
 
     // Java (exists to suppress NOP log message, must not be included in compile-time)
     val slf4jNop = "org.slf4j" % "slf4j-nop" % V.slf4j % Test
