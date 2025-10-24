@@ -41,6 +41,7 @@ import com.snowplowanalytics.iglu.core.SchemaKey
 
 // JSON Schema
 import com.networknt.schema._
+import com.networknt.schema.PathType
 
 // circe
 import io.circe.Json
@@ -80,6 +81,9 @@ object CirceValidator extends Validator[Json] {
   private val ValidatorsConfig: SchemaValidatorsConfig =
     SchemaValidatorsConfig
       .builder()
+      .pathType(
+        PathType.JSON_PATH
+      ) // Use JSONPath format ($.field) instead of JSON Pointer (/field) for backward compatibility
       .typeLoose(false) // typeLoose is OpenAPI workaround to cast stringly typed properties
       // e.g, with default true "5" string would validate against integer type
       .build()

@@ -109,8 +109,8 @@ class CachingValidationSpec extends Specification {
     val nonStringExpected = ValidatorError.InvalidData(
       NonEmptyList.of(
         ValidatorReport(
-          "/country: integer found, string expected",
-          Some("/country"),
+          "$.country: integer found, string expected",
+          Some("$.country"),
           List("integer", "string"),
           Some("type")
         )
@@ -119,8 +119,8 @@ class CachingValidationSpec extends Specification {
     val missingKeyExpected = ValidatorError.InvalidData(
       NonEmptyList.of(
         ValidatorReport(
-          ": required property 'beers' not found",
-          Some(""),
+          "$: required property 'beers' not found",
+          Some("$"),
           List("beers"),
           Some("required")
         )
@@ -129,8 +129,8 @@ class CachingValidationSpec extends Specification {
     val heterogeneusArrayExpected = ValidatorError.InvalidData(
       NonEmptyList.of(
         ValidatorReport(
-          "/beers/1: boolean found, string expected",
-          Some("/beers/1"),
+          "$.beers[1]: boolean found, string expected",
+          Some("$.beers[1]"),
           List("boolean", "string"),
           Some("type")
         )
@@ -139,14 +139,14 @@ class CachingValidationSpec extends Specification {
     val doubleErrorExpected = ValidatorError.InvalidData(
       NonEmptyList.of(
         ValidatorReport(
-          "/country: integer found, string expected",
-          Some("/country"),
+          "$.country: integer found, string expected",
+          Some("$.country"),
           List("integer", "string"),
           Some("type")
         ),
         ValidatorReport(
-          "/beers/1: boolean found, string expected",
-          Some("/beers/1"),
+          "$.beers[1]: boolean found, string expected",
+          Some("$.beers[1]"),
           List("boolean", "string"),
           Some("type")
         )
@@ -205,8 +205,8 @@ class CachingValidationSpec extends Specification {
     val expected = ValidatorError.InvalidData(
       NonEmptyList.of(
         ValidatorReport(
-          "/shortKey: must be at most 3 characters long",
-          Some("/shortKey"),
+          "$.shortKey: must be at most 3 characters long",
+          Some("$.shortKey"),
           List("3"),
           Some("maxLength")
         )
@@ -259,8 +259,8 @@ class CachingValidationSpec extends Specification {
     val expected = ValidatorError.InvalidData(
       NonEmptyList.of(
         ValidatorReport(
-          "/twoKeys: property 'three' is not defined in the schema and the schema does not allow additional properties",
-          Some("/twoKeys"),
+          "$.twoKeys: property 'three' is not defined in the schema and the schema does not allow additional properties",
+          Some("$.twoKeys"),
           List("three"),
           Some("additionalProperties")
         )
@@ -289,8 +289,8 @@ class CachingValidationSpec extends Specification {
     val expected = ValidatorError.InvalidData(
       NonEmptyList.of(
         ValidatorReport(
-          "/address: does not match the ipv4 pattern must be a valid RFC 2673 IP address",
-          Some("/address"),
+          "$.address: does not match the ipv4 pattern must be a valid RFC 2673 IP address",
+          Some("$.address"),
           List(
             "ipv4",
             "^(([0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5])\\.){3}([0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5])$",
