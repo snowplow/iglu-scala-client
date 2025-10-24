@@ -31,8 +31,8 @@ import com.typesafe.sbt.site.SiteScaladocPlugin.autoImport._
 object BuildSettings {
 
   lazy val buildSettings = Seq[Setting[_]](
-    organization := "com.snowplowanalytics",
-    scalaVersion := "2.13.9",
+    organization       := "com.snowplowanalytics",
+    scalaVersion       := "2.13.9",
     crossScalaVersions := Seq("3.2.0", "2.13.9", "2.12.17"),
     licenses += ("Apache-2.0", url("http://www.apache.org/licenses/LICENSE-2.0.html")),
     Test / parallelExecution := false, // possible race bugs
@@ -44,15 +44,14 @@ object BuildSettings {
         )
       } else Nil
     }
- )
-
+  )
 
   // Bintray publishing settings
   lazy val publishSettings = Seq[Setting[_]](
-    publishArtifact := true,
-    Test / publishArtifact := false,
-    pomIncludeRepository := { _ => false },
-    homepage := Some(url("http://snowplowanalytics.com")),
+    publishArtifact              := true,
+    Test / publishArtifact       := false,
+    pomIncludeRepository         := { _ => false },
+    homepage                     := Some(url("http://snowplowanalytics.com")),
     ThisBuild / dynverVTagPrefix := false, // Otherwise git tags required to have v-prefix
     developers := List(
       Developer(
@@ -72,7 +71,7 @@ object BuildSettings {
 
   lazy val mimaSettings = Seq(
     mimaPreviousArtifacts := {
-      mimaPreviousVersions.map { organization.value %% name.value % _ }
+      mimaPreviousVersions.map(organization.value %% name.value % _)
     },
     ThisBuild / mimaFailOnNoPrevious := false,
     mimaBinaryIssueFilters ++= Seq(),
@@ -84,14 +83,14 @@ object BuildSettings {
 
   val scoverageSettings = Seq(
     coverageMinimumStmtTotal := 50,
-    coverageFailOnMinimum := false,
-    coverageHighlighting := false,
+    coverageFailOnMinimum    := false,
+    coverageHighlighting     := false,
     (Test / test) := {
       (coverageReport dependsOn (Test / test)).value
     }
   )
 
   val docsSettings = Seq(
-    SiteScaladoc / siteSubdirName := s"${version.value}",
+    SiteScaladoc / siteSubdirName := s"${version.value}"
   )
 }
