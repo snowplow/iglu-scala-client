@@ -32,8 +32,8 @@ object BuildSettings {
 
   lazy val buildSettings = Seq[Setting[_]](
     organization       := "com.snowplowanalytics",
-    scalaVersion       := "2.13.14",
-    crossScalaVersions := Seq("3.2.0", "2.13.14", "2.12.19"),
+    scalaVersion       := "2.13.16",
+    crossScalaVersions := Seq("3.2.0", "2.13.16", "2.12.19"),
     licenses += ("Apache-2.0", url("http://www.apache.org/licenses/LICENSE-2.0.html")),
     Test / parallelExecution := false, // possible race bugs
     libraryDependencies ++= {
