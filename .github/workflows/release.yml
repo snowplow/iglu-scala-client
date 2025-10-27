@@ -6,14 +6,15 @@ on:
       - '*'
 
 jobs:
-  release:
+  docs:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v5
     - uses: coursier/cache-action@v6
 
     - name: Install sbt
       uses: sbt/setup-sbt@v1
+
     - name: Make site
       run: sbt makeSite
 
@@ -24,24 +25,20 @@ jobs:
         folder: modules/core/target/site
         clean: false
 
-    - name: Deploy iglu-scala-client-data to Maven Central
-      run: sbt "project data" ci-release
-      env:
-        PGP_PASSPHRASE: ${{ secrets.SONA_PGP_PASSPHRASE }}
-        PGP_SECRET: ${{ secrets.SONA_PGP_SECRET }}
-        SONATYPE_USERNAME: ${{ secrets.SONA_USER }}
-        SONATYPE_PASSWORD: ${{ secrets.SONA_PASS }}
+  release:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        module: [data, core, http4s]
+    steps:
+    - uses: actions/checkout@v5
+    - uses: coursier/cache-action@v6
 
-    - name: Deploy iglu-scala-client to Maven Central
-      run: sbt "project core" ci-release
-      env:
-        PGP_PASSPHRASE: ${{ secrets.SONA_PGP_PASSPHRASE }}
-        PGP_SECRET: ${{ secrets.SONA_PGP_SECRET }}
-        SONATYPE_USERNAME: ${{ secrets.SONA_USER }}
-        SONATYPE_PASSWORD: ${{ secrets.SONA_PASS }}
+    - name: Install sbt
+      uses: sbt/setup-sbt@v1
 
-    - name: Deploy iglu-scala-client-http4s to Maven Central
-      run: sbt "project http4s" ci-release
+    - name: Deploy ${{ matrix.module }} to Maven Central
+      run: sbt "project ${{ matrix.module }}" ci-release
       env:
         PGP_PASSPHRASE: ${{ secrets.SONA_PGP_PASSPHRASE }}
         PGP_SECRET: ${{ secrets.SONA_PGP_SECRET }}
