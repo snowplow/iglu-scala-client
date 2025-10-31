@@ -33,47 +33,42 @@ class ValidatorMessageFormatSpec extends Specification {
     minimum validator produces correct message format $e1
     maximum validator produces correct message format $e2
     multipleOf validator produces correct message format $e3
+    exclusiveMinimum validator produces correct message format $e4
+    exclusiveMaximum validator produces correct message format $e5
 
   String validators:
-    minLength validator produces correct message format $e4
-    maxLength validator produces correct message format $e5
-    pattern validator produces correct message format $e6
+    minLength validator produces correct message format $e6
+    maxLength validator produces correct message format $e7
+    pattern validator produces correct message format $e8
 
   Array validators:
-    minItems validator produces correct message format $e7
-    maxItems validator produces correct message format $e8
-    uniqueItems validator produces correct message format $e9
-    items validator (via type error) produces correct message format $e10
+    minItems validator produces correct message format $e9
+    maxItems validator produces correct message format $e10
+    uniqueItems validator produces correct message format $e11
+    items validator (via type error) produces correct message format $e12
+    additionalItems validator produces correct message format $e13
 
   Object validators:
-    minProperties validator produces correct message format $e11
-    maxProperties validator produces correct message format $e12
-    required validator produces correct message format $e13
-    additionalProperties validator produces correct message format $e14
+    minProperties validator produces correct message format $e14
+    maxProperties validator produces correct message format $e15
+    required validator produces correct message format $e16
+    additionalProperties validator produces correct message format $e17
+    patternProperties validator produces correct message format $e18
+    dependencies validator produces correct message format $e19
 
   Type validators:
-    type validator produces correct message format $e15
-    enum validator produces correct message format $e16
+    type validator produces correct message format $e20
+    enum validator produces correct message format $e21
 
   Composition validators:
-    allOf validator (via sub-validator) produces correct message format $e17
-    oneOf validator produces correct message format $e18
-    not validator produces correct message format $e19
+    allOf validator (via sub-validator) produces correct message format $e22
+    anyOf validator produces correct message format $e23
+    oneOf validator produces correct message format $e24
+    not validator produces correct message format $e25
 
   Format validators:
-    format validator produces correct message format $e20
+    format validator produces correct message format $e26
   """
-
-  // Helper to check message matches expected pattern
-  def checkMessage(message: String, pattern: String): Boolean = {
-    // Pattern uses placeholders: PATH, ARG1, ARG2, etc.
-    val regex = pattern
-      .replace("PATH", "\\$.*?")
-      .replace("ARG1", ".+")
-      .replace("ARG2", ".+")
-      .replace("ARG3", ".+")
-    message.matches(regex)
-  }
 
   // Numeric validators
 
@@ -116,9 +111,33 @@ class ValidatorMessageFormatSpec extends Specification {
     }
   }
 
+  def e4 = {
+    val schema = json"""{ "minimum": 5, "exclusiveMinimum": true }"""
+    val input  = json"""5"""
+    CirceValidator.validate(input, schema) match {
+      case Left(ValidatorError.InvalidData(errors)) =>
+        val report = errors.head
+        report.keyword must beSome("minimum")
+        report.message must beEqualTo("$: must have a minimum value of 5")
+      case other => ko(s"Expected InvalidData with exclusiveMinimum error, got: $other")
+    }
+  }
+
+  def e5 = {
+    val schema = json"""{ "maximum": 10, "exclusiveMaximum": true }"""
+    val input  = json"""10"""
+    CirceValidator.validate(input, schema) match {
+      case Left(ValidatorError.InvalidData(errors)) =>
+        val report = errors.head
+        report.keyword must beSome("maximum")
+        report.message must beEqualTo("$: must have a maximum value of 10")
+      case other => ko(s"Expected InvalidData with exclusiveMaximum error, got: $other")
+    }
+  }
+
   // String validators
 
-  def e4 = {
+  def e6 = {
     val schema = json"""{ "minLength": 5 }"""
     val input  = json""""abc""""
     CirceValidator.validate(input, schema) match {
@@ -131,7 +150,7 @@ class ValidatorMessageFormatSpec extends Specification {
     }
   }
 
-  def e5 = {
+  def e7 = {
     val schema = json"""{ "maxLength": 3 }"""
     val input  = json""""abcd""""
     CirceValidator.validate(input, schema) match {
@@ -144,7 +163,7 @@ class ValidatorMessageFormatSpec extends Specification {
     }
   }
 
-  def e6 = {
+  def e8 = {
     val schema = json"""{ "pattern": "^[a-z]+$$" }"""
     val input  = json""""ABC123""""
     CirceValidator.validate(input, schema) match {
@@ -159,7 +178,7 @@ class ValidatorMessageFormatSpec extends Specification {
 
   // Array validators
 
-  def e7 = {
+  def e9 = {
     val schema = json"""{ "minItems": 3 }"""
     val input  = json"""[1, 2]"""
     CirceValidator.validate(input, schema) match {
@@ -173,7 +192,7 @@ class ValidatorMessageFormatSpec extends Specification {
     }
   }
 
-  def e8 = {
+  def e10 = {
     val schema = json"""{ "maxItems": 2 }"""
     val input  = json"""[1, 2, 3]"""
     CirceValidator.validate(input, schema) match {
@@ -187,7 +206,7 @@ class ValidatorMessageFormatSpec extends Specification {
     }
   }
 
-  def e9 = {
+  def e11 = {
     val schema = json"""{ "uniqueItems": true }"""
     val input  = json"""[1, 2, 2, 3]"""
     CirceValidator.validate(input, schema) match {
@@ -199,7 +218,7 @@ class ValidatorMessageFormatSpec extends Specification {
     }
   }
 
-  def e10 = {
+  def e12 = {
     val schema = json"""{
       "items": { "type": "string" }
     }"""
@@ -214,9 +233,27 @@ class ValidatorMessageFormatSpec extends Specification {
     }
   }
 
+  def e13 = {
+    val schema = json"""{
+      "items": [
+        { "type": "number" },
+        { "type": "string" }
+      ],
+      "additionalItems": false
+    }"""
+    val input = json"""[1, "two", 3]"""
+    CirceValidator.validate(input, schema) match {
+      case Left(ValidatorError.InvalidData(errors)) =>
+        val report = errors.head
+        report.keyword must beSome("additionalItems")
+        report.message must beEqualTo("$[2]: no validator found at this index")
+      case other => ko(s"Expected InvalidData with additionalItems error, got: $other")
+    }
+  }
+
   // Object validators
 
-  def e11 = {
+  def e14 = {
     val schema = json"""{ "minProperties": 3 }"""
     val input  = json"""{ "a": 1, "b": 2 }"""
     CirceValidator.validate(input, schema) match {
@@ -229,7 +266,7 @@ class ValidatorMessageFormatSpec extends Specification {
     }
   }
 
-  def e12 = {
+  def e15 = {
     val schema = json"""{ "maxProperties": 2 }"""
     val input  = json"""{ "a": 1, "b": 2, "c": 3 }"""
     CirceValidator.validate(input, schema) match {
@@ -242,7 +279,7 @@ class ValidatorMessageFormatSpec extends Specification {
     }
   }
 
-  def e13 = {
+  def e16 = {
     val schema = json"""{
       "properties": {
         "name": { "type": "string" }
@@ -260,7 +297,7 @@ class ValidatorMessageFormatSpec extends Specification {
     }
   }
 
-  def e14 = {
+  def e17 = {
     val schema = json"""{
       "properties": {
         "name": { "type": "string" }
@@ -280,9 +317,47 @@ class ValidatorMessageFormatSpec extends Specification {
     }
   }
 
+  def e18 = {
+    val schema = json"""{
+      "patternProperties": {
+        "^num_": { "type": "number" }
+      },
+      "additionalProperties": false
+    }"""
+    val input = json"""{ "num_value": "not a number" }"""
+    CirceValidator.validate(input, schema) match {
+      case Left(ValidatorError.InvalidData(errors)) =>
+        val report = errors.head
+        // patternProperties validation will fail on type, not patternProperties itself
+        report.keyword must beSome("type")
+        report.message must beEqualTo("$.num_value: string found, number expected")
+      case other => ko(s"Expected InvalidData with type error from patternProperties, got: $other")
+    }
+  }
+
+  def e19 = {
+    val schema = json"""{
+      "properties": {
+        "name": { "type": "string" },
+        "age": { "type": "number" }
+      },
+      "dependencies": {
+        "age": ["name"]
+      }
+    }"""
+    val input = json"""{ "age": 30 }"""
+    CirceValidator.validate(input, schema) match {
+      case Left(ValidatorError.InvalidData(errors)) =>
+        val report = errors.head
+        report.keyword must beSome("dependencies")
+        report.message must beEqualTo("$: has an error with dependencies {age=[name]}")
+      case other => ko(s"Expected InvalidData with dependencies error, got: $other")
+    }
+  }
+
   // Type validators
 
-  def e15 = {
+  def e20 = {
     val schema = json"""{ "type": "string" }"""
     val input  = json"""123"""
     CirceValidator.validate(input, schema) match {
@@ -295,21 +370,23 @@ class ValidatorMessageFormatSpec extends Specification {
     }
   }
 
-  def e16 = {
+  def e21 = {
     val schema = json"""{ "enum": ["red", "green", "blue"] }"""
     val input  = json""""yellow""""
     CirceValidator.validate(input, schema) match {
       case Left(ValidatorError.InvalidData(errors)) =>
         val report = errors.head
         report.keyword must beSome("enum")
-        report.message must contain("does not have a value in the enumeration")
+        report.message must beEqualTo(
+          "$: does not have a value in the enumeration [red, green, blue]"
+        )
       case other => ko(s"Expected InvalidData with enum error, got: $other")
     }
   }
 
   // Composition validators
 
-  def e17 = {
+  def e22 = {
     val schema = json"""{
       "allOf": [
         { "type": "string" },
@@ -326,7 +403,26 @@ class ValidatorMessageFormatSpec extends Specification {
     }
   }
 
-  def e18 = {
+  def e23 = {
+    val schema = json"""{
+      "anyOf": [
+        { "type": "string" },
+        { "type": "number" }
+      ]
+    }"""
+    val input = json"""true"""
+    CirceValidator.validate(input, schema) match {
+      case Left(ValidatorError.InvalidData(errors)) =>
+        // anyOf typically reports sub-validator failures, not anyOf itself
+        // Look for the first error which should be a type error
+        val report = errors.head
+        report.keyword must beSome("type")
+        report.message must beEqualTo("$: boolean found, string expected")
+      case other => ko(s"Expected InvalidData with type error from anyOf, got: $other")
+    }
+  }
+
+  def e24 = {
     val schema = json"""{
       "oneOf": [
         { "type": "number", "multipleOf": 5 },
@@ -338,12 +434,14 @@ class ValidatorMessageFormatSpec extends Specification {
       case Left(ValidatorError.InvalidData(errors)) =>
         val report = errors.head
         report.keyword must beSome("oneOf")
-        report.message must contain("should be valid to one and only one of schema")
+        report.message must beEqualTo(
+          "$: should be valid to one and only one of schema, but more than one are valid: {\"type\":\"number\",\"multipleOf\":5}{\"type\":\"number\",\"multipleOf\":3}"
+        )
       case other => ko(s"Expected InvalidData with oneOf error, got: $other")
     }
   }
 
-  def e19 = {
+  def e25 = {
     val schema = json"""{
       "not": { "type": "string" }
     }"""
@@ -352,21 +450,25 @@ class ValidatorMessageFormatSpec extends Specification {
       case Left(ValidatorError.InvalidData(errors)) =>
         val report = errors.head
         report.keyword must beSome("not")
-        report.message must contain("should not be valid to the schema")
+        report.message must beEqualTo(
+          "$: should not be valid to the schema \"not\" : {\"type\":\"string\"}"
+        )
       case other => ko(s"Expected InvalidData with not error, got: $other")
     }
   }
 
   // Format validators
 
-  def e20 = {
+  def e26 = {
     val schema = json"""{ "format": "ipv4" }"""
     val input  = json""""not-an-ip""""
     CirceValidator.validate(input, schema) match {
       case Left(ValidatorError.InvalidData(errors)) =>
         val report = errors.head
         report.keyword must beSome("format")
-        report.message must contain("does not match the ipv4 pattern")
+        report.message must beEqualTo(
+          """$: does not match the ipv4 pattern ^(([0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5])$"""
+        )
         report.targets.headOption must beSome("ipv4")
       case other => ko(s"Expected InvalidData with format error, got: $other")
     }
