@@ -17,7 +17,7 @@ object Dependencies {
     val validator    = "1.5.8"
     val slf4j        = "1.7.30"
     val jackson      = "2.18.3"
-    val commonsLang3 = "3.17.0"
+    val commonsLang3 = "3.18.0"
 
     // Scala
     val igluCore         = "1.1.3"
