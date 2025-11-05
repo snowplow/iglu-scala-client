@@ -1,3 +1,9 @@
+Version 4.0.3 (2025-11-05)
+--------------------------
+Refactor CI (#265)
+Upgrade json-schema-validator from 1.0.76 to 1.5.8 (#265)
+Add comprehensive validator error message test suite (#266)
+
 Version 4.0.2 (2025-02-21)
 --------------------------
 Remove entropy from client failures (#262)
