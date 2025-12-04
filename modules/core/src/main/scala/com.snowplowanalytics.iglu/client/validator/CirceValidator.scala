@@ -115,8 +115,8 @@ object CirceValidator extends Validator[Json] {
     }
   }
 
-  /** Validate instance against schema and return same instance */
-  private def validateOnReadySchema(
+  /** Validate instance against schema */
+  def validateOnReadySchema(
     schema: JsonSchema,
     instance: Json,
     maxJsonDepth: Int
@@ -165,7 +165,8 @@ object CirceValidator extends Validator[Json] {
     )
   }
 
-  private def evaluateSchema(
+  /** Compile jackson schema to networknt schema */
+  def evaluateSchema(
     schemaAsNode: JsonNode
   ): Either[ValidatorError.InvalidSchema, JsonSchema] = {
     Either
