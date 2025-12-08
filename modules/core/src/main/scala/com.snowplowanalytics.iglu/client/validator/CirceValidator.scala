@@ -115,8 +115,7 @@ object CirceValidator extends Validator[Json] {
     }
   }
 
-  /** Validate instance against schema */
-  def validateOnReadySchema(
+  private def validateOnReadySchema(
     schema: JsonSchema,
     instance: Json,
     maxJsonDepth: Int
