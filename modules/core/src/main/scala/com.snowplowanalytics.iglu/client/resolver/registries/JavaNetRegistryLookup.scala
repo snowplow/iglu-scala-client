@@ -32,7 +32,10 @@ import scala.util.control.NonFatal
 
 object JavaNetRegistryLookup {
 
-  private val ReadTimeoutMs = 4000L
+  private val ReadTimeoutMs    = 4000L
+  private val MaxRetries       = 5
+  private val InitialBackoffMs = 100L
+  private val MaxBackoffMs     = 5000L
 
   private lazy val httpClient = HttpClient
     .newBuilder()
@@ -147,8 +150,17 @@ object JavaNetRegistryLookup {
    * @param apikey optional apikey UUID to authenticate in Iglu Server
    * @return The document at that URL if code is 2xx
    */
-  private def getFromUri[F[_]: Sync](uri: URI, apikey: Option[String]): F[Option[String]] =
-    Sync[F].blocking(executeCall(uri, apikey))
+  private def getFromUri[F[_]: Sync](
+    uri: URI,
+    apikey: Option[String]
+  ): F[Option[String]] = {
+    Sync[F]
+      .blocking {
+        val httpRequest = buildLookupRequest(uri, apikey)
+        val response    = httpClient.send(httpRequest, BodyHandlers.ofString())
+        if (is2xx(response)) response.body.some else None
+      }
+  }
 
   /** Non-RT analog of [[getFromUri]] */
   private def unsafeGetFromUri(uri: URI, apikey: Option[String]): Either[RegistryError, Json] =
@@ -169,10 +181,53 @@ object JavaNetRegistryLookup {
       list <- json.as[SchemaList].leftMap(e => RegistryError.RepoFailure(e.show))
     } yield list
 
-  private def executeCall(uri: URI, apikey: Option[String]): Option[String] = {
+  private def executeCall(uri: URI, apikey: Option[String]): Option[String] =
+    executeCallWithRetry(uri, apikey, 0, httpClient.send(_, BodyHandlers.ofString()))
+
+  private[registries] def executeCallWithRetry(
+    uri: URI,
+    apikey: Option[String],
+    attempt: Int,
+    send: HttpRequest => HttpResponse[String]
+  ): Option[String] = {
     val httpRequest = buildLookupRequest(uri, apikey)
-    val response    = httpClient.send(httpRequest, BodyHandlers.ofString())
-    if (is2xx(response)) response.body.some else None
+    try {
+      val response = send(httpRequest)
+      if (is2xx(response)) {
+        response.body.some
+      } else if (isRetriableStatus(response) && attempt < MaxRetries) {
+        val backoffMs = calculateBackoff(attempt)
+        Thread.sleep(backoffMs)
+        executeCallWithRetry(uri, apikey, attempt + 1, send)
+      } else {
+        None
+      }
+    } catch {
+      case NonFatal(_) if attempt < MaxRetries =>
+        val backoffMs = calculateBackoff(attempt)
+        Thread.sleep(backoffMs)
+        executeCallWithRetry(uri, apikey, attempt + 1, send)
+      case NonFatal(_) =>
+        None
+    }
+  }
+
+  private def calculateBackoff(attempt: Int): Long = {
+    val backoff = InitialBackoffMs * Math.pow(2, attempt.toDouble).toLong
+    Math.min(backoff, MaxBackoffMs)
+  }
+
+  /**
+   * Determines whether an HTTP response status code indicates a transient failure
+   * that should be retried.
+   *
+   * @param response The HTTP response to check
+   * @return true if the status code is retriable (408 Request Timeout, 429 Too Many Requests,
+   *         or 5xx Server Errors), false otherwise
+   */
+  private def isRetriableStatus(response: HttpResponse[String]): Boolean = {
+    val status = response.statusCode()
+    status == 408 || status == 429 || (status >= 500 && status < 600)
   }
 
   private def buildLookupRequest(uri: URI, apikey: Option[String]): HttpRequest = {
