@@ -1,3 +1,8 @@
+Version 4.1.0 (2025-12-18)
+--------------------------
+Add retry mechanism to idLookupInstance (#270)
+Create new public method CirceValidator#compileJsonSchema (#269)
+
 Version 4.0.3 (2025-11-05)
 --------------------------
 Bump commons-lang3 to 3.18.0 (#268)
