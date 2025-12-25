@@ -212,7 +212,7 @@ object ResolverCache {
             Some(TimestampedItem(lookup, storageTime))
           else {
             lookup match {
-              case Right(_) => None
+              case Right(_) => Some(TimestampedItem(lookup, storageTime))
               case Left(failures) =>
                 val noNotFounds = failures.map { case (k, history) =>
                   k -> history.copy(errors = history.errors - RegistryError.NotFound)
