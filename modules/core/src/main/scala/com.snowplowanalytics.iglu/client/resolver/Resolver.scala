@@ -206,6 +206,33 @@ final case class Resolver[F[_]](repos: List[Registry], cache: Option[ResolverCac
   }
 
   /**
+   * Checks if the resolution error indicates server unavailability.
+   *
+   * Returns true when:
+   * - Any custom (non-Iglu Central) repository has a RepoFailure
+   * - All Iglu Central mirrors have a RepoFailure
+   *
+   * Returns false otherwise.
+   *
+   * If a registry has RepoFailure alongside other errors, assume it is unavailable.
+   */
+  def isUnrecoverable(error: ResolutionError): Boolean = {
+    val (igluCentral, custom) = error.value.partition { case (repo, _) =>
+      allIgluCentral.contains(repo)
+    }
+
+    def hasRepoFailure(history: LookupHistory): Boolean =
+      history.errors.exists(_.isInstanceOf[RegistryError.RepoFailure])
+
+    val customUnavailable = custom.values.exists(hasRepoFailure)
+
+    val igluCentralUnavailable =
+      igluCentral.nonEmpty && igluCentral.values.forall(hasRepoFailure)
+
+    customUnavailable || igluCentralUnavailable
+  }
+
+  /**
    * The variant of lookupSchemasUntilResult that returns the result
    * that isn't wrapped with ResolverResult
    */
