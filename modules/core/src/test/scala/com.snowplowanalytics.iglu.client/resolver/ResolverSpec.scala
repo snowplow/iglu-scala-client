@@ -1126,7 +1126,11 @@ class ResolverSpec extends Specification with CatsEffect {
       ResolutionError(
         SortedMap(
           SpecHelpers.IgluCentral.config.name -> LookupHistory(centralErrors, 2, Instant.now()),
-          SpecHelpers.IgluCentralMirror.config.name -> LookupHistory(mirrorErrors, 2, Instant.now()),
+          SpecHelpers.IgluCentralMirror.config.name -> LookupHistory(
+            mirrorErrors,
+            2,
+            Instant.now()
+          ),
           Repos.custom.config.name -> LookupHistory(Set(RegistryError.NotFound), 1, Instant.now())
         )
       )
@@ -1248,7 +1252,7 @@ class ResolverSpec extends Specification with CatsEffect {
           1,
           Instant.now()
         ),
-        Repos.custom.config.name  -> LookupHistory(Set(RegistryError.NotFound), 1, Instant.now()),
+        Repos.custom.config.name -> LookupHistory(Set(RegistryError.NotFound), 1, Instant.now()),
         Repos.custom2.config.name -> LookupHistory(
           Set(RegistryError.ClientFailure("Forbidden")),
           1,
