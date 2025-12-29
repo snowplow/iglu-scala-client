@@ -40,6 +40,7 @@ class RawValidationSpec extends Specification with DataTables {
   validate null in [array, null] type $e8
   invalidate stringly integer with integer type $e9
   validate integer with number type $e10
+  required + additionalProperties returns errors in deterministic order $e11
   """
 
   val simpleSchemaResult: Json =
@@ -244,5 +245,39 @@ class RawValidationSpec extends Specification with DataTables {
     val schema = json"""{ "type": "number" }"""
     val input  = json"""5"""
     CirceValidator.validate(input, schema) must beRight
+  }
+
+  def e11 = {
+    val schema = json"""
+      {
+        "$$schema": "http://iglucentral.com/schemas/com.snowplowanalytics.self-desc/schema/jsonschema/1-0-0#",
+        "type": "object",
+        "properties": {
+          "sku": { "type": "string" },
+          "quantity": { "type": "number" }
+        },
+        "required": ["sku", "quantity"],
+        "additionalProperties": false
+      }
+      """
+    val input = json"""{"skuu": "pedals", "quantity": 2}"""
+    val expected = ValidatorError.InvalidData(
+      NonEmptyList.of(
+        ValidatorReport(
+          "$.skuu: is not defined in the schema and the schema does not allow additional properties",
+          Some("$"),
+          List("skuu"),
+          Some("additionalProperties")
+        ),
+        ValidatorReport(
+          "$.sku: is missing but it is required",
+          Some("$"),
+          List("sku"),
+          Some("required")
+        )
+      )
+    )
+
+    CirceValidator.validate(input, schema) must beLeft(expected)
   }
 }
