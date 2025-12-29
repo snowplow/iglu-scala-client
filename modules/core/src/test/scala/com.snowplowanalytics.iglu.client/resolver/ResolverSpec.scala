@@ -107,7 +107,7 @@ class ResolverSpec extends Specification with CatsEffect {
     return true if there is just one custom repo that returns a ClientFailure $e23
     return true if one Iglu Central repo returns 2 errors and the other one returns one error and one NotFound $e24
 
-  isUnrecoverable should return false when
+  isSystemError should return false when
     [single custom]: NotFound $f1
     [single IC]: NotFound $f2
     [2 custom]: all NotFound $f3
@@ -118,7 +118,7 @@ class ResolverSpec extends Specification with CatsEffect {
     [IC + 2 custom]: all NotFound $f8
     [2 IC mirrors + custom]: all NotFound $f9
 
-  isUnrecoverable should return true when
+  isSystemError should return true when
     [single custom]: RepoFailure $t1
     [single custom]: ClientFailure $t2
     [single IC]: RepoFailure $t3
@@ -780,7 +780,7 @@ class ResolverSpec extends Specification with CatsEffect {
         Repos.custom.config.name -> LookupHistory(Set(RegistryError.NotFound), 1, Instant.now())
       )
     )
-    resolver.isUnrecoverable(resolutionError) should beFalse
+    resolver.isSystemError(resolutionError) should beFalse
   }
 
   // f2: [single IC]: NotFound
@@ -795,7 +795,7 @@ class ResolverSpec extends Specification with CatsEffect {
         )
       )
     )
-    resolver.isUnrecoverable(resolutionError) should beFalse
+    resolver.isSystemError(resolutionError) should beFalse
   }
 
   // f3: [2 custom]: all NotFound
@@ -807,7 +807,7 @@ class ResolverSpec extends Specification with CatsEffect {
         Repos.custom2.config.name -> LookupHistory(Set(RegistryError.NotFound), 1, Instant.now())
       )
     )
-    resolver.isUnrecoverable(resolutionError) should beFalse
+    resolver.isSystemError(resolutionError) should beFalse
   }
 
   // f4: [2 IC mirrors]: one RepoFailure, other NotFound
@@ -828,7 +828,7 @@ class ResolverSpec extends Specification with CatsEffect {
         )
       )
     )
-    resolver.isUnrecoverable(resolutionError) should beFalse
+    resolver.isSystemError(resolutionError) should beFalse
   }
 
   // f5: [2 IC mirrors]: one ClientFailure, other NotFound
@@ -849,7 +849,7 @@ class ResolverSpec extends Specification with CatsEffect {
         )
       )
     )
-    resolver.isUnrecoverable(resolutionError) should beFalse
+    resolver.isSystemError(resolutionError) should beFalse
   }
 
   // f6: [2 IC mirrors]: one has RepoFailure + NotFound mixed, other NotFound
@@ -870,7 +870,7 @@ class ResolverSpec extends Specification with CatsEffect {
         )
       )
     )
-    resolver.isUnrecoverable(resolutionError) should beFalse
+    resolver.isSystemError(resolutionError) should beFalse
   }
 
   // f7: [2 IC mirrors + custom]: one IC RepoFailure, other NotFound, custom NotFound
@@ -893,7 +893,7 @@ class ResolverSpec extends Specification with CatsEffect {
         Repos.custom.config.name -> LookupHistory(Set(RegistryError.NotFound), 1, Instant.now())
       )
     )
-    resolver.isUnrecoverable(resolutionError) should beFalse
+    resolver.isSystemError(resolutionError) should beFalse
   }
 
   // f8: [IC + 2 custom]: all NotFound
@@ -911,7 +911,7 @@ class ResolverSpec extends Specification with CatsEffect {
         Repos.custom2.config.name -> LookupHistory(Set(RegistryError.NotFound), 1, Instant.now())
       )
     )
-    resolver.isUnrecoverable(resolutionError) should beFalse
+    resolver.isSystemError(resolutionError) should beFalse
   }
 
   // f9: [2 IC mirrors + custom]: all NotFound
@@ -934,7 +934,7 @@ class ResolverSpec extends Specification with CatsEffect {
         Repos.custom.config.name -> LookupHistory(Set(RegistryError.NotFound), 1, Instant.now())
       )
     )
-    resolver.isUnrecoverable(resolutionError) should beFalse
+    resolver.isSystemError(resolutionError) should beFalse
   }
 
   // === TRUE CASES (t1-t17) ===
@@ -951,7 +951,7 @@ class ResolverSpec extends Specification with CatsEffect {
         )
       )
     )
-    resolver.isUnrecoverable(resolutionError) should beTrue
+    resolver.isSystemError(resolutionError) should beTrue
   }
 
   // t2: [single custom]: ClientFailure
@@ -966,7 +966,7 @@ class ResolverSpec extends Specification with CatsEffect {
         )
       )
     )
-    resolver.isUnrecoverable(resolutionError) should beTrue
+    resolver.isSystemError(resolutionError) should beTrue
   }
 
   // t3: [single IC]: RepoFailure
@@ -981,7 +981,7 @@ class ResolverSpec extends Specification with CatsEffect {
         )
       )
     )
-    resolver.isUnrecoverable(resolutionError) should beTrue
+    resolver.isSystemError(resolutionError) should beTrue
   }
 
   // t4: [single IC]: ClientFailure
@@ -996,7 +996,7 @@ class ResolverSpec extends Specification with CatsEffect {
         )
       )
     )
-    resolver.isUnrecoverable(resolutionError) should beTrue
+    resolver.isSystemError(resolutionError) should beTrue
   }
 
   // t5: [2 IC mirrors]: both have RepoFailure
@@ -1017,7 +1017,7 @@ class ResolverSpec extends Specification with CatsEffect {
         )
       )
     )
-    resolver.isUnrecoverable(resolutionError) should beTrue
+    resolver.isSystemError(resolutionError) should beTrue
   }
 
   // t6: [2 IC mirrors]: both have ClientFailure
@@ -1038,7 +1038,7 @@ class ResolverSpec extends Specification with CatsEffect {
         )
       )
     )
-    resolver.isUnrecoverable(resolutionError) should beTrue
+    resolver.isSystemError(resolutionError) should beTrue
   }
 
   // t7: [2 IC mirrors]: both have ClientFailure + NotFound mixed
@@ -1059,7 +1059,7 @@ class ResolverSpec extends Specification with CatsEffect {
         )
       )
     )
-    resolver.isUnrecoverable(resolutionError) should beTrue
+    resolver.isSystemError(resolutionError) should beTrue
   }
 
   // t8: [2 IC mirrors + custom]: custom has RepoFailure
@@ -1086,7 +1086,7 @@ class ResolverSpec extends Specification with CatsEffect {
         )
       )
     )
-    resolver.isUnrecoverable(resolutionError) should beTrue
+    resolver.isSystemError(resolutionError) should beTrue
   }
 
   // t9: [2 IC mirrors + custom]: custom has ClientFailure
@@ -1113,7 +1113,7 @@ class ResolverSpec extends Specification with CatsEffect {
         )
       )
     )
-    resolver.isUnrecoverable(resolutionError) should beTrue
+    resolver.isSystemError(resolutionError) should beTrue
   }
 
   // t10: [2 IC mirrors + custom]: both IC mirrors have mixed fatal errors
@@ -1139,10 +1139,10 @@ class ResolverSpec extends Specification with CatsEffect {
     val clientFailure = RegistryError.ClientFailure("Forbidden")
     val notFound      = RegistryError.NotFound
 
-    resolver.isUnrecoverable(
+    resolver.isSystemError(
       mkError(Set(repoFailure, clientFailure), Set(repoFailure, notFound))
     ) should beTrue
-    resolver.isUnrecoverable(
+    resolver.isSystemError(
       mkError(Set(repoFailure, clientFailure, notFound), Set(repoFailure, clientFailure, notFound))
     ) should beTrue
   }
@@ -1173,8 +1173,8 @@ class ResolverSpec extends Specification with CatsEffect {
     val clientFailure = RegistryError.ClientFailure("Forbidden")
     val notFound      = RegistryError.NotFound
 
-    resolver.isUnrecoverable(mkError(Set(repoFailure, clientFailure))) should beTrue
-    resolver.isUnrecoverable(mkError(Set(repoFailure, clientFailure, notFound))) should beTrue
+    resolver.isSystemError(mkError(Set(repoFailure, clientFailure))) should beTrue
+    resolver.isSystemError(mkError(Set(repoFailure, clientFailure, notFound))) should beTrue
   }
 
   // t12: [IC + custom]: custom has RepoFailure + NotFound mixed
@@ -1195,7 +1195,7 @@ class ResolverSpec extends Specification with CatsEffect {
         )
       )
     )
-    resolver.isUnrecoverable(resolutionError) should beTrue
+    resolver.isSystemError(resolutionError) should beTrue
   }
 
   // t13: [IC + custom]: custom has ClientFailure + NotFound mixed
@@ -1216,7 +1216,7 @@ class ResolverSpec extends Specification with CatsEffect {
         )
       )
     )
-    resolver.isUnrecoverable(resolutionError) should beTrue
+    resolver.isSystemError(resolutionError) should beTrue
   }
 
   // t14: [IC + 2 custom]: one custom has RepoFailure
@@ -1238,7 +1238,7 @@ class ResolverSpec extends Specification with CatsEffect {
         )
       )
     )
-    resolver.isUnrecoverable(resolutionError) should beTrue
+    resolver.isSystemError(resolutionError) should beTrue
   }
 
   // t15: [IC + 2 custom]: one custom has ClientFailure
@@ -1260,7 +1260,7 @@ class ResolverSpec extends Specification with CatsEffect {
         )
       )
     )
-    resolver.isUnrecoverable(resolutionError) should beTrue
+    resolver.isSystemError(resolutionError) should beTrue
   }
 
   // t16: [IC + 2 custom]: both custom have RepoFailure
@@ -1286,7 +1286,7 @@ class ResolverSpec extends Specification with CatsEffect {
         )
       )
     )
-    resolver.isUnrecoverable(resolutionError) should beTrue
+    resolver.isSystemError(resolutionError) should beTrue
   }
 
   // t17: [IC + 2 custom]: both custom have ClientFailure
@@ -1312,6 +1312,6 @@ class ResolverSpec extends Specification with CatsEffect {
         )
       )
     )
-    resolver.isUnrecoverable(resolutionError) should beTrue
+    resolver.isSystemError(resolutionError) should beTrue
   }
 }
