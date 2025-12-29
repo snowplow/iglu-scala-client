@@ -206,28 +206,30 @@ final case class Resolver[F[_]](repos: List[Registry], cache: Option[ResolverCac
   }
 
   /**
-   * Checks if the resolution error indicates server unavailability.
+   * Checks if the resolution error indicates a fatal/unrecoverable issue.
    *
    * Returns true when:
-   * - Any custom (non-Iglu Central) repository has a RepoFailure
-   * - All Iglu Central mirrors have a RepoFailure
+   * - Any custom (non-Iglu Central) repository has a RepoFailure or ClientFailure
+   * - All Iglu Central mirrors have a RepoFailure or ClientFailure
    *
    * Returns false otherwise.
    *
-   * If a registry has RepoFailure alongside other errors, assume it is unavailable.
+   * If a registry has a fatal error alongside other errors, assume it is unrecoverable.
    */
   def isUnrecoverable(error: ResolutionError): Boolean = {
     val (igluCentral, custom) = error.value.partition { case (repo, _) =>
       allIgluCentral.contains(repo)
     }
 
-    def hasRepoFailure(history: LookupHistory): Boolean =
-      history.errors.exists(_.isInstanceOf[RegistryError.RepoFailure])
+    def hasFatalError(history: LookupHistory): Boolean =
+      history.errors.exists(e =>
+        e.isInstanceOf[RegistryError.RepoFailure] || e.isInstanceOf[RegistryError.ClientFailure]
+      )
 
-    val customUnavailable = custom.values.exists(hasRepoFailure)
+    val customUnavailable = custom.values.exists(hasFatalError)
 
     val igluCentralUnavailable =
-      igluCentral.nonEmpty && igluCentral.values.forall(hasRepoFailure)
+      igluCentral.nonEmpty && igluCentral.values.forall(hasFatalError)
 
     customUnavailable || igluCentralUnavailable
   }
