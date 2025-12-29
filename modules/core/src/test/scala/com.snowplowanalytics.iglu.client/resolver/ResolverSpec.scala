@@ -117,6 +117,9 @@ class ResolverSpec extends Specification with CatsEffect {
     [2 IC mirrors + custom]: one IC RepoFailure, other NotFound, custom NotFound $f7
     [IC + 2 custom]: all NotFound $f8
     [2 IC mirrors + custom]: all NotFound $f9
+    [2 IC mirrors]: both have ClientFailure + NotFound mixed $f10
+    [IC + custom]: custom has RepoFailure + NotFound mixed $f11
+    [IC + custom]: custom has ClientFailure + NotFound mixed $f12
 
   isSystemError should return true when
     [single custom]: RepoFailure $t1
@@ -125,17 +128,14 @@ class ResolverSpec extends Specification with CatsEffect {
     [single IC]: ClientFailure $t4
     [2 IC mirrors]: both have RepoFailure $t5
     [2 IC mirrors]: both have ClientFailure $t6
-    [2 IC mirrors]: both have ClientFailure + NotFound mixed $t7
-    [2 IC mirrors + custom]: custom has RepoFailure $t8
-    [2 IC mirrors + custom]: custom has ClientFailure $t9
-    [2 IC mirrors + custom]: both IC mirrors have mixed fatal errors $t10
-    [2 IC mirrors + custom]: custom has RepoFailure + ClientFailure mixed $t11
-    [IC + custom]: custom has RepoFailure + NotFound mixed $t12
-    [IC + custom]: custom has ClientFailure + NotFound mixed $t13
-    [IC + 2 custom]: one custom has RepoFailure $t14
-    [IC + 2 custom]: one custom has ClientFailure $t15
-    [IC + 2 custom]: both custom have RepoFailure $t16
-    [IC + 2 custom]: both custom have ClientFailure $t17
+    [2 IC mirrors + custom]: custom has RepoFailure $t7
+    [2 IC mirrors + custom]: custom has ClientFailure $t8
+    [2 IC mirrors + custom]: both IC mirrors have mixed fatal errors $t9
+    [2 IC mirrors + custom]: custom has RepoFailure + ClientFailure mixed $t10
+    [IC + 2 custom]: one custom has RepoFailure $t11
+    [IC + 2 custom]: one custom has ClientFailure $t12
+    [IC + 2 custom]: both custom have RepoFailure $t13
+    [IC + 2 custom]: both custom have ClientFailure $t14
   """
 
   import ResolverSpec._
@@ -1041,8 +1041,8 @@ class ResolverSpec extends Specification with CatsEffect {
     resolver.isSystemError(resolutionError) should beTrue
   }
 
-  // t7: [2 IC mirrors]: both have ClientFailure + NotFound mixed
-  def t7 = {
+  // f10: [2 IC mirrors]: both have ClientFailure + NotFound mixed
+  def f10 = {
     val resolver: Resolver[Id] =
       Resolver.init[Id](0, None, SpecHelpers.IgluCentral, SpecHelpers.IgluCentralMirror)
     val resolutionError = ResolutionError(
@@ -1059,11 +1059,55 @@ class ResolverSpec extends Specification with CatsEffect {
         )
       )
     )
-    resolver.isSystemError(resolutionError) should beTrue
+    resolver.isSystemError(resolutionError) should beFalse
   }
 
-  // t8: [2 IC mirrors + custom]: custom has RepoFailure
-  def t8 = {
+  // f11: [IC + custom]: custom has RepoFailure + NotFound mixed
+  def f11 = {
+    val resolver: Resolver[Id] =
+      Resolver.init[Id](0, None, SpecHelpers.IgluCentral, Repos.custom)
+    val resolutionError = ResolutionError(
+      SortedMap(
+        SpecHelpers.IgluCentral.config.name -> LookupHistory(
+          Set(RegistryError.NotFound),
+          1,
+          Instant.now()
+        ),
+        Repos.custom.config.name -> LookupHistory(
+          Set(RegistryError.RepoFailure("Timeout"), RegistryError.NotFound),
+          2,
+          Instant.now()
+        )
+      )
+    )
+    resolver.isSystemError(resolutionError) should beFalse
+  }
+
+  // f12: [IC + custom]: custom has ClientFailure + NotFound mixed
+  def f12 = {
+    val resolver: Resolver[Id] =
+      Resolver.init[Id](0, None, SpecHelpers.IgluCentral, Repos.custom)
+    val resolutionError = ResolutionError(
+      SortedMap(
+        SpecHelpers.IgluCentral.config.name -> LookupHistory(
+          Set(RegistryError.NotFound),
+          1,
+          Instant.now()
+        ),
+        Repos.custom.config.name -> LookupHistory(
+          Set(RegistryError.ClientFailure("Forbidden"), RegistryError.NotFound),
+          2,
+          Instant.now()
+        )
+      )
+    )
+    resolver.isSystemError(resolutionError) should beFalse
+  }
+
+  // === TRUE CASES (t1-t14) ===
+
+  // t7: [2 IC mirrors + custom]: custom has RepoFailure
+  def t7 = {
     val resolver: Resolver[Id] =
       Resolver
         .init[Id](0, None, SpecHelpers.IgluCentral, SpecHelpers.IgluCentralMirror, Repos.custom)
@@ -1089,8 +1133,8 @@ class ResolverSpec extends Specification with CatsEffect {
     resolver.isSystemError(resolutionError) should beTrue
   }
 
-  // t9: [2 IC mirrors + custom]: custom has ClientFailure
-  def t9 = {
+  // t8: [2 IC mirrors + custom]: custom has ClientFailure
+  def t8 = {
     val resolver: Resolver[Id] =
       Resolver
         .init[Id](0, None, SpecHelpers.IgluCentral, SpecHelpers.IgluCentralMirror, Repos.custom)
@@ -1116,44 +1160,38 @@ class ResolverSpec extends Specification with CatsEffect {
     resolver.isSystemError(resolutionError) should beTrue
   }
 
-  // t10: [2 IC mirrors + custom]: both IC mirrors have mixed fatal errors
+  // t9: [2 IC mirrors + custom]: both IC mirrors have mixed fatal errors (RepoFailure + ClientFailure, no NotFound)
+  def t9 = {
+    val resolver: Resolver[Id] =
+      Resolver
+        .init[Id](0, None, SpecHelpers.IgluCentral, SpecHelpers.IgluCentralMirror, Repos.custom)
+
+    val resolutionError = ResolutionError(
+      SortedMap(
+        SpecHelpers.IgluCentral.config.name -> LookupHistory(
+          Set(RegistryError.RepoFailure("Timeout"), RegistryError.ClientFailure("Forbidden")),
+          2,
+          Instant.now()
+        ),
+        SpecHelpers.IgluCentralMirror.config.name -> LookupHistory(
+          Set(RegistryError.RepoFailure("Connection reset"), RegistryError.ClientFailure("Unauthorized")),
+          2,
+          Instant.now()
+        ),
+        Repos.custom.config.name -> LookupHistory(Set(RegistryError.NotFound), 1, Instant.now())
+      )
+    )
+
+    resolver.isSystemError(resolutionError) should beTrue
+  }
+
+  // t10: [2 IC mirrors + custom]: custom has RepoFailure + ClientFailure mixed (no NotFound)
   def t10 = {
     val resolver: Resolver[Id] =
       Resolver
         .init[Id](0, None, SpecHelpers.IgluCentral, SpecHelpers.IgluCentralMirror, Repos.custom)
 
-    def mkError(centralErrors: Set[RegistryError], mirrorErrors: Set[RegistryError]) =
-      ResolutionError(
-        SortedMap(
-          SpecHelpers.IgluCentral.config.name -> LookupHistory(centralErrors, 2, Instant.now()),
-          SpecHelpers.IgluCentralMirror.config.name -> LookupHistory(
-            mirrorErrors,
-            2,
-            Instant.now()
-          ),
-          Repos.custom.config.name -> LookupHistory(Set(RegistryError.NotFound), 1, Instant.now())
-        )
-      )
-
-    val repoFailure   = RegistryError.RepoFailure("Timeout")
-    val clientFailure = RegistryError.ClientFailure("Forbidden")
-    val notFound      = RegistryError.NotFound
-
-    resolver.isSystemError(
-      mkError(Set(repoFailure, clientFailure), Set(repoFailure, notFound))
-    ) should beTrue
-    resolver.isSystemError(
-      mkError(Set(repoFailure, clientFailure, notFound), Set(repoFailure, clientFailure, notFound))
-    ) should beTrue
-  }
-
-  // t11: [2 IC mirrors + custom]: custom has RepoFailure + ClientFailure mixed
-  def t11 = {
-    val resolver: Resolver[Id] =
-      Resolver
-        .init[Id](0, None, SpecHelpers.IgluCentral, SpecHelpers.IgluCentralMirror, Repos.custom)
-
-    def mkError(errors: Set[RegistryError]) = ResolutionError(
+    val resolutionError = ResolutionError(
       SortedMap(
         SpecHelpers.IgluCentral.config.name -> LookupHistory(
           Set(RegistryError.NotFound),
@@ -1165,62 +1203,19 @@ class ResolverSpec extends Specification with CatsEffect {
           1,
           Instant.now()
         ),
-        Repos.custom.config.name -> LookupHistory(errors, 2, Instant.now())
-      )
-    )
-
-    val repoFailure   = RegistryError.RepoFailure("Timeout")
-    val clientFailure = RegistryError.ClientFailure("Forbidden")
-    val notFound      = RegistryError.NotFound
-
-    resolver.isSystemError(mkError(Set(repoFailure, clientFailure))) should beTrue
-    resolver.isSystemError(mkError(Set(repoFailure, clientFailure, notFound))) should beTrue
-  }
-
-  // t12: [IC + custom]: custom has RepoFailure + NotFound mixed
-  def t12 = {
-    val resolver: Resolver[Id] =
-      Resolver.init[Id](0, None, SpecHelpers.IgluCentral, Repos.custom)
-    val resolutionError = ResolutionError(
-      SortedMap(
-        SpecHelpers.IgluCentral.config.name -> LookupHistory(
-          Set(RegistryError.NotFound),
-          1,
-          Instant.now()
-        ),
         Repos.custom.config.name -> LookupHistory(
-          Set(RegistryError.RepoFailure("Timeout"), RegistryError.NotFound),
+          Set(RegistryError.RepoFailure("Timeout"), RegistryError.ClientFailure("Forbidden")),
           2,
           Instant.now()
         )
       )
     )
+
     resolver.isSystemError(resolutionError) should beTrue
   }
 
-  // t13: [IC + custom]: custom has ClientFailure + NotFound mixed
-  def t13 = {
-    val resolver: Resolver[Id] =
-      Resolver.init[Id](0, None, SpecHelpers.IgluCentral, Repos.custom)
-    val resolutionError = ResolutionError(
-      SortedMap(
-        SpecHelpers.IgluCentral.config.name -> LookupHistory(
-          Set(RegistryError.NotFound),
-          1,
-          Instant.now()
-        ),
-        Repos.custom.config.name -> LookupHistory(
-          Set(RegistryError.ClientFailure("Forbidden"), RegistryError.NotFound),
-          2,
-          Instant.now()
-        )
-      )
-    )
-    resolver.isSystemError(resolutionError) should beTrue
-  }
-
-  // t14: [IC + 2 custom]: one custom has RepoFailure
-  def t14 = {
+  // t11: [IC + 2 custom]: one custom has RepoFailure
+  def t11 = {
     val resolver: Resolver[Id] =
       Resolver.init[Id](0, None, SpecHelpers.IgluCentral, Repos.custom, Repos.custom2)
     val resolutionError = ResolutionError(
@@ -1241,8 +1236,8 @@ class ResolverSpec extends Specification with CatsEffect {
     resolver.isSystemError(resolutionError) should beTrue
   }
 
-  // t15: [IC + 2 custom]: one custom has ClientFailure
-  def t15 = {
+  // t12: [IC + 2 custom]: one custom has ClientFailure
+  def t12 = {
     val resolver: Resolver[Id] =
       Resolver.init[Id](0, None, SpecHelpers.IgluCentral, Repos.custom, Repos.custom2)
     val resolutionError = ResolutionError(
@@ -1263,8 +1258,8 @@ class ResolverSpec extends Specification with CatsEffect {
     resolver.isSystemError(resolutionError) should beTrue
   }
 
-  // t16: [IC + 2 custom]: both custom have RepoFailure
-  def t16 = {
+  // t13: [IC + 2 custom]: both custom have RepoFailure
+  def t13 = {
     val resolver: Resolver[Id] =
       Resolver.init[Id](0, None, SpecHelpers.IgluCentral, Repos.custom, Repos.custom2)
     val resolutionError = ResolutionError(
@@ -1289,8 +1284,8 @@ class ResolverSpec extends Specification with CatsEffect {
     resolver.isSystemError(resolutionError) should beTrue
   }
 
-  // t17: [IC + 2 custom]: both custom have ClientFailure
-  def t17 = {
+  // t14: [IC + 2 custom]: both custom have ClientFailure
+  def t14 = {
     val resolver: Resolver[Id] =
       Resolver.init[Id](0, None, SpecHelpers.IgluCentral, Repos.custom, Repos.custom2)
     val resolutionError = ResolutionError(

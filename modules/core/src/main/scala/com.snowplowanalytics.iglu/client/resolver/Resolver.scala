@@ -209,29 +209,29 @@ final case class Resolver[F[_]](repos: List[Registry], cache: Option[ResolverCac
    * Checks if the resolution error indicates a system/platform issue rather than a data issue.
    *
    * Returns true when:
-   * - Any custom (non-Iglu Central) repository has a RepoFailure or ClientFailure
-   * - All Iglu Central mirrors have a RepoFailure or ClientFailure
+   * - Any custom (non-Iglu Central) repository has ONLY RepoFailure/ClientFailure errors
+   * - All Iglu Central mirrors have ONLY RepoFailure/ClientFailure errors
    *
-   * Returns false otherwise (e.g., NotFound errors indicate missing schema, not system failure).
-   *
-   * If a registry has a fatal error alongside other errors, assume it is a system error.
+   * Returns false otherwise. Notably, if a registry has a NotFound alongside fatal errors,
+   * we consider this NOT a system error because the NotFound confirms the schema doesn't exist.
+   * This prevents crashes when a schema is genuinely missing and the registry later becomes unavailable.
    */
   def isSystemError(error: ResolutionError): Boolean = {
     val (igluCentral, custom) = error.value.partition { case (repo, _) =>
       allIgluCentral.contains(repo)
     }
 
-    def hasFatalError(history: LookupHistory): Boolean =
-      history.errors.exists {
+    def hasOnlyFatalErrors(history: LookupHistory): Boolean =
+      history.errors.nonEmpty && history.errors.forall {
         case _: RegistryError.RepoFailure   => true
         case _: RegistryError.ClientFailure => true
         case RegistryError.NotFound         => false
       }
 
-    val customUnavailable = custom.values.exists(hasFatalError)
+    val customUnavailable = custom.values.exists(hasOnlyFatalErrors)
 
     val igluCentralUnavailable =
-      igluCentral.nonEmpty && igluCentral.values.forall(hasFatalError)
+      igluCentral.nonEmpty && igluCentral.values.forall(hasOnlyFatalErrors)
 
     customUnavailable || igluCentralUnavailable
   }
