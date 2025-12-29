@@ -1174,7 +1174,10 @@ class ResolverSpec extends Specification with CatsEffect {
           Instant.now()
         ),
         SpecHelpers.IgluCentralMirror.config.name -> LookupHistory(
-          Set(RegistryError.RepoFailure("Connection reset"), RegistryError.ClientFailure("Unauthorized")),
+          Set(
+            RegistryError.RepoFailure("Connection reset"),
+            RegistryError.ClientFailure("Unauthorized")
+          ),
           2,
           Instant.now()
         ),
