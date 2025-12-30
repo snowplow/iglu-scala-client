@@ -63,6 +63,12 @@ object ResolverSpec {
         Registry.HttpConnection(URI.create("http://iglu.acme.com"), None)
       )
 
+    val custom2: Registry =
+      Registry.Http(
+        Registry.Config("Iglu Custom Repo 2", 10, List("com.example")),
+        Registry.HttpConnection(URI.create("http://iglu.example.com"), None)
+      )
+
     val httpRep =
       Registry.Http(
         Registry.Config("Mock Repo", 1, List("com.snowplowanalytics.iglu-test")),
@@ -100,6 +106,36 @@ class ResolverSpec extends Specification with CatsEffect {
     return false if there is just one custom repo that returns a RepoFailure $e22
     return true if there is just one custom repo that returns a ClientFailure $e23
     return true if one Iglu Central repo returns 2 errors and the other one returns one error and one NotFound $e24
+
+  isSystemError should return false when
+    [single custom]: NotFound $f1
+    [single IC]: NotFound $f2
+    [2 custom]: all NotFound $f3
+    [2 IC mirrors]: one RepoFailure, other NotFound $f4
+    [2 IC mirrors]: one ClientFailure, other NotFound $f5
+    [2 IC mirrors]: one has RepoFailure + NotFound mixed, other NotFound $f6
+    [2 IC mirrors + custom]: one IC RepoFailure, other NotFound, custom NotFound $f7
+    [IC + 2 custom]: all NotFound $f8
+    [2 IC mirrors + custom]: all NotFound $f9
+    [2 IC mirrors]: both have ClientFailure + NotFound mixed $f10
+    [IC + custom]: custom has RepoFailure + NotFound mixed $f11
+    [IC + custom]: custom has ClientFailure + NotFound mixed $f12
+
+  isSystemError should return true when
+    [single custom]: RepoFailure $t1
+    [single custom]: ClientFailure $t2
+    [single IC]: RepoFailure $t3
+    [single IC]: ClientFailure $t4
+    [2 IC mirrors]: both have RepoFailure $t5
+    [2 IC mirrors]: both have ClientFailure $t6
+    [2 IC mirrors + custom]: custom has RepoFailure $t7
+    [2 IC mirrors + custom]: custom has ClientFailure $t8
+    [2 IC mirrors + custom]: both IC mirrors have mixed fatal errors $t9
+    [2 IC mirrors + custom]: custom has RepoFailure + ClientFailure mixed $t10
+    [IC + 2 custom]: one custom has RepoFailure $t11
+    [IC + 2 custom]: one custom has ClientFailure $t12
+    [IC + 2 custom]: both custom have RepoFailure $t13
+    [IC + 2 custom]: both custom have ClientFailure $t14
   """
 
   import ResolverSpec._
@@ -732,5 +768,548 @@ class ResolverSpec extends Specification with CatsEffect {
     )
 
     resolver.isNotFound(resolutionError) should beTrue
+  }
+
+  // === FALSE CASES (f1-f9) ===
+
+  // f1: [single custom]: NotFound
+  def f1 = {
+    val resolver: Resolver[Id] = Resolver.init[Id](0, None, Repos.custom)
+    val resolutionError = ResolutionError(
+      SortedMap(
+        Repos.custom.config.name -> LookupHistory(Set(RegistryError.NotFound), 1, Instant.now())
+      )
+    )
+    resolver.isSystemError(resolutionError) should beFalse
+  }
+
+  // f2: [single IC]: NotFound
+  def f2 = {
+    val resolver: Resolver[Id] = Resolver.init[Id](0, None, SpecHelpers.IgluCentral)
+    val resolutionError = ResolutionError(
+      SortedMap(
+        SpecHelpers.IgluCentral.config.name -> LookupHistory(
+          Set(RegistryError.NotFound),
+          1,
+          Instant.now()
+        )
+      )
+    )
+    resolver.isSystemError(resolutionError) should beFalse
+  }
+
+  // f3: [2 custom]: all NotFound
+  def f3 = {
+    val resolver: Resolver[Id] = Resolver.init[Id](0, None, Repos.custom, Repos.custom2)
+    val resolutionError = ResolutionError(
+      SortedMap(
+        Repos.custom.config.name  -> LookupHistory(Set(RegistryError.NotFound), 1, Instant.now()),
+        Repos.custom2.config.name -> LookupHistory(Set(RegistryError.NotFound), 1, Instant.now())
+      )
+    )
+    resolver.isSystemError(resolutionError) should beFalse
+  }
+
+  // f4: [2 IC mirrors]: one RepoFailure, other NotFound
+  def f4 = {
+    val resolver: Resolver[Id] =
+      Resolver.init[Id](0, None, SpecHelpers.IgluCentral, SpecHelpers.IgluCentralMirror)
+    val resolutionError = ResolutionError(
+      SortedMap(
+        SpecHelpers.IgluCentral.config.name -> LookupHistory(
+          Set(RegistryError.RepoFailure("Problem")),
+          1,
+          Instant.now()
+        ),
+        SpecHelpers.IgluCentralMirror.config.name -> LookupHistory(
+          Set(RegistryError.NotFound),
+          1,
+          Instant.now()
+        )
+      )
+    )
+    resolver.isSystemError(resolutionError) should beFalse
+  }
+
+  // f5: [2 IC mirrors]: one ClientFailure, other NotFound
+  def f5 = {
+    val resolver: Resolver[Id] =
+      Resolver.init[Id](0, None, SpecHelpers.IgluCentral, SpecHelpers.IgluCentralMirror)
+    val resolutionError = ResolutionError(
+      SortedMap(
+        SpecHelpers.IgluCentral.config.name -> LookupHistory(
+          Set(RegistryError.NotFound),
+          1,
+          Instant.now()
+        ),
+        SpecHelpers.IgluCentralMirror.config.name -> LookupHistory(
+          Set(RegistryError.ClientFailure("Forbidden")),
+          1,
+          Instant.now()
+        )
+      )
+    )
+    resolver.isSystemError(resolutionError) should beFalse
+  }
+
+  // f6: [2 IC mirrors]: one has RepoFailure + NotFound mixed, other NotFound
+  def f6 = {
+    val resolver: Resolver[Id] =
+      Resolver.init[Id](0, None, SpecHelpers.IgluCentral, SpecHelpers.IgluCentralMirror)
+    val resolutionError = ResolutionError(
+      SortedMap(
+        SpecHelpers.IgluCentral.config.name -> LookupHistory(
+          Set(RegistryError.RepoFailure("Timeout"), RegistryError.NotFound),
+          2,
+          Instant.now()
+        ),
+        SpecHelpers.IgluCentralMirror.config.name -> LookupHistory(
+          Set(RegistryError.NotFound),
+          1,
+          Instant.now()
+        )
+      )
+    )
+    resolver.isSystemError(resolutionError) should beFalse
+  }
+
+  // f7: [2 IC mirrors + custom]: one IC RepoFailure, other NotFound, custom NotFound
+  def f7 = {
+    val resolver: Resolver[Id] =
+      Resolver
+        .init[Id](0, None, SpecHelpers.IgluCentral, SpecHelpers.IgluCentralMirror, Repos.custom)
+    val resolutionError = ResolutionError(
+      SortedMap(
+        SpecHelpers.IgluCentral.config.name -> LookupHistory(
+          Set(RegistryError.RepoFailure("Problem")),
+          1,
+          Instant.now()
+        ),
+        SpecHelpers.IgluCentralMirror.config.name -> LookupHistory(
+          Set(RegistryError.NotFound),
+          1,
+          Instant.now()
+        ),
+        Repos.custom.config.name -> LookupHistory(Set(RegistryError.NotFound), 1, Instant.now())
+      )
+    )
+    resolver.isSystemError(resolutionError) should beFalse
+  }
+
+  // f8: [IC + 2 custom]: all NotFound
+  def f8 = {
+    val resolver: Resolver[Id] =
+      Resolver.init[Id](0, None, SpecHelpers.IgluCentral, Repos.custom, Repos.custom2)
+    val resolutionError = ResolutionError(
+      SortedMap(
+        SpecHelpers.IgluCentral.config.name -> LookupHistory(
+          Set(RegistryError.NotFound),
+          1,
+          Instant.now()
+        ),
+        Repos.custom.config.name  -> LookupHistory(Set(RegistryError.NotFound), 1, Instant.now()),
+        Repos.custom2.config.name -> LookupHistory(Set(RegistryError.NotFound), 1, Instant.now())
+      )
+    )
+    resolver.isSystemError(resolutionError) should beFalse
+  }
+
+  // f9: [2 IC mirrors + custom]: all NotFound
+  def f9 = {
+    val resolver: Resolver[Id] =
+      Resolver
+        .init[Id](0, None, SpecHelpers.IgluCentral, SpecHelpers.IgluCentralMirror, Repos.custom)
+    val resolutionError = ResolutionError(
+      SortedMap(
+        SpecHelpers.IgluCentral.config.name -> LookupHistory(
+          Set(RegistryError.NotFound),
+          1,
+          Instant.now()
+        ),
+        SpecHelpers.IgluCentralMirror.config.name -> LookupHistory(
+          Set(RegistryError.NotFound),
+          1,
+          Instant.now()
+        ),
+        Repos.custom.config.name -> LookupHistory(Set(RegistryError.NotFound), 1, Instant.now())
+      )
+    )
+    resolver.isSystemError(resolutionError) should beFalse
+  }
+
+  // === TRUE CASES (t1-t17) ===
+
+  // t1: [single custom]: RepoFailure
+  def t1 = {
+    val resolver: Resolver[Id] = Resolver.init[Id](0, None, Repos.custom)
+    val resolutionError = ResolutionError(
+      SortedMap(
+        Repos.custom.config.name -> LookupHistory(
+          Set(RegistryError.RepoFailure("Boom")),
+          1,
+          Instant.now()
+        )
+      )
+    )
+    resolver.isSystemError(resolutionError) should beTrue
+  }
+
+  // t2: [single custom]: ClientFailure
+  def t2 = {
+    val resolver: Resolver[Id] = Resolver.init[Id](0, None, Repos.custom)
+    val resolutionError = ResolutionError(
+      SortedMap(
+        Repos.custom.config.name -> LookupHistory(
+          Set(RegistryError.ClientFailure("401")),
+          1,
+          Instant.now()
+        )
+      )
+    )
+    resolver.isSystemError(resolutionError) should beTrue
+  }
+
+  // t3: [single IC]: RepoFailure
+  def t3 = {
+    val resolver: Resolver[Id] = Resolver.init[Id](0, None, SpecHelpers.IgluCentral)
+    val resolutionError = ResolutionError(
+      SortedMap(
+        SpecHelpers.IgluCentral.config.name -> LookupHistory(
+          Set(RegistryError.RepoFailure("Connection refused")),
+          1,
+          Instant.now()
+        )
+      )
+    )
+    resolver.isSystemError(resolutionError) should beTrue
+  }
+
+  // t4: [single IC]: ClientFailure
+  def t4 = {
+    val resolver: Resolver[Id] = Resolver.init[Id](0, None, SpecHelpers.IgluCentral)
+    val resolutionError = ResolutionError(
+      SortedMap(
+        SpecHelpers.IgluCentral.config.name -> LookupHistory(
+          Set(RegistryError.ClientFailure("Forbidden")),
+          1,
+          Instant.now()
+        )
+      )
+    )
+    resolver.isSystemError(resolutionError) should beTrue
+  }
+
+  // t5: [2 IC mirrors]: both have RepoFailure
+  def t5 = {
+    val resolver: Resolver[Id] =
+      Resolver.init[Id](0, None, SpecHelpers.IgluCentral, SpecHelpers.IgluCentralMirror)
+    val resolutionError = ResolutionError(
+      SortedMap(
+        SpecHelpers.IgluCentral.config.name -> LookupHistory(
+          Set(RegistryError.RepoFailure("Problem")),
+          1,
+          Instant.now()
+        ),
+        SpecHelpers.IgluCentralMirror.config.name -> LookupHistory(
+          Set(RegistryError.RepoFailure("Network issue")),
+          1,
+          Instant.now()
+        )
+      )
+    )
+    resolver.isSystemError(resolutionError) should beTrue
+  }
+
+  // t6: [2 IC mirrors]: both have ClientFailure
+  def t6 = {
+    val resolver: Resolver[Id] =
+      Resolver.init[Id](0, None, SpecHelpers.IgluCentral, SpecHelpers.IgluCentralMirror)
+    val resolutionError = ResolutionError(
+      SortedMap(
+        SpecHelpers.IgluCentral.config.name -> LookupHistory(
+          Set(RegistryError.ClientFailure("403 Forbidden")),
+          1,
+          Instant.now()
+        ),
+        SpecHelpers.IgluCentralMirror.config.name -> LookupHistory(
+          Set(RegistryError.ClientFailure("401 Unauthorized")),
+          1,
+          Instant.now()
+        )
+      )
+    )
+    resolver.isSystemError(resolutionError) should beTrue
+  }
+
+  // f10: [2 IC mirrors]: both have ClientFailure + NotFound mixed
+  def f10 = {
+    val resolver: Resolver[Id] =
+      Resolver.init[Id](0, None, SpecHelpers.IgluCentral, SpecHelpers.IgluCentralMirror)
+    val resolutionError = ResolutionError(
+      SortedMap(
+        SpecHelpers.IgluCentral.config.name -> LookupHistory(
+          Set(RegistryError.ClientFailure("Forbidden"), RegistryError.NotFound),
+          2,
+          Instant.now()
+        ),
+        SpecHelpers.IgluCentralMirror.config.name -> LookupHistory(
+          Set(RegistryError.ClientFailure("Unauthorized"), RegistryError.NotFound),
+          2,
+          Instant.now()
+        )
+      )
+    )
+    resolver.isSystemError(resolutionError) should beFalse
+  }
+
+  // f11: [IC + custom]: custom has RepoFailure + NotFound mixed
+  def f11 = {
+    val resolver: Resolver[Id] =
+      Resolver.init[Id](0, None, SpecHelpers.IgluCentral, Repos.custom)
+    val resolutionError = ResolutionError(
+      SortedMap(
+        SpecHelpers.IgluCentral.config.name -> LookupHistory(
+          Set(RegistryError.NotFound),
+          1,
+          Instant.now()
+        ),
+        Repos.custom.config.name -> LookupHistory(
+          Set(RegistryError.RepoFailure("Timeout"), RegistryError.NotFound),
+          2,
+          Instant.now()
+        )
+      )
+    )
+    resolver.isSystemError(resolutionError) should beFalse
+  }
+
+  // f12: [IC + custom]: custom has ClientFailure + NotFound mixed
+  def f12 = {
+    val resolver: Resolver[Id] =
+      Resolver.init[Id](0, None, SpecHelpers.IgluCentral, Repos.custom)
+    val resolutionError = ResolutionError(
+      SortedMap(
+        SpecHelpers.IgluCentral.config.name -> LookupHistory(
+          Set(RegistryError.NotFound),
+          1,
+          Instant.now()
+        ),
+        Repos.custom.config.name -> LookupHistory(
+          Set(RegistryError.ClientFailure("Forbidden"), RegistryError.NotFound),
+          2,
+          Instant.now()
+        )
+      )
+    )
+    resolver.isSystemError(resolutionError) should beFalse
+  }
+
+  // === TRUE CASES (t1-t14) ===
+
+  // t7: [2 IC mirrors + custom]: custom has RepoFailure
+  def t7 = {
+    val resolver: Resolver[Id] =
+      Resolver
+        .init[Id](0, None, SpecHelpers.IgluCentral, SpecHelpers.IgluCentralMirror, Repos.custom)
+    val resolutionError = ResolutionError(
+      SortedMap(
+        SpecHelpers.IgluCentral.config.name -> LookupHistory(
+          Set(RegistryError.NotFound),
+          1,
+          Instant.now()
+        ),
+        SpecHelpers.IgluCentralMirror.config.name -> LookupHistory(
+          Set(RegistryError.NotFound),
+          1,
+          Instant.now()
+        ),
+        Repos.custom.config.name -> LookupHistory(
+          Set(RegistryError.RepoFailure("Something went wrong")),
+          1,
+          Instant.now()
+        )
+      )
+    )
+    resolver.isSystemError(resolutionError) should beTrue
+  }
+
+  // t8: [2 IC mirrors + custom]: custom has ClientFailure
+  def t8 = {
+    val resolver: Resolver[Id] =
+      Resolver
+        .init[Id](0, None, SpecHelpers.IgluCentral, SpecHelpers.IgluCentralMirror, Repos.custom)
+    val resolutionError = ResolutionError(
+      SortedMap(
+        SpecHelpers.IgluCentral.config.name -> LookupHistory(
+          Set(RegistryError.NotFound),
+          1,
+          Instant.now()
+        ),
+        SpecHelpers.IgluCentralMirror.config.name -> LookupHistory(
+          Set(RegistryError.NotFound),
+          1,
+          Instant.now()
+        ),
+        Repos.custom.config.name -> LookupHistory(
+          Set(RegistryError.ClientFailure("402")),
+          1,
+          Instant.now()
+        )
+      )
+    )
+    resolver.isSystemError(resolutionError) should beTrue
+  }
+
+  // t9: [2 IC mirrors + custom]: both IC mirrors have mixed fatal errors (RepoFailure + ClientFailure, no NotFound)
+  def t9 = {
+    val resolver: Resolver[Id] =
+      Resolver
+        .init[Id](0, None, SpecHelpers.IgluCentral, SpecHelpers.IgluCentralMirror, Repos.custom)
+
+    val resolutionError = ResolutionError(
+      SortedMap(
+        SpecHelpers.IgluCentral.config.name -> LookupHistory(
+          Set(RegistryError.RepoFailure("Timeout"), RegistryError.ClientFailure("Forbidden")),
+          2,
+          Instant.now()
+        ),
+        SpecHelpers.IgluCentralMirror.config.name -> LookupHistory(
+          Set(
+            RegistryError.RepoFailure("Connection reset"),
+            RegistryError.ClientFailure("Unauthorized")
+          ),
+          2,
+          Instant.now()
+        ),
+        Repos.custom.config.name -> LookupHistory(Set(RegistryError.NotFound), 1, Instant.now())
+      )
+    )
+
+    resolver.isSystemError(resolutionError) should beTrue
+  }
+
+  // t10: [2 IC mirrors + custom]: custom has RepoFailure + ClientFailure mixed (no NotFound)
+  def t10 = {
+    val resolver: Resolver[Id] =
+      Resolver
+        .init[Id](0, None, SpecHelpers.IgluCentral, SpecHelpers.IgluCentralMirror, Repos.custom)
+
+    val resolutionError = ResolutionError(
+      SortedMap(
+        SpecHelpers.IgluCentral.config.name -> LookupHistory(
+          Set(RegistryError.NotFound),
+          1,
+          Instant.now()
+        ),
+        SpecHelpers.IgluCentralMirror.config.name -> LookupHistory(
+          Set(RegistryError.NotFound),
+          1,
+          Instant.now()
+        ),
+        Repos.custom.config.name -> LookupHistory(
+          Set(RegistryError.RepoFailure("Timeout"), RegistryError.ClientFailure("Forbidden")),
+          2,
+          Instant.now()
+        )
+      )
+    )
+
+    resolver.isSystemError(resolutionError) should beTrue
+  }
+
+  // t11: [IC + 2 custom]: one custom has RepoFailure
+  def t11 = {
+    val resolver: Resolver[Id] =
+      Resolver.init[Id](0, None, SpecHelpers.IgluCentral, Repos.custom, Repos.custom2)
+    val resolutionError = ResolutionError(
+      SortedMap(
+        SpecHelpers.IgluCentral.config.name -> LookupHistory(
+          Set(RegistryError.NotFound),
+          1,
+          Instant.now()
+        ),
+        Repos.custom.config.name -> LookupHistory(Set(RegistryError.NotFound), 1, Instant.now()),
+        Repos.custom2.config.name -> LookupHistory(
+          Set(RegistryError.RepoFailure("Unavailable")),
+          1,
+          Instant.now()
+        )
+      )
+    )
+    resolver.isSystemError(resolutionError) should beTrue
+  }
+
+  // t12: [IC + 2 custom]: one custom has ClientFailure
+  def t12 = {
+    val resolver: Resolver[Id] =
+      Resolver.init[Id](0, None, SpecHelpers.IgluCentral, Repos.custom, Repos.custom2)
+    val resolutionError = ResolutionError(
+      SortedMap(
+        SpecHelpers.IgluCentral.config.name -> LookupHistory(
+          Set(RegistryError.NotFound),
+          1,
+          Instant.now()
+        ),
+        Repos.custom.config.name -> LookupHistory(Set(RegistryError.NotFound), 1, Instant.now()),
+        Repos.custom2.config.name -> LookupHistory(
+          Set(RegistryError.ClientFailure("Forbidden")),
+          1,
+          Instant.now()
+        )
+      )
+    )
+    resolver.isSystemError(resolutionError) should beTrue
+  }
+
+  // t13: [IC + 2 custom]: both custom have RepoFailure
+  def t13 = {
+    val resolver: Resolver[Id] =
+      Resolver.init[Id](0, None, SpecHelpers.IgluCentral, Repos.custom, Repos.custom2)
+    val resolutionError = ResolutionError(
+      SortedMap(
+        SpecHelpers.IgluCentral.config.name -> LookupHistory(
+          Set(RegistryError.NotFound),
+          1,
+          Instant.now()
+        ),
+        Repos.custom.config.name -> LookupHistory(
+          Set(RegistryError.RepoFailure("Unavailable")),
+          1,
+          Instant.now()
+        ),
+        Repos.custom2.config.name -> LookupHistory(
+          Set(RegistryError.RepoFailure("Also unavailable")),
+          1,
+          Instant.now()
+        )
+      )
+    )
+    resolver.isSystemError(resolutionError) should beTrue
+  }
+
+  // t14: [IC + 2 custom]: both custom have ClientFailure
+  def t14 = {
+    val resolver: Resolver[Id] =
+      Resolver.init[Id](0, None, SpecHelpers.IgluCentral, Repos.custom, Repos.custom2)
+    val resolutionError = ResolutionError(
+      SortedMap(
+        SpecHelpers.IgluCentral.config.name -> LookupHistory(
+          Set(RegistryError.NotFound),
+          1,
+          Instant.now()
+        ),
+        Repos.custom.config.name -> LookupHistory(
+          Set(RegistryError.ClientFailure("Forbidden")),
+          1,
+          Instant.now()
+        ),
+        Repos.custom2.config.name -> LookupHistory(
+          Set(RegistryError.ClientFailure("Unauthorized")),
+          1,
+          Instant.now()
+        )
+      )
+    )
+    resolver.isSystemError(resolutionError) should beTrue
   }
 }
