@@ -35,7 +35,7 @@ import io.circe.{DecodingFailure, Json}
  * Should provide significant performance boost for the 'check' operation when called frequently.
  */
 final class IgluCirceClient[F[_]] private (
-  resolver: Resolver[F],
+  val resolver: Resolver[F],
   schemaEvaluationCache: SchemaEvaluationCache[F],
   maxJsonDepth: Int
 ) {
