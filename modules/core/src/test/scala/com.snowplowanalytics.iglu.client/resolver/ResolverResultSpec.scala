@@ -75,7 +75,7 @@ class ResolverResultSpec extends Specification with ValidatedMatchers with CatsE
   a Resolver should cache SchemaLists with different models separately $e11
   a Resolver should not cache schema if cache is disabled $e12
   a Resolver should return cached schema when ttl not exceeded $e13
-  a Resolver should return cached schema even when ttl exceeded $e14
+  a Resolver should return cached schema when ttl exceeded $e14
   a Resolver should not spam the registry with similar requests $e15
   a Resolver should return superseding schema if resolveSupersedingSchema is true $e16
   a Resolver shouldn't return superseding schema if resolveSupersedingSchema is false $e17
@@ -96,7 +96,7 @@ class ResolverResultSpec extends Specification with ValidatedMatchers with CatsE
     return 3-0-0 (no 1-*-* and 2-*-* schemas) $e31
     return 3-0-0 from a registry and 3-1-0 from another one $e32
     return cached schema when ttl not exceeded $e33
-    return cached schema even when ttl exceeded $e34
+    refetch the schema from registry when ttl exceeded  $e34
     not cache schema if cache is disabled $e35
     cache errors $e36
     return expected results when called multiple times $e37
@@ -287,7 +287,8 @@ class ResolverResultSpec extends Specification with ValidatedMatchers with CatsE
     val responses = List(
       RegistryError.RepoFailure("Timeout exception 1").asLeft,
       RegistryError.RepoFailure("Timeout exception 2").asLeft,
-      correctSchema.asRight
+      correctSchema.asRight,
+      RegistryError.RepoFailure("Should never be reached").asLeft
     )
 
     implicit val cache = ResolverSpecHelpers.staticResolverCache
@@ -309,7 +310,7 @@ class ResolverResultSpec extends Specification with ValidatedMatchers with CatsE
       _      <- StaticLookup.addTime(2.seconds)
       _      <- resolver.lookupSchemaResult(schemaKey)
       _      <- StaticLookup.addTime(2.seconds)
-      result <- resolver.lookupSchemaResult(schemaKey)
+      result <- resolver.lookupSchemaResult(schemaKey) // ... but don't try to overwrite it
     } yield result
 
     val (state, response) = result.run(ResolverSpecHelpers.RegistryState.init).value
@@ -320,9 +321,8 @@ class ResolverResultSpec extends Specification with ValidatedMatchers with CatsE
         key must beEqualTo(schemaKey) and (value must beEqualTo(Json.Null))
     }
 
-    // Found schemas are cached forever - only 3 requests needed (2 failures + 1 success)
-    // No 4th request because successful result is cached forever
-    val lookupTries = state.req must beEqualTo(3)
+    // Check that it attempted to get fourth schema (500 response)
+    val lookupTries = state.req must beEqualTo(4)
 
     finalResult and lookupTries
   }
@@ -527,9 +527,14 @@ class ResolverResultSpec extends Specification with ValidatedMatchers with CatsE
     val (_, (response1, response2)) =
       result.run(ResolverSpecHelpers.RegistryState.init).value
 
-    // Found schemas are cached forever - same cached item including timestamps even after TTL expired
-    response1 must beRight[SchemaLookupResult].like { case _: ResolverResult.Cached[_, _] =>
-      response1 must beEqualTo(response2)
+    response1 must beRight[SchemaLookupResult].like {
+      case ResolverResult.Cached(_, value1, timestamp1) =>
+        response2 must beRight[SchemaLookupResult].like {
+          case ResolverResult.Cached(_, value2, timestamp2) =>
+            value1 must beEqualTo(
+              value2
+            ) and (timestamp1 mustNotEqual timestamp2) // same value but different timestamps because original item expired
+        }
     }
   }
 
@@ -888,10 +893,15 @@ class ResolverResultSpec extends Specification with ValidatedMatchers with CatsE
       result.run(ResolverSpecHelpers.RegistryState.init).value
 
     response1 must beRight[SchemaContentListLookupResult].like {
-      case ResolverResult.Cached(_, value1, _) =>
-        (response1 mustEqual response2) and
-          (value1.head.self.schemaKey mustEqual schemaKey) and
-          (value1.head.schema mustEqual schema1)
+      case ResolverResult.Cached(_, value1, timestamp1) =>
+        response2 must beRight[SchemaContentListLookupResult].like {
+          case ResolverResult.Cached(_, value2, timestamp2) =>
+            (value1.head.self.schemaKey mustEqual schemaKey) and
+              (value1.head.schema mustEqual schema1) and
+              (value2.head.self.schemaKey mustEqual schemaKey) and
+              (value2.head.schema mustEqual schema2) and
+              (timestamp1 mustNotEqual timestamp2)
+        }
     }
   }
 
@@ -989,25 +999,16 @@ class ResolverResultSpec extends Specification with ValidatedMatchers with CatsE
       (schemaKey100.copy(version = SchemaVer.Full(1, 0, 2)), Json.fromString("1-0-2").asRight)
     )
 
+    val response100_2 = List(
+      (schemaKey100, Json.fromString("1-0-0_2").asRight)
+    )
+
     val response200 = List(
       (schemaKey200, Json.fromString("2-0-0").asRight)
     )
 
-    // Expected result for lookupSchemasUntil(schemaKey214) - includes 2-0-0 from cache
-    val expected214 = List(
+    val response214 = List(
       (schemaKey200, Json.fromString("2-0-0").asRight),
-      (schemaKey200.copy(version = SchemaVer.Full(2, 0, 1)), Json.fromString("2-0-1").asRight),
-      (schemaKey200.copy(version = SchemaVer.Full(2, 0, 2)), Json.fromString("2-0-2").asRight),
-      (schemaKey200, RegistryError.NotFound.asLeft),
-      (schemaKey200.copy(version = SchemaVer.Full(2, 1, 0)), Json.fromString("2-1-0").asRight),
-      (schemaKey200.copy(version = SchemaVer.Full(2, 1, 1)), Json.fromString("2-1-1").asRight),
-      (schemaKey200.copy(version = SchemaVer.Full(2, 1, 2)), Json.fromString("2-1-2").asRight),
-      (schemaKey200.copy(version = SchemaVer.Full(2, 1, 3)), Json.fromString("2-1-3").asRight),
-      (schemaKey200.copy(version = SchemaVer.Full(2, 1, 4)), Json.fromString("2-1-4").asRight)
-    )
-
-    // Mock responses for lookupSchemasUntil(schemaKey214) - excludes 2-0-0 which comes from cache
-    val mock214 = List(
       (schemaKey200.copy(version = SchemaVer.Full(2, 0, 1)), Json.fromString("2-0-1").asRight),
       (schemaKey200.copy(version = SchemaVer.Full(2, 0, 2)), Json.fromString("2-0-2").asRight),
       (schemaKey200, RegistryError.NotFound.asLeft),
@@ -1025,9 +1026,15 @@ class ResolverResultSpec extends Specification with ValidatedMatchers with CatsE
       (schemaKey100.copy(version = SchemaVer.Full(1, 0, 3)), Json.fromString("1-0-3_1").asRight)
     )
 
-    // mock214 is used instead of expected214 because 2-0-0 comes from cache
+    val response103_2 = List(
+      (schemaKey100, Json.fromString("1-0-0_1").asRight),
+      (schemaKey100.copy(version = SchemaVer.Full(1, 0, 1)), Json.fromString("1-0-1_2").asRight),
+      (schemaKey100.copy(version = SchemaVer.Full(1, 0, 2)), Json.fromString("1-0-2_2").asRight),
+      (schemaKey100.copy(version = SchemaVer.Full(1, 0, 3)), Json.fromString("1-0-3_2").asRight)
+    )
+
     val responses =
-      response100_1 ++ response102 ++ response200 ++ mock214 ++ response103_1
+      response100_1 ++ response102 ++ response100_2 ++ response200 ++ response214 ++ response103_1 ++ response103_2
 
     implicit val cache = ResolverSpecHelpers.staticResolverCache
     implicit val clock = ResolverSpecHelpers.staticClock
@@ -1054,8 +1061,7 @@ class ResolverResultSpec extends Specification with ValidatedMatchers with CatsE
       cached100      <- resolver.lookupSchemasUntilResult(schemaKey100)
       cached102      <- resolver.lookupSchemasUntilResult(schemaKey102)
       _              <- StaticLookup.addTime(200.seconds)
-      // After TTL expired, found schemas are still cached forever
-      stillCached100 <- resolver.lookupSchemasUntilResult(schemaKey100)
+      notCached100_2 <- resolver.lookupSchemasUntilResult(schemaKey100)
       _              <- StaticLookup.addTime(300.seconds)
       notCached200   <- resolver.lookupSchemasUntilResult(schemaKey200)
       _              <- StaticLookup.addTime(100.seconds)
@@ -1069,20 +1075,19 @@ class ResolverResultSpec extends Specification with ValidatedMatchers with CatsE
       _              <- StaticLookup.addTime(100.seconds)
       cached103      <- resolver.lookupSchemasUntilResult(schemaKey103)
       _              <- StaticLookup.addTime(200.seconds)
-      // After TTL expired, found schemas are still cached forever
-      stillCached103 <- resolver.lookupSchemasUntilResult(schemaKey103)
+      notCached103_2 <- resolver.lookupSchemasUntilResult(schemaKey103)
     } yield checkResult(notCached100_1, response100_1, schemaKey100) and
+      checkResult(notCached100_2, response100_2, schemaKey100) and
       checkResult(notCached102, response100_1 ++ response102, schemaKey102) and
       checkResult(notCached200, response200, schemaKey200) and
-      checkResult(notCached214, expected214, schemaKey214) and
+      checkResult(notCached214, response214, schemaKey214) and
       checkResult(notCached103_1, response103_1, schemaKey103) and
+      checkResult(notCached103_2, response103_2, schemaKey103) and
       (cached100 mustEqual notCached100_1) and
       (cached102 mustEqual notCached102) and
       (cached200 mustEqual notCached200) and
       (cached214 mustEqual notCached214) and
-      (cached103 mustEqual notCached103_1) and
-      (stillCached100 mustEqual notCached100_1) and
-      (stillCached103 mustEqual notCached103_1)
+      (cached103 mustEqual notCached103_1)
 
     result.run(ResolverSpecHelpers.RegistryState.init).value._2
   }

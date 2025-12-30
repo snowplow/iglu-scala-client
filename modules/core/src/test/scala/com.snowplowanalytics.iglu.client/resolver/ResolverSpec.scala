@@ -314,7 +314,8 @@ class ResolverSpec extends Specification with CatsEffect {
     val responses = List(
       RegistryError.RepoFailure("Timeout exception 1").asLeft,
       RegistryError.RepoFailure("Timeout exception 2").asLeft,
-      correctSchema.asRight
+      correctSchema.asRight,
+      RegistryError.RepoFailure("Should never be reached").asLeft
     )
 
     implicit val cache: CreateResolverCache[StaticLookup] = ResolverSpecHelpers.staticResolverCache
@@ -332,7 +333,7 @@ class ResolverSpec extends Specification with CatsEffect {
       _      <- StaticLookup.addTime(2.seconds)
       _      <- resolver.lookupSchema(schemaKey)
       _      <- StaticLookup.addTime(2.seconds)
-      result <- resolver.lookupSchema(schemaKey)
+      result <- resolver.lookupSchema(schemaKey) // ... but don't try to overwrite it
     } yield result
 
     val (state, response) = result.run(ResolverSpecHelpers.RegistryState.init).value
@@ -340,9 +341,8 @@ class ResolverSpec extends Specification with CatsEffect {
     // Final response must not overwrite a successful one
     val finalResult = response must beRight(correctSchema)
 
-    // Found schemas are cached forever - only 3 requests needed (2 failures + 1 success)
-    // No 4th request because successful result is cached forever
-    val lookupTries = state.req must beEqualTo(3)
+    // Check that it attempted to get fourth schema (500 response)
+    val lookupTries = state.req must beEqualTo(4)
 
     finalResult and lookupTries
   }
