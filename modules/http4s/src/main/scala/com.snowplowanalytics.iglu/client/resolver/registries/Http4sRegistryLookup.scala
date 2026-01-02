@@ -126,7 +126,8 @@ object Http4sRegistryLookup {
           .handleError { e =>
             RegistryError.ClientFailure(s"Could not decode server response. $e").asLeft[A]
           }
-      case Status.ClientError(response) if response.status.code == 404 =>
+      case Status.ClientError(response)
+          if response.status.code == 404 || response.status.code == 403 =>
         (RegistryError.NotFound: RegistryError).asLeft[A].pure[F]
       case Status.ServerError(response) =>
         response.bodyText.compile.string.map { body =>
