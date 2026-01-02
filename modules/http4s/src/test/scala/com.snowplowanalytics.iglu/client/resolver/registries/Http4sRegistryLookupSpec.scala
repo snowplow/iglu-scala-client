@@ -14,7 +14,10 @@ package com.snowplowanalytics.iglu.client.resolver.registries
 
 import cats.effect.testing.specs2.CatsEffect
 import cats.effect.{IO, Resource}
-import com.snowplowanalytics.iglu.client.resolver.registries.RegistryError.ClientFailure
+import com.snowplowanalytics.iglu.client.resolver.registries.RegistryError.{
+  ClientFailure,
+  RepoFailure
+}
 import com.snowplowanalytics.iglu.core.{SchemaKey, SchemaList, SchemaVer}
 import io.circe.Json
 import org.http4s.client.{Client => HttpClient}
@@ -27,7 +30,7 @@ import java.net.URI
 class Http4sRegistryLookupSpec extends Specification with CatsEffect {
 
   "The Http4sRegistryLookup lookup" should {
-    "lookup a valid schema" in {
+    "return schema on 200" in {
 
       val repositoryRef =
         Registry.Http(
@@ -49,7 +52,7 @@ class Http4sRegistryLookupSpec extends Specification with CatsEffect {
       }
     }
 
-    "return a registry error for an unknown schema" in {
+    "return NotFound on 404" in {
 
       val repositoryRef =
         Registry.Http(
@@ -64,11 +67,11 @@ class Http4sRegistryLookupSpec extends Specification with CatsEffect {
       }
 
       Http4sRegistryLookup(client).lookup(repositoryRef, schemaKey).map { result =>
-        result should beLeft
+        result should beLeft(RegistryError.NotFound: RegistryError)
       }
     }
 
-    "return a registry error when http client raises exception" in {
+    "return ClientFailure on client exception" in {
 
       val repositoryRef =
         Registry.Http(
@@ -82,18 +85,18 @@ class Http4sRegistryLookupSpec extends Specification with CatsEffect {
       }
 
       Http4sRegistryLookup(client).lookup(repositoryRef, schemaKey).map { result =>
-        result should beLeft
+        result should beLeft(ClientFailure("boom!"))
       }
     }
 
-    "return a registry error with status code only for a client failure - Forbidden" in {
+    "return NotFound on 403" in {
 
       val repositoryRef =
         Registry.Http(
           Registry.Config("name", 1, Nil),
           Registry.HttpConnection(URI.create("http://custom-iglu.com"), None)
         )
-      val schemaKey = SchemaKey("com.myvendor", "status", "jsonschema", SchemaVer.Full(42, 42, 42))
+      val schemaKey = SchemaKey("com.myvendor", "myname", "jsonschema", SchemaVer.Full(42, 42, 42))
 
       val client = HttpClient[IO] { _ =>
         val dsl = new Http4sDsl[IO] {}; import dsl._
@@ -101,18 +104,18 @@ class Http4sRegistryLookupSpec extends Specification with CatsEffect {
       }
 
       Http4sRegistryLookup(client).lookup(repositoryRef, schemaKey).map { result =>
-        result should beLeft(ClientFailure("Unexpected response code: 403"))
+        result should beLeft(RegistryError.NotFound: RegistryError)
       }
     }
 
-    "return a registry error with status code only for a client failure - RequestTimeout" in {
+    "return ClientFailure on 408" in {
 
       val repositoryRef =
         Registry.Http(
           Registry.Config("name", 1, Nil),
           Registry.HttpConnection(URI.create("http://custom-iglu.com"), None)
         )
-      val schemaKey = SchemaKey("com.myvendor", "status", "jsonschema", SchemaVer.Full(42, 42, 42))
+      val schemaKey = SchemaKey("com.myvendor", "myname", "jsonschema", SchemaVer.Full(42, 42, 42))
 
       val client = HttpClient[IO] { _ =>
         val dsl = new Http4sDsl[IO] {}; import dsl._
@@ -123,10 +126,50 @@ class Http4sRegistryLookupSpec extends Specification with CatsEffect {
         result should beLeft(ClientFailure("Unexpected response code: 408"))
       }
     }
+
+    "return RepoFailure on 500" in {
+
+      val repositoryRef =
+        Registry.Http(
+          Registry.Config("name", 1, Nil),
+          Registry.HttpConnection(URI.create("http://custom-iglu.com"), None)
+        )
+      val schemaKey = SchemaKey("com.myvendor", "myname", "jsonschema", SchemaVer.Full(42, 42, 42))
+
+      val client = HttpClient[IO] { _ =>
+        val dsl = new Http4sDsl[IO] {}; import dsl._
+        Resource.eval(InternalServerError("internal error"))
+      }
+
+      Http4sRegistryLookup(client).lookup(repositoryRef, schemaKey).map { result =>
+        result should beLeft(RepoFailure("Unexpected server response: internal error"))
+      }
+    }
+
+    "return ClientFailure on 200 with invalid JSON" in {
+
+      val repositoryRef =
+        Registry.Http(
+          Registry.Config("name", 1, Nil),
+          Registry.HttpConnection(URI.create("http://custom-iglu.com"), None)
+        )
+      val schemaKey = SchemaKey("com.myvendor", "myname", "jsonschema", SchemaVer.Full(42, 42, 42))
+
+      val client = HttpClient[IO] { _ =>
+        val dsl = new Http4sDsl[IO] {}; import dsl._
+        Resource.eval(Ok("not valid json"))
+      }
+
+      Http4sRegistryLookup(client).lookup(repositoryRef, schemaKey).map { result =>
+        result should beLeft.like { case ClientFailure(msg) =>
+          msg must startWith("Could not decode server response.")
+        }
+      }
+    }
   }
 
   "The Http4sRegistryLookup list" should {
-    "list schemas for a valid vendor and name" in {
+    "return schema list on 200" in {
 
       val registry =
         Registry.Http(
@@ -156,7 +199,7 @@ class Http4sRegistryLookupSpec extends Specification with CatsEffect {
       }
     }
 
-    "return a registry error when http client raises exception" in {
+    "return ClientFailure on client exception" in {
 
       val registry =
         Registry.Http(
@@ -169,7 +212,7 @@ class Http4sRegistryLookupSpec extends Specification with CatsEffect {
       }
 
       Http4sRegistryLookup(client).list(registry, "com.myvendor", "myname", 42).map { result =>
-        result should beLeft
+        result should beLeft(ClientFailure("boom!"))
       }
     }
 
