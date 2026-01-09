@@ -1,3 +1,10 @@
+Version 4.2.0 (2026-01-09)
+--------------------------
+Treat 403 as NotFound in Http4sRegistryLookup (#276)
+Revert "Cache found schemas forever (#272)" (#275)
+Add Resolver#isSystemError (#273)
+Cache found schemas forever (#272)
+
 Version 4.1.0 (2025-12-18)
 --------------------------
 Add retry mechanism to idLookupInstance (#270)
