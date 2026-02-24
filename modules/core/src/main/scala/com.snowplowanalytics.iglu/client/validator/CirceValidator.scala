@@ -28,7 +28,7 @@ import com.snowplowanalytics.lrumap.{CreateLruMap, LruMap}
 import com.snowplowanalytics.iglu.core.SchemaKey
 
 // Native JSON Schema Validator
-import com.snowplowanalytics.iglu.jsonschema.{CompiledSchema, ValidationError, Validator}
+import com.snowplowanalytics.iglu.jsonschema.{CompiledSchema, ValidationError, Validator => NativeValidator}
 
 // circe
 import io.circe.Json
@@ -49,7 +49,7 @@ object CirceValidator extends validator.Validator[Json] {
     if (maxJsonDepth < Int.MaxValue && jsonDepth(schema) > maxJsonDepth)
       List(ValidatorError.SchemaIssue("/", "Maximum allowed JSON depth exceeded"))
     else
-      Validator.checkSchema(schema).toList.map { e =>
+      NativeValidator.checkSchema(schema).toList.map { e =>
         ValidatorError.SchemaIssue(
           e.path.render,
           e.render
@@ -107,7 +107,7 @@ object CirceValidator extends validator.Validator[Json] {
       return ValidatorError.InvalidSchema(NonEmptyList.one(issue)).asLeft
     }
     // Validate schema against Draft-04 meta-schema first
-    val metaErrors = Validator.checkSchema(schema)
+    val metaErrors = NativeValidator.checkSchema(schema)
     metaErrors.toList match {
       case head :: tail =>
         val issues = NonEmptyList(head, tail).map(e =>
@@ -116,7 +116,7 @@ object CirceValidator extends validator.Validator[Json] {
         return ValidatorError.InvalidSchema(issues).asLeft
       case Nil => ()
     }
-    Validator
+    NativeValidator
       .compile(schema)
       .leftMap(err =>
         ValidatorError.InvalidSchema(
