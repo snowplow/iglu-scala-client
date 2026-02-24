@@ -44,11 +44,8 @@ lazy val core = (project in file("modules/core"))
   .settings(BuildSettings.docsSettings)
   .settings(
     libraryDependencies ++= Seq(
-      // Java
-      Dependencies.Libraries.validator,
-      Dependencies.Libraries.jackson,
-      Dependencies.Libraries.commonsLang3,
       // Scala
+      Dependencies.Libraries.nativeValidator,
       Dependencies.Libraries.igluCore,
       Dependencies.Libraries.igluCoreCirce,
       Dependencies.Libraries.catsEffect,
@@ -59,9 +56,7 @@ lazy val core = (project in file("modules/core"))
       Dependencies.Libraries.circeLiteral,
       Dependencies.Libraries.specs2,
       Dependencies.Libraries.specs2Cats,
-      Dependencies.Libraries.specs2CatsEffect,
-      // Java (test only)
-      Dependencies.Libraries.slf4jNop
+      Dependencies.Libraries.specs2CatsEffect
     )
   )
   .dependsOn(data)

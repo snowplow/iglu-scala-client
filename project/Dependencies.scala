@@ -13,12 +13,6 @@ import sbt._
 
 object Dependencies {
   object V {
-    // Java
-    val validator    = "1.5.8"
-    val slf4j        = "1.7.30"
-    val jackson      = "2.18.3"
-    val commonsLang3 = "3.18.0"
-
     // Scala
     val igluCore         = "1.1.3"
     val cats             = "2.9.0"
@@ -34,12 +28,10 @@ object Dependencies {
   }
 
   object Libraries {
-    // Java
-    val validator    = "com.networknt"              % "json-schema-validator" % V.validator
-    val jackson      = "com.fasterxml.jackson.core" % "jackson-databind"      % V.jackson
-    val commonsLang3 = "org.apache.commons"         % "commons-lang3"         % V.commonsLang3
-
     // Scala
+    val nativeValidator =
+      "com.snowplowanalytics" %% "json-schema-validator" % "0.1.0-SNAPSHOT"
+
     val igluCore      = "com.snowplowanalytics" %% "iglu-core"       % V.igluCore
     val igluCoreCirce = "com.snowplowanalytics" %% "iglu-core-circe" % V.igluCore
     val cats          = "org.typelevel"         %% "cats-core"       % V.cats
@@ -61,7 +53,5 @@ object Dependencies {
       "org.typelevel" %% "cats-effect-testing-specs2" % V.specs2CatsEffect % Test
     val http4sDsl = "org.http4s" %% "http4s-dsl" % V.http4s % Test
 
-    // Java (exists to suppress NOP log message, must not be included in compile-time)
-    val slf4jNop = "org.slf4j" % "slf4j-nop" % V.slf4j % Test
   }
 }

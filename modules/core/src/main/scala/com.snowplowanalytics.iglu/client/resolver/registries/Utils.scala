@@ -23,9 +23,6 @@ import cats.syntax.show._
 // circe
 import io.circe.ParsingFailure
 
-// Apache Commons
-import org.apache.commons.lang3.exception.ExceptionUtils
-
 private[registries] object Utils {
 
   /**
@@ -40,12 +37,22 @@ private[registries] object Utils {
       case _: NullPointerException =>
         RegistryError.ClientFailure("Provided URL was null").asLeft
       case e: IllegalArgumentException =>
-        val error = ExceptionUtils.getRootCause(e).getMessage
+        val error = rootCause(e).getMessage
         RegistryError.ClientFailure(s"Provided URI string violates RFC 2396: [$error]").asLeft
     }
 
   def invalidSchema(failure: ParsingFailure): RegistryError =
     RegistryError.RepoFailure(failure.show)
+
+  private def rootCause(t: Throwable): Throwable = {
+    var current = t
+    val seen    = new java.util.IdentityHashMap[Throwable, java.lang.Boolean]()
+    while (current.getCause != null && !seen.containsKey(current.getCause)) {
+      seen.put(current, java.lang.Boolean.TRUE)
+      current = current.getCause
+    }
+    current
+  }
 
   def repoFailure(failure: Throwable): RegistryError =
     RegistryError.RepoFailure(
