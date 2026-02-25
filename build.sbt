@@ -61,6 +61,16 @@ lazy val core = (project in file("modules/core"))
   )
   .dependsOn(data)
 
+lazy val benchmark = (project in file("modules/benchmark"))
+  .enablePlugins(JmhPlugin)
+  .dependsOn(core)
+  .settings(BuildSettings.buildSettings)
+  .settings(
+    crossScalaVersions := Seq("2.13.16"),
+    publish / skip := true,
+    libraryDependencies += "io.circe" %% "circe-parser" % Dependencies.V.circe
+  )
+
 lazy val http4s = (project in file("modules/http4s"))
   .settings(
     name        := "iglu-scala-client-http4s",
