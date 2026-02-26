@@ -30,30 +30,32 @@ import com.snowplowanalytics.iglu.client.validator.CirceValidator
 @Fork(1)
 class ValidatorBenchmark {
 
-  var schema: Json = _
-  var instances: Array[Json] = _
+  var schema: Json                            = _
+  var instances: Array[Json]                  = _
   var compiled: CirceValidator.CompiledSchema = _
 
   @Setup(Level.Trial)
   def setup(): Unit = {
     schema = {
       val stream = getClass.getResourceAsStream("/draft-04/schema.json")
-      val raw = scala.io.Source.fromInputStream(stream, "UTF-8").mkString
+      val raw    = scala.io.Source.fromInputStream(stream, "UTF-8").mkString
       stream.close()
       parseJson(raw).fold(throw _, identity)
     }
 
     instances = {
       val stream = getClass.getResourceAsStream("/draft-04/instances.jsonl")
-      val lines = scala.io.Source.fromInputStream(stream, "UTF-8").getLines().toArray
+      val lines  = scala.io.Source.fromInputStream(stream, "UTF-8").getLines().toArray
       stream.close()
       lines.map(line => parseJson(line).fold(throw _, identity))
     }
 
-    compiled = CirceValidator.compileJsonSchema(schema, Int.MaxValue).fold(
-      e => throw new RuntimeException(s"Schema compilation failed: $e"),
-      identity
-    )
+    compiled = CirceValidator
+      .compileJsonSchema(schema, Int.MaxValue)
+      .fold(
+        e => throw new RuntimeException(s"Schema compilation failed: $e"),
+        identity
+      )
   }
 
   @Benchmark
@@ -75,7 +77,6 @@ class ValidatorBenchmark {
   }
 
   @Benchmark
-  def checkSchema(bh: Blackhole): Unit = {
+  def checkSchema(bh: Blackhole): Unit =
     bh.consume(CirceValidator.checkSchema(schema, Int.MaxValue))
-  }
 }

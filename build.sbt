@@ -45,7 +45,6 @@ lazy val core = (project in file("modules/core"))
   .settings(
     libraryDependencies ++= Seq(
       // Scala
-      Dependencies.Libraries.nativeValidator,
       Dependencies.Libraries.igluCore,
       Dependencies.Libraries.igluCoreCirce,
       Dependencies.Libraries.catsEffect,

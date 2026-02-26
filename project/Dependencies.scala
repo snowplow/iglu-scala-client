@@ -29,9 +29,6 @@ object Dependencies {
 
   object Libraries {
     // Scala
-    val nativeValidator =
-      "com.snowplowanalytics" %% "json-schema-validator" % "0.1.0-SNAPSHOT"
-
     val igluCore      = "com.snowplowanalytics" %% "iglu-core"       % V.igluCore
     val igluCoreCirce = "com.snowplowanalytics" %% "iglu-core-circe" % V.igluCore
     val cats          = "org.typelevel"         %% "cats-core"       % V.cats
