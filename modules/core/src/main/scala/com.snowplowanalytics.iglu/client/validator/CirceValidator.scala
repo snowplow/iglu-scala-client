@@ -115,13 +115,20 @@ object CirceValidator extends validator.Validator[Json] {
       val issue = ValidatorError.SchemaIssue("/", "Maximum allowed JSON depth exceeded")
       return ValidatorError.InvalidSchema(NonEmptyList.one(issue)).asLeft
     }
-    NativeValidator
-      .compile(schema)
-      .leftMap(err =>
-        ValidatorError.InvalidSchema(
-          NonEmptyList.one(ValidatorError.SchemaIssue(err.path, err.message))
-        )
-      )
+    // Validate schema against meta-schema first (like networknt's validateSchema + evaluateSchema)
+    val schemaIssues = checkSchema(schema, maxJsonDepth)
+    schemaIssues match {
+      case head :: tail =>
+        ValidatorError.InvalidSchema(NonEmptyList(head, tail)).asLeft
+      case Nil =>
+        NativeValidator
+          .compile(schema)
+          .leftMap(err =>
+            ValidatorError.InvalidSchema(
+              NonEmptyList.one(ValidatorError.SchemaIssue(err.path, err.message))
+            )
+          )
+    }
   }
 
   private def jsonDepth(json: Json): Int = {
@@ -136,7 +143,8 @@ object CirceValidator extends validator.Validator[Json] {
           else arr.foldLeft(depth)((max, elem) => math.max(max, go(elem, depth + 1))),
         jsonObject = obj =>
           if (obj.isEmpty) depth
-          else obj.toIterable.foldLeft(depth) { case (max, (_, v)) => math.max(max, go(v, depth + 1)) }
+          else
+            obj.toIterable.foldLeft(depth) { case (max, (_, v)) => math.max(max, go(v, depth + 1)) }
       )
     go(json, 1)
   }
