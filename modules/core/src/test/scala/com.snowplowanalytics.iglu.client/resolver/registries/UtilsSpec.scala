@@ -13,7 +13,6 @@
 package com.snowplowanalytics.iglu.client.resolver.registries
 
 import java.net.URI
-
 import io.circe.ParsingFailure
 
 import org.specs2.Specification
@@ -40,10 +39,8 @@ class UtilsSpec extends Specification {
   }
 
   def e3 = {
-    // Use a string that triggers IllegalArgumentException via URI.create
-    val result = Utils.stringToUri("http://example.com/invalid path with spaces")
-    // This may actually succeed since URI.create is lenient; test either way
-    result must (beRight[URI] or beLeft[RegistryError])
+    val result = Utils.stringToUri("http://exa mple.com")
+    result must beLeft[RegistryError].which(_.isInstanceOf[RegistryError.ClientFailure])
   }
 
   def e4 = {
