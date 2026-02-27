@@ -21,6 +21,7 @@ import io.circe.Json
 import io.circe.parser.{parse => parseJson}
 
 import com.snowplowanalytics.iglu.client.validator.CirceValidator
+import com.snowplowanalytics.iglu.jsonschema.{Validator => NativeValidator}
 
 @State(Scope.Benchmark)
 @BenchmarkMode(Array(Mode.Throughput))
@@ -50,8 +51,8 @@ class ValidatorBenchmark {
       lines.map(line => parseJson(line).fold(throw _, identity))
     }
 
-    compiled = CirceValidator
-      .compileJsonSchema(schema, Int.MaxValue)
+    compiled = NativeValidator
+      .compile(schema)
       .fold(
         e => throw new RuntimeException(s"Schema compilation failed: $e"),
         identity
@@ -62,7 +63,8 @@ class ValidatorBenchmark {
   def compileAndValidate(bh: Blackhole): Unit = {
     var i = 0
     while (i < instances.length) {
-      bh.consume(CirceValidator.validate(instances(i), schema))
+      val cs = NativeValidator.compile(schema).fold(e => throw new RuntimeException(e.toString), identity)
+      bh.consume(CirceValidator.validateCompiled(instances(i), cs))
       i += 1
     }
   }

@@ -9,13 +9,12 @@
  */
 package com.snowplowanalytics.iglu.jsonschema
 
-/**
- * Represents a path to a location in a JSON document. Used for error reporting.
- */
+/** Represents a path to a location in a JSON document. Used for error reporting.
+  */
 sealed trait JsonPath {
   def render: String
   def field(name: String): JsonPath = JsonPath.Field(this, name)
-  def index(idx: Int): JsonPath     = JsonPath.Index(this, idx)
+  def index(idx: Int): JsonPath = JsonPath.Index(this, idx)
 }
 
 object JsonPath {

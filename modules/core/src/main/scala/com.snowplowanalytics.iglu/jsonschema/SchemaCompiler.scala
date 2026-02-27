@@ -13,9 +13,8 @@ import scala.collection.mutable
 import java.util.{HashMap => JHashMap}
 import io.circe.{Json, JsonObject}
 
-/**
- * Compiles JSON Schema (as Circe Json) into optimized Schema AST. Compilation happens once per schema, validation happens many times.
- */
+/** Compiles JSON Schema (as Circe Json) into optimized Schema AST. Compilation happens once per schema, validation happens many times.
+  */
 object SchemaCompiler {
 
   case class CompilationError(path: String, message: String)
@@ -69,15 +68,10 @@ object SchemaCompiler {
             case Some(value) => Right(value)
             case None =>
               current.asArray.flatMap { arr =>
-                scala.util
-                  .Try(segment.toInt)
-                  .toOption
-                  .filter(i => i >= 0 && i < arr.size)
-                  .map(arr(_))
+                scala.util.Try(segment.toInt).toOption.filter(i => i >= 0 && i < arr.size).map(arr(_))
               } match {
                 case Some(value) => Right(value)
-                case None =>
-                  Left(CompilationError(path, s"Cannot resolve $$ref pointer: #/$pointer"))
+                case None        => Left(CompilationError(path, s"Cannot resolve $$ref pointer: #/$pointer"))
               }
           }
         }
@@ -86,15 +80,11 @@ object SchemaCompiler {
 
     private def decodePointerSegment(segment: String): String = {
       val unescaped = segment.replace("~1", "/").replace("~0", "~")
-      java.net.URLDecoder.decode(unescaped, "UTF-8")
+      if (!unescaped.contains('%')) unescaped else java.net.URLDecoder.decode(unescaped, "UTF-8")
     }
   }
 
-  private def compileJson(
-    json: Json,
-    path: String,
-    ctx: CompilationContext
-  ): Either[CompilationError, Schema] = {
+  private def compileJson(json: Json, path: String, ctx: CompilationContext): Either[CompilationError, Schema] = {
     json.fold(
       jsonNull = Left(CompilationError(path, "Schema cannot be null")),
       jsonBoolean = b => Right(if (b) Schema.Empty else Schema.Never),
@@ -105,11 +95,7 @@ object SchemaCompiler {
     )
   }
 
-  private def compileObject(
-    obj: JsonObject,
-    path: String,
-    ctx: CompilationContext
-  ): Either[CompilationError, Schema] = {
+  private def compileObject(obj: JsonObject, path: String, ctx: CompilationContext): Either[CompilationError, Schema] = {
     if (obj.isEmpty) return Right(Schema.Empty)
 
     // $ref overrides all sibling keywords (Draft-04 spec)
@@ -121,33 +107,33 @@ object SchemaCompiler {
         }
       case None =>
         for {
-          types     <- compileType(obj, path)
-          `enum`    <- compileEnum(obj, path)
+          types <- compileType(obj, path)
+          `enum` <- compileEnum(obj, path)
           minLength <- compilePositiveInt(obj, "minLength", path)
           maxLength <- compilePositiveInt(obj, "maxLength", path)
-          pattern   <- compilePattern(obj, path)
-          format    <- compileFormat(obj, path)
-          minimum   <- compileNumber(obj, "minimum", path)
-          maximum   <- compileNumber(obj, "maximum", path)
+          pattern <- compilePattern(obj, path)
+          format <- compileFormat(obj, path)
+          minimum <- compileNumber(obj, "minimum", path)
+          maximum <- compileNumber(obj, "maximum", path)
           exclusiveMinimum = obj("exclusiveMinimum").flatMap(_.asBoolean).getOrElse(false)
           exclusiveMaximum = obj("exclusiveMaximum").flatMap(_.asBoolean).getOrElse(false)
-          multipleOf           <- compileNumber(obj, "multipleOf", path)
-          items                <- compileItems(obj, path, ctx)
-          additionalItems      <- compileAdditionalItems(obj, path, ctx)
-          minItems             <- compilePositiveInt(obj, "minItems", path)
-          maxItems             <- compilePositiveInt(obj, "maxItems", path)
-          uniqueItems          <- compileBoolean(obj, "uniqueItems", path).map(_.getOrElse(false))
-          properties           <- compileProperties(obj, path, ctx)
-          patternProperties    <- compilePatternProperties(obj, path, ctx)
+          multipleOf <- compileNumber(obj, "multipleOf", path).map(_.filter(_ != BigDecimal(0)))
+          items <- compileItems(obj, path, ctx)
+          additionalItems <- compileAdditionalItems(obj, path, ctx)
+          minItems <- compilePositiveInt(obj, "minItems", path)
+          maxItems <- compilePositiveInt(obj, "maxItems", path)
+          uniqueItems <- compileBoolean(obj, "uniqueItems", path).map(_.getOrElse(false))
+          properties <- compileProperties(obj, path, ctx)
+          patternProperties <- compilePatternProperties(obj, path, ctx)
           additionalProperties <- compileAdditionalProperties(obj, path, ctx)
-          required             <- compileRequired(obj, path)
-          dependencies         <- compileDependencies(obj, path, ctx)
-          minProperties        <- compilePositiveInt(obj, "minProperties", path)
-          maxProperties        <- compilePositiveInt(obj, "maxProperties", path)
-          anyOf                <- compileSchemaArray(obj, "anyOf", path, ctx)
-          oneOf                <- compileSchemaArray(obj, "oneOf", path, ctx)
-          allOf                <- compileSchemaArray(obj, "allOf", path, ctx)
-          notSchema            <- compileNot(obj, path, ctx)
+          required <- compileRequired(obj, path)
+          dependencies <- compileDependencies(obj, path, ctx)
+          minProperties <- compilePositiveInt(obj, "minProperties", path)
+          maxProperties <- compilePositiveInt(obj, "maxProperties", path)
+          anyOf <- compileSchemaArray(obj, "anyOf", path, ctx)
+          oneOf <- compileSchemaArray(obj, "oneOf", path, ctx)
+          allOf <- compileSchemaArray(obj, "allOf", path, ctx)
+          notSchema <- compileNot(obj, path, ctx)
         } yield {
           val compiled = Schema.Compiled(
             types = types,
@@ -196,10 +182,7 @@ object SchemaCompiler {
     }
   }
 
-  private def compileType(
-    obj: JsonObject,
-    path: String
-  ): Either[CompilationError, Option[Schema.TypeConstraint]] = {
+  private def compileType(obj: JsonObject, path: String): Either[CompilationError, Option[Schema.TypeConstraint]] = {
     obj("type") match {
       case None => Right(None)
       case Some(json) =>
@@ -213,10 +196,7 @@ object SchemaCompiler {
             json.asArray match {
               case Some(arr) =>
                 val types = arr.flatMap(_.asString).flatMap(Schema.JsonType.fromString)
-                if (types.isEmpty)
-                  Left(
-                    CompilationError(s"$path.type", "Type array is empty or contains invalid types")
-                  )
+                if (types.isEmpty) Left(CompilationError(s"$path.type", "Type array is empty or contains invalid types"))
                 else {
                   val mask = types.foldLeft(0)(_ | _.flag)
                   Right(Some(Schema.TypeConstraint.Union(types.toSet, mask)))
@@ -228,44 +208,31 @@ object SchemaCompiler {
     }
   }
 
-  private def compileEnum(
-    obj: JsonObject,
-    path: String
-  ): Either[CompilationError, Option[(Set[Json], Vector[Json])]] = {
+  private def compileEnum(obj: JsonObject, path: String): Either[CompilationError, Option[(Set[Json], Vector[Json])]] = {
     obj("enum") match {
       case None => Right(None)
       case Some(json) =>
         json.asArray match {
           case Some(arr) if arr.nonEmpty => Right(Some((arr.toSet, arr)))
-          case Some(_) =>
-            Left(CompilationError(s"$path.enum", "enum must have at least one element"))
-          case None => Left(CompilationError(s"$path.enum", "enum must be an array"))
+          case Some(_)                   => Left(CompilationError(s"$path.enum", "enum must have at least one element"))
+          case None                      => Left(CompilationError(s"$path.enum", "enum must be an array"))
         }
     }
   }
 
-  private def compilePositiveInt(
-    obj: JsonObject,
-    field: String,
-    path: String
-  ): Either[CompilationError, Option[Int]] = {
+  private def compilePositiveInt(obj: JsonObject, field: String, path: String): Either[CompilationError, Option[Int]] = {
     obj(field) match {
       case None => Right(None)
       case Some(json) =>
         json.asNumber.flatMap(_.toInt) match {
           case Some(n) if n >= 0 => Right(Some(n))
-          case Some(n) =>
-            Left(CompilationError(s"$path.$field", s"$field must be non-negative, got $n"))
-          case None => Left(CompilationError(s"$path.$field", s"$field must be an integer"))
+          case Some(n)           => Left(CompilationError(s"$path.$field", s"$field must be non-negative, got $n"))
+          case None              => Left(CompilationError(s"$path.$field", s"$field must be an integer"))
         }
     }
   }
 
-  private def compileNumber(
-    obj: JsonObject,
-    field: String,
-    path: String
-  ): Either[CompilationError, Option[BigDecimal]] = {
+  private def compileNumber(obj: JsonObject, field: String, path: String): Either[CompilationError, Option[BigDecimal]] = {
     obj(field) match {
       case None => Right(None)
       case Some(json) =>
@@ -276,11 +243,7 @@ object SchemaCompiler {
     }
   }
 
-  private def compileBoolean(
-    obj: JsonObject,
-    field: String,
-    path: String
-  ): Either[CompilationError, Option[Boolean]] = {
+  private def compileBoolean(obj: JsonObject, field: String, path: String): Either[CompilationError, Option[Boolean]] = {
     obj(field) match {
       case None => Right(None)
       case Some(json) =>
@@ -291,10 +254,7 @@ object SchemaCompiler {
     }
   }
 
-  private def compilePattern(
-    obj: JsonObject,
-    path: String
-  ): Either[CompilationError, Option[Schema.CompiledPattern]] = {
+  private def compilePattern(obj: JsonObject, path: String): Either[CompilationError, Option[Schema.CompiledPattern]] = {
     obj("pattern") match {
       case None => Right(None)
       case Some(json) =>
@@ -309,10 +269,7 @@ object SchemaCompiler {
     }
   }
 
-  private def compileFormat(
-    obj: JsonObject,
-    path: String
-  ): Either[CompilationError, Option[Schema.CompiledFormat]] = {
+  private def compileFormat(obj: JsonObject, path: String): Either[CompilationError, Option[Schema.CompiledFormat]] = {
     obj("format") match {
       case None => Right(None)
       case Some(json) =>
@@ -331,9 +288,9 @@ object SchemaCompiler {
   }
 
   private def compileItems(
-    obj: JsonObject,
-    path: String,
-    ctx: CompilationContext
+      obj: JsonObject,
+      path: String,
+      ctx: CompilationContext
   ): Either[CompilationError, Option[Schema.ItemsConstraint]] = {
     obj("items") match {
       case None => Right(None)
@@ -353,9 +310,9 @@ object SchemaCompiler {
   private val EmptyProperties = new JHashMap[String, Schema](0)
 
   private def compileProperties(
-    obj: JsonObject,
-    path: String,
-    ctx: CompilationContext
+      obj: JsonObject,
+      path: String,
+      ctx: CompilationContext
   ): Either[CompilationError, JHashMap[String, Schema]] = {
     obj("properties") match {
       case None => Right(EmptyProperties)
@@ -373,7 +330,7 @@ object SchemaCompiler {
               val i = pairs.iterator
               while (i.hasNext) {
                 val (k, v) = i.next()
-                val _      = map.put(k, v)
+                val _ = map.put(k, v)
               }
               map
             }
@@ -384,37 +341,32 @@ object SchemaCompiler {
   }
 
   private def compilePatternProperties(
-    obj: JsonObject,
-    path: String,
-    ctx: CompilationContext
-  ): Either[CompilationError, Vector[(Schema.CompiledPattern, Schema)]] = {
+      obj: JsonObject,
+      path: String,
+      ctx: CompilationContext
+  ): Either[CompilationError, Array[(Schema.CompiledPattern, Schema)]] = {
     obj("patternProperties") match {
-      case None => Right(Vector.empty)
+      case None => Right(Array.empty)
       case Some(json) =>
         json.asObject match {
           case Some(ppObj) =>
             val compiled = ppObj.toVector.map { case (patternStr, value) =>
               for {
-                cp <- Schema
-                  .CompiledPattern(patternStr)
-                  .left
-                  .map(err => CompilationError(s"$path.patternProperties.$patternStr", err))
+                cp <- Schema.CompiledPattern(patternStr).left.map(err => CompilationError(s"$path.patternProperties.$patternStr", err))
                 schema <- compileJson(value, s"$path.patternProperties.$patternStr", ctx)
               } yield (cp, schema)
             }
-            sequence(compiled)
+            sequence(compiled).map(_.toArray)
           case None =>
-            Left(
-              CompilationError(s"$path.patternProperties", "patternProperties must be an object")
-            )
+            Left(CompilationError(s"$path.patternProperties", "patternProperties must be an object"))
         }
     }
   }
 
   private def compileAdditionalProperties(
-    obj: JsonObject,
-    path: String,
-    ctx: CompilationContext
+      obj: JsonObject,
+      path: String,
+      ctx: CompilationContext
   ): Either[CompilationError, Option[Schema.AdditionalProperties]] = {
     obj("additionalProperties") match {
       case None => Right(None)
@@ -428,23 +380,15 @@ object SchemaCompiler {
                 compileObject(schemaObj, s"$path.additionalProperties", ctx)
                   .map(s => Some(Schema.AdditionalProperties.Allowed(s)))
               case None =>
-                Left(
-                  CompilationError(
-                    s"$path.additionalProperties",
-                    "additionalProperties must be a boolean or object"
-                  )
-                )
+                Left(CompilationError(s"$path.additionalProperties", "additionalProperties must be a boolean or object"))
             }
         }
     }
   }
 
-  private def compileRequired(
-    obj: JsonObject,
-    path: String
-  ): Either[CompilationError, Vector[String]] = {
+  private def compileRequired(obj: JsonObject, path: String): Either[CompilationError, Array[String]] = {
     obj("required") match {
-      case None => Right(Vector.empty[String])
+      case None => Right(Array.empty[String])
       case Some(json) =>
         json.asArray match {
           case Some(arr) =>
@@ -452,7 +396,7 @@ object SchemaCompiler {
             if (strings.length != arr.length) {
               Left(CompilationError(s"$path.required", "required must be an array of strings"))
             } else {
-              Right(strings)
+              Right(strings.toArray)
             }
           case None =>
             Left(CompilationError(s"$path.required", "required must be an array"))
@@ -461,9 +405,9 @@ object SchemaCompiler {
   }
 
   private def compileDependencies(
-    obj: JsonObject,
-    path: String,
-    ctx: CompilationContext
+      obj: JsonObject,
+      path: String,
+      ctx: CompilationContext
   ): Either[CompilationError, Vector[(String, Either[Vector[String], Schema])]] = {
     obj("dependencies") match {
       case None => Right(Vector.empty)
@@ -476,12 +420,7 @@ object SchemaCompiler {
                   // Property dependency: {"key": ["prop1", "prop2"]}
                   val strings = arr.flatMap(_.asString)
                   if (strings.length != arr.length)
-                    Left(
-                      CompilationError(
-                        s"$path.dependencies.$key",
-                        "property dependency must be an array of strings"
-                      )
-                    )
+                    Left(CompilationError(s"$path.dependencies.$key", "property dependency must be an array of strings"))
                   else
                     Right((key, Left(strings)))
                 case None =>
@@ -498,10 +437,10 @@ object SchemaCompiler {
 
   // Returns both compiled schema and original JSON for error messages (networknt compatibility)
   private def compileSchemaArray(
-    obj: JsonObject,
-    field: String,
-    path: String,
-    ctx: CompilationContext
+      obj: JsonObject,
+      field: String,
+      path: String,
+      ctx: CompilationContext
   ): Either[CompilationError, Vector[(Schema, Json)]] = {
     obj(field) match {
       case None => Right(Vector.empty)
@@ -519,9 +458,9 @@ object SchemaCompiler {
   }
 
   private def compileNot(
-    obj: JsonObject,
-    path: String,
-    ctx: CompilationContext
+      obj: JsonObject,
+      path: String,
+      ctx: CompilationContext
   ): Either[CompilationError, Option[(Schema, Json)]] = {
     obj("not") match {
       case None       => Right(None)
@@ -530,9 +469,9 @@ object SchemaCompiler {
   }
 
   private def compileAdditionalItems(
-    obj: JsonObject,
-    path: String,
-    ctx: CompilationContext
+      obj: JsonObject,
+      path: String,
+      ctx: CompilationContext
   ): Either[CompilationError, Option[Schema]] = {
     obj("additionalItems") match {
       case None => Right(None)
@@ -546,9 +485,7 @@ object SchemaCompiler {
     }
   }
 
-  private def sequence[A](
-    eithers: Vector[Either[CompilationError, A]]
-  ): Either[CompilationError, Vector[A]] = {
+  private def sequence[A](eithers: Vector[Either[CompilationError, A]]): Either[CompilationError, Vector[A]] = {
     val builder = Vector.newBuilder[A]
     builder.sizeHint(eithers.length)
     var i = 0
@@ -562,14 +499,13 @@ object SchemaCompiler {
     Right(builder.result())
   }
 
-  /**
-   * Returns an exact double representation of the BigDecimal, or Double.NaN if absent, non-integer, or not exactly representable as a
-   * double.
-   *
-   * Uses a zero-allocation integer-only check: `bd.isValidLong` (confirms whole number in Long range) + `v.toDouble.toLong == v` (confirms
-   * no precision loss in double conversion). Fractional bounds (e.g. 0.5) return NaN and fall back to BigDecimal at validation time —
-   * acceptable since all real-world Snowplow and Draft-04 meta-schema bounds are integers.
-   */
+  /** Returns an exact double representation of the BigDecimal, or Double.NaN if absent, non-integer, or not exactly representable as a
+    * double.
+    *
+    * Uses a zero-allocation integer-only check: `bd.isValidLong` (confirms whole number in Long range) + `v.toDouble.toLong == v` (confirms
+    * no precision loss in double conversion). Fractional bounds (e.g. 0.5) return NaN and fall back to BigDecimal at validation time —
+    * acceptable since all real-world Snowplow and Draft-04 meta-schema bounds are integers.
+    */
   private def toExactDouble(opt: Option[BigDecimal]): Double = opt match {
     case None => Double.NaN
     case Some(bd) =>
@@ -580,11 +516,9 @@ object SchemaCompiler {
       } else Double.NaN
   }
 
-  private def sequence[A](
-    eithers: List[Either[CompilationError, A]]
-  ): Either[CompilationError, List[A]] = {
+  private def sequence[A](eithers: List[Either[CompilationError, A]]): Either[CompilationError, List[A]] = {
     val builder = List.newBuilder[A]
-    val iter    = eithers.iterator
+    val iter = eithers.iterator
     while (iter.hasNext) {
       iter.next() match {
         case Left(err) => return Left(err)

@@ -14,35 +14,32 @@ import java.util.regex.Pattern
 import java.util.{HashMap => JHashMap}
 import io.circe.{Json, JsonNumber, JsonObject, JsonObjectUnsafe}
 
-/**
- * Compiled schema representation. Immutable, reusable, optimized for repeated validation.
- */
+/** Compiled schema representation. Immutable, reusable, optimized for repeated validation.
+  */
 sealed trait Schema {
 
-  /**
-   * Validate JSON data against this schema.
-   *
-   * @param json
-   *   The JSON data to validate
-   * @param path
-   *   The current JSON path (for error reporting)
-   * @param remainingDepth
-   *   Maximum remaining depth for recursive validation (prevents stack overflow)
-   * @return
-   *   Vector of validation errors (empty if valid)
-   */
+  /** Validate JSON data against this schema.
+    *
+    * @param json
+    *   The JSON data to validate
+    * @param path
+    *   The current JSON path (for error reporting)
+    * @param remainingDepth
+    *   Maximum remaining depth for recursive validation (prevents stack overflow)
+    * @return
+    *   Vector of validation errors (empty if valid)
+    */
   def validate(json: Json, path: JsonPath, remainingDepth: Int): Vector[ValidationError]
 
-  /**
-   * Fast validity check with short-circuit evaluation. No error construction, no path allocation.
-   *
-   * @param json
-   *   The JSON data to validate
-   * @param remainingDepth
-   *   Maximum remaining depth for recursive validation
-   * @return
-   *   true if valid, false otherwise
-   */
+  /** Fast validity check with short-circuit evaluation. No error construction, no path allocation.
+    *
+    * @param json
+    *   The JSON data to validate
+    * @param remainingDepth
+    *   Maximum remaining depth for recursive validation
+    * @return
+    *   true if valid, false otherwise
+    */
   def isValid(json: Json, remainingDepth: Int): Boolean
 }
 
@@ -50,8 +47,7 @@ object Schema {
 
   /** Schema that always passes (empty schema {}). No recursion needed — there are no constraints. */
   case object Empty extends Schema {
-    def validate(json: Json, path: JsonPath, remainingDepth: Int): Vector[ValidationError] =
-      Vector.empty
+    def validate(json: Json, path: JsonPath, remainingDepth: Int): Vector[ValidationError] = Vector.empty
     def isValid(json: Json, remainingDepth: Int): Boolean = true
   }
 
@@ -80,69 +76,67 @@ object Schema {
   // Meta-schema support only. No event/entity schemas use allOf.
   // Kept as a separate variant so Compiled.validate has zero allOf overhead.
   case class WithAllOf(base: Schema, allOf: Vector[(Schema, Json)]) extends Schema {
-    def validate(json: Json, path: JsonPath, remainingDepth: Int): Vector[ValidationError] =
+    def validate(json: Json, path: JsonPath, remainingDepth: Int): Vector[ValidationError] = {
       base.validate(json, path, remainingDepth) ++
         allOf.flatMap { case (s, _) => s.validate(json, path, remainingDepth - 1) }
+    }
     def isValid(json: Json, remainingDepth: Int): Boolean =
-      base.isValid(json, remainingDepth) && allOf.forall { case (s, _) =>
-        s.isValid(json, remainingDepth - 1)
-      }
+      base.isValid(json, remainingDepth) && allOf.forall { case (s, _) => s.isValid(json, remainingDepth - 1) }
   }
 
   /** Pre-resolved format validator with cached error pattern (no Map.get per validation) */
   case class CompiledFormat(name: String, validator: formats.Format, errorPattern: String)
 
-  /**
-   * Composite schema with all keyword validations. Uses HashMap for O(1) property lookup (instead of SortedMap's O(log n)).
-   */
+  /** Composite schema with all keyword validations. Uses HashMap for O(1) property lookup (instead of SortedMap's O(log n)).
+    */
   case class Compiled(
-    // Type validation
-    types: Option[TypeConstraint],
-    `enum`: Option[(Set[Json], Vector[Json])],
-    // String-only enum fast-path: Some(set) iff every enum value is a string.
-    // Avoids Json.hashCode (O(n) for JNumber) on the hot isValid path.
-    enumStrings: Option[Set[String]],
+      // Type validation
+      types: Option[TypeConstraint],
+      `enum`: Option[(Set[Json], Vector[Json])],
+      // String-only enum fast-path: Some(set) iff every enum value is a string.
+      // Avoids Json.hashCode (O(n) for JNumber) on the hot isValid path.
+      enumStrings: Option[Set[String]],
 
-    // String constraints
-    minLength: Option[Int],
-    maxLength: Option[Int],
-    pattern: Option[CompiledPattern],
-    format: Option[CompiledFormat],
+      // String constraints
+      minLength: Option[Int],
+      maxLength: Option[Int],
+      pattern: Option[CompiledPattern],
+      format: Option[CompiledFormat],
 
-    // Number constraints
-    minimum: Option[BigDecimal],
-    maximum: Option[BigDecimal],
-    exclusiveMinimum: Boolean,
-    exclusiveMaximum: Boolean,
-    // Exact-double precomputed at compile time. Double.NaN when absent or not exactly
-    // representable (e.g. very high-precision decimals). Used by isValidNumberRaw to
-    // avoid n.toBigDecimal (BiggerDecimal.fromLong) on the hot path.
-    minimumD: Double,
-    maximumD: Double,
-    multipleOf: Option[BigDecimal],
+      // Number constraints
+      minimum: Option[BigDecimal],
+      maximum: Option[BigDecimal],
+      exclusiveMinimum: Boolean,
+      exclusiveMaximum: Boolean,
+      // Exact-double precomputed at compile time. Double.NaN when absent or not exactly
+      // representable (e.g. very high-precision decimals). Used by isValidNumberRaw to
+      // avoid n.toBigDecimal (BiggerDecimal.fromLong) on the hot path.
+      minimumD: Double,
+      maximumD: Double,
+      multipleOf: Option[BigDecimal],
 
-    // Array constraints
-    items: Option[ItemsConstraint],
-    additionalItems: Option[Schema],
-    minItems: Option[Int],
-    maxItems: Option[Int],
-    uniqueItems: Boolean,
+      // Array constraints
+      items: Option[ItemsConstraint],
+      additionalItems: Option[Schema],
+      minItems: Option[Int],
+      maxItems: Option[Int],
+      uniqueItems: Boolean,
 
-    // Object constraints — Java HashMap for O(1) lookup with no Option boxing
-    properties: JHashMap[String, Schema],
-    patternProperties: Vector[(CompiledPattern, Schema)],
-    additionalProperties: Option[AdditionalProperties],
-    required: Vector[String],
-    minProperties: Option[Int],
-    maxProperties: Option[Int],
+      // Object constraints — Java HashMap for O(1) lookup with no Option boxing
+      properties: JHashMap[String, Schema],
+      patternProperties: Array[(CompiledPattern, Schema)],
+      additionalProperties: Option[AdditionalProperties],
+      required: Array[String],
+      minProperties: Option[Int],
+      maxProperties: Option[Int],
 
-    // Dependencies: if key is present, either listed properties must exist or schema must validate
-    dependencies: Vector[(String, Either[Vector[String], Schema])],
+      // Dependencies: if key is present, either listed properties must exist or schema must validate
+      dependencies: Vector[(String, Either[Vector[String], Schema])],
 
-    // Composition - stores both compiled schema and original JSON for error messages
-    anyOf: Vector[(Schema, Json)],
-    oneOf: Vector[(Schema, Json)],
-    not: Option[(Schema, Json)]
+      // Composition - stores both compiled schema and original JSON for error messages
+      anyOf: Vector[(Schema, Json)],
+      oneOf: Vector[(Schema, Json)],
+      not: Option[(Schema, Json)]
   ) extends Schema {
 
     // Pre-computed flags: skip entire validation branches when no constraints exist
@@ -153,15 +147,19 @@ object Schema {
     private val hasNumberConstraints: Boolean =
       minimum.isDefined || maximum.isDefined || multipleOf.isDefined
     private val hasPatternProperties: Boolean = patternProperties.nonEmpty
-    private val hasRequired: Boolean          = required.nonEmpty
-    private val hasDependencies: Boolean      = dependencies.nonEmpty
-    private val hasComposition: Boolean       = anyOf.nonEmpty || oneOf.nonEmpty || not.isDefined
+    private val hasRequired: Boolean = required.nonEmpty
+    private val hasDependencies: Boolean = dependencies.nonEmpty
+    private val hasComposition: Boolean = anyOf.nonEmpty || oneOf.nonEmpty || not.isDefined
     // Pre-computed sizes: avoid Vector.length virtual dispatch in while-loop bounds
     private val patternPropertiesSize: Int = patternProperties.length
-    private val requiredSize: Int          = required.length
-    private val dependenciesSize: Int      = dependencies.length
-    private val anyOfSize: Int             = anyOf.length
-    private val oneOfSize: Int             = oneOf.length
+    private val requiredSize: Int = required.length
+    private val dependenciesSize: Int = dependencies.length
+    private val anyOfSize: Int = anyOf.length
+    private val oneOfSize: Int = oneOf.length
+    // Pre-computed at schema compile time: enum error display list avoids per-call List allocation
+    private val enumErrorStrings: List[String] = `enum`.fold(Nil: List[String]) { case (_, vec) =>
+      vec.iterator.map(v => v.asString.getOrElse(v.noSpaces)).toList
+    }
 
     def validate(json: Json, path: JsonPath, remainingDepth: Int): Vector[ValidationError] = {
       if (remainingDepth <= 0) {
@@ -182,46 +180,45 @@ object Schema {
 
             case TypeConstraint.Union(expectedTypes, mask) =>
               if ((mask & actualType.matchMask) == 0)
-                errors += ValidationError.typeMismatchUnion(
-                  path,
-                  actualType.name,
-                  expectedTypes.map(_.name)
-                )
+                errors += ValidationError.typeMismatchUnion(path, actualType.name, expectedTypes.map(_.name))
           }
         case None => ()
       }
 
       // Enum validation — string fast-path avoids Json.hashCode
       `enum` match {
-        case Some((allowedSet, allowedVec)) =>
+        case Some((allowedSet, _)) =>
           val inEnum = enumStrings match {
             case Some(ss) =>
               val s = JsonObjectUnsafe.stringValue(json) // null if not a JString
               s != null && ss.contains(s)
             case None => allowedSet.contains(json)
           }
-          if (!inEnum) {
-            val allowedStrs = allowedVec.map { v =>
-              v.asString.getOrElse(v.noSpaces)
-            }.toList
-            errors += ValidationError.`enum`(path, allowedStrs)
-          }
+          if (!inEnum)
+            errors += ValidationError.`enum`(path, enumErrorStrings)
         case None => ()
       }
 
-      // Type-specific validations — use json dispatch, operate directly on unwrapped values
-      json.fold(
-        jsonNull = (),
-        jsonBoolean = _ => (),
-        jsonNumber = n =>
-          if (hasNumberConstraints) {
-            val bd = n.toBigDecimal.getOrElse(BigDecimal(n.toDouble))
-            validateNumber(bd, path, errors)
-          },
-        jsonString = s => if (hasStringConstraints) validateString(s, path, errors),
-        jsonArray = a => validateArray(a, path, remainingDepth, errors),
-        jsonObject = o => validateObject(o, path, remainingDepth, errors)
-      )
+      // Type-specific validations — direct dispatch, zero closure allocation.
+      val obj = JsonObjectUnsafe.objectValue(json)
+      if (obj != null) {
+        validateObject(obj, path, remainingDepth, errors)
+      } else {
+        val arr = JsonObjectUnsafe.arrayValue(json)
+        if (arr != null) {
+          validateArray(arr, path, remainingDepth, errors)
+        } else {
+          val s = JsonObjectUnsafe.stringValue(json)
+          if (s != null) {
+            if (hasStringConstraints) validateString(s, path, errors)
+          } else {
+            val n = JsonObjectUnsafe.numberValue(json)
+            if (n != null && hasNumberConstraints) {
+              validateNumberRaw(n, path, errors)
+            }
+          }
+        }
+      }
 
       // Composition validations
       if (hasComposition) validateComposition(json, path, remainingDepth, errors)
@@ -258,19 +255,34 @@ object Schema {
         case None => ()
       }
 
-      // Type-specific validations + composition
-      json.fold(
-        jsonNull = true,
-        jsonBoolean = _ => true,
-        jsonNumber = n =>
-          if (hasNumberConstraints) isValidNumberRaw(n)
-          else true,
-        jsonString = s =>
-          if (hasStringConstraints) isValidString(s)
-          else true,
-        jsonArray = a => isValidArray(a, remainingDepth),
-        jsonObject = o => isValidObject(o, remainingDepth)
-      ) && (!hasComposition || isValidComposition(json, remainingDepth))
+      // Type-specific validations — direct dispatch, zero closure allocation.
+      // Replaces json.fold(...) which allocates 5-6 lambda closures per call and
+      // boxes the Boolean return. Null-returning extractors avoid Option boxing too.
+      val obj = JsonObjectUnsafe.objectValue(json)
+      if (obj != null) {
+        if (!isValidObject(obj, remainingDepth)) return false
+      } else {
+        val arr = JsonObjectUnsafe.arrayValue(json)
+        if (arr != null) {
+          if (!isValidArray(arr, remainingDepth)) return false
+        } else {
+          val s = JsonObjectUnsafe.stringValue(json)
+          if (s != null) {
+            if (hasStringConstraints && !isValidString(s)) return false
+          } else {
+            val n = JsonObjectUnsafe.numberValue(json)
+            if (n != null) {
+              if (hasNumberConstraints && !isValidNumberRaw(n)) return false
+            }
+            // null and boolean: no type-specific validation needed
+          }
+        }
+      }
+
+      // Composition validations
+      if (hasComposition && !isValidComposition(json, remainingDepth)) return false
+
+      true
     }
 
     private def matchesType(actual: JsonType, expected: JsonType): Boolean =
@@ -283,9 +295,9 @@ object Schema {
     // --- validate helpers: append errors to shared builder ---
 
     private def validateString(
-      s: String,
-      path: JsonPath,
-      errors: LazyErrors
+        s: String,
+        path: JsonPath,
+        errors: LazyErrors
     ): Unit = {
       if (hasLengthConstraints) {
         val codePointCount = s.codePointCount(0, s.length)
@@ -308,10 +320,58 @@ object Schema {
       }
     }
 
+    // validate fast-path: mirrors isValidNumberRaw, avoids n.toBigDecimal (BiggerDecimal.fromLong)
+    // for Long-valued JSON numbers. On error paths BigDecimal(v) is used for messages — acceptable
+    // since errors are exceptional. Non-Long values (e.g. 1.5, huge integers) fall through to validateNumber.
+    private def validateNumberRaw(n: JsonNumber, path: JsonPath, errors: LazyErrors): Unit =
+      n.toLong match {
+        case Some(v) =>
+          val vd = v.toDouble
+          // minimum — double fast-path when minimumD is an exact double, BigDecimal otherwise
+          if (!minimumD.isNaN) {
+            if (exclusiveMinimum && vd <= minimumD)
+              errors += ValidationError.minimum(path, minimum.get)
+            else if (!exclusiveMinimum && vd < minimumD)
+              errors += ValidationError.minimum(path, minimum.get)
+          } else
+            minimum match {
+              case Some(min) if exclusiveMinimum && BigDecimal(v) <= min =>
+                errors += ValidationError.minimum(path, min)
+              case Some(min) if !exclusiveMinimum && BigDecimal(v) < min =>
+                errors += ValidationError.minimum(path, min)
+              case _ => ()
+            }
+          // maximum
+          if (!maximumD.isNaN) {
+            if (exclusiveMaximum && vd >= maximumD)
+              errors += ValidationError.maximum(path, maximum.get)
+            else if (!exclusiveMaximum && vd > maximumD)
+              errors += ValidationError.maximum(path, maximum.get)
+          } else
+            maximum match {
+              case Some(max) if exclusiveMaximum && BigDecimal(v) >= max =>
+                errors += ValidationError.maximum(path, max)
+              case Some(max) if !exclusiveMaximum && BigDecimal(v) > max =>
+                errors += ValidationError.maximum(path, max)
+              case _ => ()
+            }
+          // multipleOf — zero divisor filtered at compile time; use match to avoid Function1 closure
+          multipleOf match {
+            case Some(divisor) =>
+              val q = vd / divisor.toDouble
+              if (q.isInfinite || q.isNaN || q != Math.floor(q))
+                errors += ValidationError.multipleOf(path, divisor)
+            case None => ()
+          }
+        case None =>
+          // Non-Long value (e.g. 1.5, very large integer): fall back to BigDecimal path
+          validateNumber(n.toBigDecimal.getOrElse(BigDecimal(n.toDouble)), path, errors)
+      }
+
     private def validateNumber(
-      n: BigDecimal,
-      path: JsonPath,
-      errors: LazyErrors
+        n: BigDecimal,
+        path: JsonPath,
+        errors: LazyErrors
     ): Unit = {
       minimum.foreach { min =>
         if (exclusiveMinimum) {
@@ -327,21 +387,20 @@ object Schema {
           if (n > max) errors += ValidationError.maximum(path, max)
         }
       }
-      multipleOf.foreach { divisor =>
-        if (divisor != BigDecimal(0)) {
+      multipleOf match {
+        case Some(divisor) =>
           val quotient = n.toDouble / divisor.toDouble
-          if (quotient.isInfinite || quotient.isNaN || quotient != Math.floor(quotient)) {
+          if (quotient.isInfinite || quotient.isNaN || quotient != Math.floor(quotient))
             errors += ValidationError.multipleOf(path, divisor)
-          }
-        }
+        case None => ()
       }
     }
 
     private def validateArray(
-      arr: Vector[Json],
-      path: JsonPath,
-      remainingDepth: Int,
-      errors: LazyErrors
+        arr: Vector[Json],
+        path: JsonPath,
+        remainingDepth: Int,
+        errors: LazyErrors
     ): Unit = {
       minItems match {
         case Some(min) if arr.length < min => errors += ValidationError.minItems(path, min)
@@ -355,7 +414,7 @@ object Schema {
 
       if (uniqueItems && arr.length > 1) {
         val seen = new mutable.HashSet[Json]()
-        var idx  = 0
+        var idx = 0
         while (idx < arr.length) {
           if (!seen.add(arr(idx))) {
             errors += ValidationError.uniqueItems(path)
@@ -393,18 +452,18 @@ object Schema {
     }
 
     private def validateObject(
-      obj: JsonObject,
-      path: JsonPath,
-      remainingDepth: Int,
-      errors: LazyErrors
+        obj: JsonObject,
+        path: JsonPath,
+        remainingDepth: Int,
+        errors: LazyErrors
     ): Unit = {
       // Validate each property: properties → patternProperties → additionalProperties
       val keyIter = obj.keys.iterator
       while (keyIter.hasNext) {
-        val key   = keyIter.next()
-        val value = JsonObjectUnsafe.getValue(obj, key) // safe: key came from obj.keys
+        val key = keyIter.next()
+        val value = JsonObjectUnsafe.getValue(obj, key)
 
-        val propSchema   = properties.get(key) // null if not found — no Option boxing
+        val propSchema = properties.get(key) // null if not found — no Option boxing
         val inProperties = propSchema != null
         if (inProperties) {
           errors ++= propSchema.validate(value, path.field(key), remainingDepth - 1)
@@ -455,7 +514,7 @@ object Schema {
           if (obj.contains(prop)) {
             dep match {
               case Left(requiredProps) =>
-                var rpIdx      = 0
+                var rpIdx = 0
                 var anyMissing = false
                 while (rpIdx < requiredProps.length) {
                   if (!obj.contains(requiredProps(rpIdx))) anyMissing = true
@@ -483,15 +542,15 @@ object Schema {
     }
 
     private def validateComposition(
-      json: Json,
-      path: JsonPath,
-      remainingDepth: Int,
-      errors: LazyErrors
+        json: Json,
+        path: JsonPath,
+        remainingDepth: Int,
+        errors: LazyErrors
     ): Unit = {
       // anyOf: at least one must match — fast isValid first, expensive validate only on failure
       if (anyOfSize > 0) {
         var anyMatches = false
-        var i          = 0
+        var i = 0
         while (i < anyOfSize && !anyMatches) {
           if (anyOf(i)._1.isValid(json, remainingDepth - 1)) anyMatches = true
           i += 1
@@ -509,7 +568,7 @@ object Schema {
       // oneOf: exactly one must match — count first, collect schemas only on error
       if (oneOfSize > 0) {
         var matchCount = 0
-        var i          = 0
+        var i = 0
         while (i < oneOfSize) {
           if (oneOf(i)._1.isValid(json, remainingDepth - 1)) matchCount += 1
           i += 1
@@ -519,7 +578,7 @@ object Schema {
         } else if (matchCount > 1) {
           // Only build the matched schemas vector for the error message
           val matched = Vector.newBuilder[Json]
-          var j       = 0
+          var j = 0
           while (j < oneOfSize) {
             val (schema, json2) = oneOf(j)
             if (schema.isValid(json, remainingDepth - 1)) matched += json2
@@ -594,10 +653,10 @@ object Schema {
             }
 
           multipleOf match {
-            case Some(divisor) if divisor != BigDecimal(0) =>
+            case Some(divisor) =>
               val q = vd / divisor.toDouble
               if (q.isInfinite || q.isNaN || q != Math.floor(q)) return false
-            case _ => ()
+            case None => ()
           }
           true
         case None =>
@@ -617,11 +676,10 @@ object Schema {
         case _                                         => ()
       }
       multipleOf match {
-        case Some(divisor) if divisor != BigDecimal(0) =>
+        case Some(divisor) =>
           val quotient = n.toDouble / divisor.toDouble
-          if (quotient.isInfinite || quotient.isNaN || quotient != Math.floor(quotient))
-            return false
-        case _ => ()
+          if (quotient.isInfinite || quotient.isNaN || quotient != Math.floor(quotient)) return false
+        case None => ()
       }
       true
     }
@@ -638,7 +696,7 @@ object Schema {
 
       if (uniqueItems && arr.length > 1) {
         val seen = new mutable.HashSet[Json]()
-        var idx  = 0
+        var idx = 0
         while (idx < arr.length) {
           if (!seen.add(arr(idx))) return false
           idx += 1
@@ -680,10 +738,10 @@ object Schema {
     private def isValidObject(obj: JsonObject, remainingDepth: Int): Boolean = {
       val keyIter = obj.keys.iterator
       while (keyIter.hasNext) {
-        val key   = keyIter.next()
-        val value = JsonObjectUnsafe.getValue(obj, key) // safe: key came from obj.keys
+        val key = keyIter.next()
+        val value = JsonObjectUnsafe.getValue(obj, key)
 
-        val propSchema   = properties.get(key) // null if not found — no Option boxing
+        val propSchema = properties.get(key) // null if not found — no Option boxing
         val inProperties = propSchema != null
         if (inProperties) {
           if (!propSchema.isValid(value, remainingDepth - 1)) return false
@@ -755,7 +813,7 @@ object Schema {
       // anyOf: short-circuit on first match
       if (anyOfSize > 0) {
         var matched = false
-        var i       = 0
+        var i = 0
         while (i < anyOfSize && !matched) {
           val (s, _) = anyOf(i)
           if (s.isValid(json, remainingDepth - 1)) matched = true
@@ -767,7 +825,7 @@ object Schema {
       // oneOf: short-circuit after finding 2 matches
       if (oneOfSize > 0) {
         var matchCount = 0
-        var i          = 0
+        var i = 0
         while (i < oneOfSize) {
           val (s, _) = oneOf(i)
           if (s.isValid(json, remainingDepth - 1)) {
@@ -808,14 +866,12 @@ object Schema {
     def matchMask: Int
   }
   object JsonType {
-    case object Null    extends JsonType { val name = "null"; val flag = 1; val matchMask = 1    }
+    case object Null extends JsonType { val name = "null"; val flag = 1; val matchMask = 1 }
     case object Boolean extends JsonType { val name = "boolean"; val flag = 2; val matchMask = 2 }
-    case object Integer extends JsonType {
-      val name = "integer"; val flag = 4; val matchMask = 4 | 8
-    }
-    case object Number extends JsonType { val name = "number"; val flag = 8; val matchMask = 8   }
+    case object Integer extends JsonType { val name = "integer"; val flag = 4; val matchMask = 4 | 8 }
+    case object Number extends JsonType { val name = "number"; val flag = 8; val matchMask = 8 }
     case object String extends JsonType { val name = "string"; val flag = 16; val matchMask = 16 }
-    case object Array  extends JsonType { val name = "array"; val flag = 32; val matchMask = 32  }
+    case object Array extends JsonType { val name = "array"; val flag = 32; val matchMask = 32 }
     case object Object extends JsonType { val name = "object"; val flag = 64; val matchMask = 64 }
 
     def of(json: Json): JsonType = json.fold(
@@ -848,199 +904,47 @@ object Schema {
   /** Items constraint: single schema or tuple validation */
   sealed trait ItemsConstraint
   object ItemsConstraint {
-    case class Single(schema: Schema)         extends ItemsConstraint
+    case class Single(schema: Schema) extends ItemsConstraint
     case class Tuple(schemas: Vector[Schema]) extends ItemsConstraint
   }
 
   /** Additional properties constraint */
   sealed trait AdditionalProperties
   object AdditionalProperties {
-    case object Forbidden              extends AdditionalProperties
+    case object Forbidden extends AdditionalProperties
     case class Allowed(schema: Schema) extends AdditionalProperties
   }
 
-  /**
-   * Pre-compiled regex pattern with fast-path detection.
-   *
-   * fastPath constants: 0 = use regex (general case) 1 = always matches (.* / ^.*$) 2 = non-empty only (.+) 3 = anchored char-class scan:
-   * ^prefix?[class]quant$ — no Matcher allocation
-   *
-   * Fields charSet/csMinLen/csMaxLen/csPrefix are only valid when fastPath == 3.
-   */
+  /** Pre-compiled regex pattern with fast-path detection.
+    *
+    * fastPath: 0 = use regex (general case), 1 = always matches (.* / ^.*$), 2 = non-empty only (.+)
+    */
   case class CompiledPattern private (
-    regex: Pattern,
-    source: String,
-    fastPath: Int,
-    // fastPath == 3 fields (null / 0 otherwise):
-    charSet: Array[Boolean], // 128-element ASCII char bitmap
-    csMinLen: Int,           // min length of the char-class portion (after prefix)
-    csMaxLen: Int,           // max length; -1 = unbounded
-    csPrefix: String         // literal prefix before the char class; "" = none
+      regex: Pattern,
+      source: String,
+      fastPath: Int
   ) {
     // JSON Schema patterns use partial matching (find), not full matching (matches).
     // Kept small so the JIT can inline this method and scalar-replace the Matcher
     // created in the case-_ branch (which prevents heap allocation for the regex path).
     def matches(s: String): Boolean = fastPath match {
-      case 1 => true         // .* always matches
-      case 2 => s.nonEmpty   // .+ requires non-empty
-      case 3 => matchesCC(s) // anchored char-class scan — see below
+      case 1 => true // .* always matches
+      case 2 => s.nonEmpty // .+ requires non-empty
       case _ => regex.matcher(s).find()
     }
-
-    // Anchored char-class fast path: no Matcher/StringBuilder allocation.
-    // csPrefix is a literal prefix the string must start with.
-    // The remainder must have length in [csMinLen, csMaxLen] and every char
-    // must appear in the 128-element charSet bitmap.
-    // Kept in a separate method so that `matches` stays small enough to inline.
-    private def matchesCC(s: String): Boolean = {
-      val plen = csPrefix.length
-      val slen = s.length
-      val clen = slen - plen
-      if (clen < csMinLen) false
-      else if (csMaxLen >= 0 && clen > csMaxLen) false
-      else if (plen > 0 && !s.startsWith(csPrefix)) false
-      else {
-        val cs = charSet
-        var i  = plen
-        var ok = true
-        while (ok && i < slen) {
-          val c = s.charAt(i)
-          ok = c < 128 && cs(c.toInt)
-          i += 1
-        }
-        ok
-      }
-    }
   }
+
   object CompiledPattern {
     def apply(pattern: String): Either[String, CompiledPattern] =
       try {
-        val compiled = Pattern.compile(pattern)
-        pattern match {
-          case ".*" | "^.*$" =>
-            Right(new CompiledPattern(compiled, pattern, 1, null, 0, 0, null))
-          case ".+" =>
-            Right(new CompiledPattern(compiled, pattern, 2, null, 0, 0, null))
-          case _ =>
-            detectCharClass(pattern) match {
-              case Some((cs, minLen, maxLen, prefix)) =>
-                Right(new CompiledPattern(compiled, pattern, 3, cs, minLen, maxLen, prefix))
-              case None =>
-                Right(new CompiledPattern(compiled, pattern, 0, null, 0, 0, null))
-            }
+        val fp = pattern match {
+          case ".*" | "^.*$" => 1 // always matches
+          case ".+"          => 2 // non-empty
+          case _             => 0 // use regex
         }
+        Right(new CompiledPattern(Pattern.compile(pattern), pattern, fp))
       } catch {
         case e: Exception => Left(s"Invalid regex pattern: ${e.getMessage}")
       }
-
-    /**
-     * Recognise anchored single-char-class patterns of the form: ^[literal_prefix]?[char_class][quantifier]$ where:
-     *   - prefix : zero or more non-meta literal ASCII characters
-     *   - char_class : `[...]` (no negation `^`, no `\` escapes, ASCII-only)
-     *   - quantifier : `+`, `*`, `?`, `{n}`, `{n,}`, `{n,m}`, or implicit `{1,1}`
-     *
-     * Returns Some((charSet, minLen, maxLen, prefix)) on success, None otherwise. On None the caller falls back to full regex.
-     */
-    private def detectCharClass(pattern: String): Option[(Array[Boolean], Int, Int, String)] = {
-      val len = pattern.length
-      if (len < 4) return None
-      if (pattern.charAt(0) != '^') return None
-      if (pattern.charAt(len - 1) != '$') return None
-
-      var i = 1 // skip '^'
-
-      // Parse optional literal prefix: non-meta, non-'[' ASCII chars.
-      val prefixStart = i
-      while (i < len - 1 && pattern.charAt(i) != '[' && !isMeta(pattern.charAt(i)))
-        i += 1
-      val prefix = pattern.substring(prefixStart, i)
-
-      // Must arrive at '['
-      if (i >= len - 1 || pattern.charAt(i) != '[') return None
-      i += 1 // skip '['
-
-      // Reject negated classes [^...]
-      if (i >= len - 1 || pattern.charAt(i) == '^') return None
-
-      val charSet    = new Array[Boolean](128)
-      val classStart = i
-
-      // Parse char-class body up to ']'
-      while (i < len - 1 && pattern.charAt(i) != ']') {
-        val c = pattern.charAt(i)
-        if (c >= 128) return None  // non-ASCII
-        if (c == '\\') return None // escape sequences not supported
-        // Range a-z: current char, '-', then a non-']' char
-        if (
-          i + 2 < len &&
-          pattern.charAt(i + 1) == '-' &&
-          pattern.charAt(i + 2) != ']'
-        ) {
-          val from = c.toInt
-          val to   = pattern.charAt(i + 2).toInt
-          if (to >= 128 || from > to) return None
-          var j = from
-          while (j <= to) { charSet(j) = true; j += 1 }
-          i += 3
-        } else {
-          charSet(c.toInt) = true
-          i += 1
-        }
-      }
-
-      if (i >= len - 1 || pattern.charAt(i) != ']') return None // unclosed class
-      if (i == classStart) return None                          // empty class []
-      i += 1                                                    // skip ']'
-
-      // Parse quantifier, or treat missing quantifier as implicit {1,1}
-      if (i >= len) return None
-      val (minLen, maxLen) =
-        if (i == len - 1 && pattern.charAt(i) == '$') {
-          (1, 1) // no explicit quantifier
-        } else {
-          pattern.charAt(i) match {
-            case '+' => i += 1; (1, -1)
-            case '*' => i += 1; (0, -1)
-            case '?' => i += 1; (0, 1)
-            case '{' =>
-              i += 1
-              val numStart = i
-              while (i < len && pattern.charAt(i) >= '0' && pattern.charAt(i) <= '9') i += 1
-              if (i >= len || numStart == i) return None
-              val n = pattern.substring(numStart, i).toInt
-              pattern.charAt(i) match {
-                case '}' =>
-                  i += 1
-                  (n, n)
-                case ',' =>
-                  i += 1
-                  if (i < len && pattern.charAt(i) == '}') {
-                    i += 1
-                    (n, -1) // {n,} = at least n
-                  } else {
-                    val numStart2 = i
-                    while (i < len && pattern.charAt(i) >= '0' && pattern.charAt(i) <= '9') i += 1
-                    if (i >= len || numStart2 == i || pattern.charAt(i) != '}') return None
-                    val m = pattern.substring(numStart2, i).toInt
-                    i += 1
-                    (n, m)
-                  }
-                case _ => return None
-              }
-            case _ => return None
-          }
-        }
-
-      // Must be sitting exactly on the trailing '$'
-      if (i != len - 1 || pattern.charAt(i) != '$') return None
-
-      Some((charSet, minLen, maxLen, prefix))
-    }
-
-    private def isMeta(c: Char): Boolean = c match {
-      case '.' | '*' | '+' | '?' | '(' | ')' | '{' | '}' | '[' | ']' | '|' | '\\' | '^' | '$' =>
-        true
-      case _ => false
-    }
   }
 }

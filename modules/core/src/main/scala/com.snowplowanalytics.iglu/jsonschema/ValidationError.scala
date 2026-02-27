@@ -9,23 +9,22 @@
  */
 package com.snowplowanalytics.iglu.jsonschema
 
-/**
- * Represents a validation error with path and message. Compatible with networknt json-schema-validator error format.
- *
- * @param path
- *   The JSON path where the error occurred (for required/additionalProperties, this is the parent path)
- * @param keyword
- *   The JSON Schema keyword that failed
- * @param message
- *   The error message (without path prefix)
- * @param targets
- *   Additional context values for the error (types, property names, limits, etc.)
- */
+/** Represents a validation error with path and message. Compatible with networknt json-schema-validator error format.
+  *
+  * @param path
+  *   The JSON path where the error occurred (for required/additionalProperties, this is the parent path)
+  * @param keyword
+  *   The JSON Schema keyword that failed
+  * @param message
+  *   The error message (without path prefix)
+  * @param targets
+  *   Additional context values for the error (types, property names, limits, etc.)
+  */
 case class ValidationError(
-  path: JsonPath,
-  keyword: String,
-  message: String,
-  targets: List[String] = List.empty
+    path: JsonPath,
+    keyword: String,
+    message: String,
+    targets: List[String] = List.empty
 ) {
   def render: String = s"${path.render}: $message"
 }
@@ -39,12 +38,7 @@ object ValidationError {
     ValidationError(path, "type", s"$actual found, $expected expected", List(actual, expected))
 
   def typeMismatchUnion(path: JsonPath, actual: String, expected: Set[String]): ValidationError =
-    ValidationError(
-      path,
-      "type",
-      s"$actual found, [${expected.mkString(", ")}] expected",
-      actual :: expected.toList
-    )
+    ValidationError(path, "type", s"$actual found, [${expected.mkString(", ")}] expected", actual :: expected.toList)
 
   def `enum`(path: JsonPath, allowed: List[String]): ValidationError = {
     val rendered = allowed.mkString(", ")
@@ -61,12 +55,7 @@ object ValidationError {
     ValidationError(path, "pattern", s"does not match the regex pattern $pattern", List(pattern))
 
   def format(path: JsonPath, format: String, pattern: String): ValidationError =
-    ValidationError(
-      path,
-      "format",
-      s"does not match the $format pattern $pattern",
-      List(format, pattern)
-    )
+    ValidationError(path, "format", s"does not match the $format pattern $pattern", List(format, pattern))
 
   def minimum(path: JsonPath, min: BigDecimal): ValidationError =
     ValidationError(path, "minimum", s"must have a minimum value of $min", List(min.toString))
@@ -78,20 +67,10 @@ object ValidationError {
     ValidationError(path, "multipleOf", s"must be multiple of $divisor", List(divisor.toString))
 
   def minItems(path: JsonPath, min: Int): ValidationError =
-    ValidationError(
-      path,
-      "minItems",
-      s"there must be a minimum of $min items in the array",
-      List(min.toString)
-    )
+    ValidationError(path, "minItems", s"there must be a minimum of $min items in the array", List(min.toString))
 
   def maxItems(path: JsonPath, max: Int): ValidationError =
-    ValidationError(
-      path,
-      "maxItems",
-      s"there must be a maximum of $max items in the array",
-      List(max.toString)
-    )
+    ValidationError(path, "maxItems", s"there must be a maximum of $max items in the array", List(max.toString))
 
   def uniqueItems(path: JsonPath): ValidationError =
     ValidationError(path, "uniqueItems", s"the items in the array must be unique", List.empty)
@@ -100,12 +79,7 @@ object ValidationError {
   // render produces "$.child: message text" (child path prefix, not parent).
   def required(parentPath: JsonPath, property: String): ValidationError = {
     val messagePath = parentPath.field(property)
-    ValidationError(
-      parentPath,
-      "required",
-      s"${messagePath.render}: is missing but it is required",
-      List(property)
-    )
+    ValidationError(parentPath, "required", s"${messagePath.render}: is missing but it is required", List(property))
   }
 
   def additionalProperty(parentPath: JsonPath, property: String): ValidationError = {
@@ -120,21 +94,11 @@ object ValidationError {
 
   def minProperties(path: JsonPath, min: Int): ValidationError =
     // networknt format: "should have a minimum of"
-    ValidationError(
-      path,
-      "minProperties",
-      s"should have a minimum of $min properties",
-      List(min.toString)
-    )
+    ValidationError(path, "minProperties", s"should have a minimum of $min properties", List(min.toString))
 
   def maxProperties(path: JsonPath, max: Int): ValidationError =
     // networknt format: "may only have a maximum of"
-    ValidationError(
-      path,
-      "maxProperties",
-      s"may only have a maximum of $max properties",
-      List(max.toString)
-    )
+    ValidationError(path, "maxProperties", s"may only have a maximum of $max properties", List(max.toString))
 
   def oneOfNone(path: JsonPath, count: Int): ValidationError =
     ValidationError(path, "oneOf", s"does not match any of the $count schemas in oneOf", List.empty)
@@ -149,11 +113,7 @@ object ValidationError {
     )
   }
 
-  def dependency(
-    path: JsonPath,
-    property: String,
-    requiredProperties: Vector[String]
-  ): ValidationError =
+  def dependency(path: JsonPath, property: String, requiredProperties: Vector[String]): ValidationError =
     ValidationError(
       path,
       "dependencies",
@@ -165,12 +125,7 @@ object ValidationError {
     ValidationError(path, "additionalItems", "no validator found at this index", List.empty)
 
   def not(path: JsonPath, notSchemaJson: io.circe.Json): ValidationError =
-    ValidationError(
-      path,
-      "not",
-      s"""should not be valid to the schema "not" : ${notSchemaJson.noSpaces}""",
-      List.empty
-    )
+    ValidationError(path, "not", s"""should not be valid to the schema "not" : ${notSchemaJson.noSpaces}""", List.empty)
 
   def maxDepthExceeded(path: JsonPath): ValidationError =
     ValidationError(path, "maxDepth", "Maximum allowed JSON depth exceeded", List.empty)
