@@ -11,6 +11,12 @@
  * See the Apache License Version 2.0 for the specific language governing permissions and limitations there under.
  */
 
+lazy val root = project
+  .in(file("."))
+  .aggregate(data, core, http4s)
+  .settings(BuildSettings.buildSettings)
+  .settings(publish / skip := true)
+
 lazy val data = (project in file("modules/data"))
   .settings(
     name        := "iglu-scala-client-data",

@@ -16,17 +16,17 @@ object Dependencies {
     // Java
     val validator    = "1.5.8"
     val slf4j        = "1.7.30"
-    val jackson      = "2.18.3"
-    val commonsLang3 = "3.18.0"
+    val jackson      = "2.21.2"
+    val commonsLang3 = "3.20.0"
 
     // Scala
-    val igluCore         = "1.1.3"
-    val cats             = "2.9.0"
-    val catsEffect       = "3.4.5"
-    val circe            = "0.14.3"
+    val igluCore         = "1.1.5"
+    val cats             = "2.13.0"
+    val catsEffect       = "3.7.0"
+    val circe            = "0.14.15"
     val lruMap           = "0.6.1"
-    val collectionCompat = "2.8.1"
-    val http4s           = "0.23.17"
+    val collectionCompat = "2.14.0"
+    val http4s           = "0.23.33"
 
     // Scala (test only)
     val specs2           = "4.17.0"

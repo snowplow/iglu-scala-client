@@ -1,3 +1,8 @@
+Version 4.2.1 (2026-03-25)
+--------------------------
+Bump dependencies to newer versions (#4)
+Add sync workflow for iglu-scala-client (#1)
+
 Version 4.2.0 (2026-01-09)
 --------------------------
 Treat 403 as NotFound in Http4sRegistryLookup (#276)

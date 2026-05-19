@@ -32,14 +32,14 @@ object BuildSettings {
 
   lazy val buildSettings = Seq[Setting[_]](
     organization       := "com.snowplowanalytics",
-    scalaVersion       := "2.13.16",
-    crossScalaVersions := Seq("3.2.0", "2.13.16", "2.12.19"),
+    scalaVersion       := "2.13.18",
+    crossScalaVersions := Seq("3.3.7", "2.13.18", "2.12.21"),
     licenses += ("Apache-2.0", url("http://www.apache.org/licenses/LICENSE-2.0.html")),
     Test / parallelExecution := false, // possible race bugs
     libraryDependencies ++= {
       if (scalaBinaryVersion.value.startsWith("2")) {
         List(
-          compilerPlugin("org.typelevel" %% "kind-projector" % "0.13.3" cross CrossVersion.full),
+          compilerPlugin("org.typelevel" %% "kind-projector" % "0.13.4" cross CrossVersion.full),
           compilerPlugin("com.olegpy" %% "better-monadic-for" % "0.3.1")
         )
       } else Nil
