@@ -90,6 +90,7 @@ lazy val http4s = (project in file("modules/http4s"))
       Dependencies.Libraries.circeCore,
       Dependencies.Libraries.specs2,
       Dependencies.Libraries.specs2CatsEffect,
+      Dependencies.Libraries.catsEffectTestkit,
       Dependencies.Libraries.http4sDsl
     )
   )

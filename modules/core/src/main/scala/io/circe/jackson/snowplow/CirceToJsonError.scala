@@ -36,4 +36,14 @@ object CirceToJsonError {
   case object MaxDepthExceeded extends CirceToJsonError {
     override def message: String = "Maximum allowed JSON depth exceeded"
   }
+
+  /**
+   * A number whose magnitude no double can hold: above `Double.MaxValue` it overflows to infinity,
+   * and below `Double.MinPositiveNormalValue` it is subnormal, carrying fewer than the full 53
+   * bits of precision, or underflows to zero.
+   */
+  final case class NumberOutOfRange(value: String) extends CirceToJsonError {
+    override def message: String =
+      s"Number $value cannot be represented as a 64-bit floating point number"
+  }
 }

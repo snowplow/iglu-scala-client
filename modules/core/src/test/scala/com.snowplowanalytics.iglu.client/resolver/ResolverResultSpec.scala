@@ -37,7 +37,7 @@ import io.circe.Json
 import io.circe.literal._
 
 // Iglu Core
-import com.snowplowanalytics.iglu.core.{SchemaKey, SchemaVer, SelfDescribingSchema}
+import com.snowplowanalytics.iglu.core.{SchemaKey, SchemaMap, SchemaVer, SelfDescribingSchema}
 
 // This project
 import com.snowplowanalytics.iglu.client.ClientError._
@@ -100,6 +100,9 @@ class ResolverResultSpec extends Specification with ValidatedMatchers with CatsE
     not cache schema if cache is disabled $e35
     cache errors $e36
     return expected results when called multiple times $e37
+    return an error, not skip to the next revision, if a previous revision fails with a non-NotFound error $e38
+    skip to the next revision once a previous revision that failed with a non-NotFound error returns NotFound on retry $e39
+    keep skipping to the next revision if a previous revision returned NotFound and its re-check after the ttl fails $e40
   """
 
   import ResolverSpec._
@@ -1090,5 +1093,134 @@ class ResolverResultSpec extends Specification with ValidatedMatchers with CatsE
       (cached103 mustEqual notCached103_1)
 
     result.run(ResolverSpecHelpers.RegistryState.init).value._2
+  }
+
+  def e38 = {
+    val schemaKey100 =
+      SchemaKey(
+        "com.snowplowanalytics.iglu-test",
+        "mock_schema",
+        "jsonschema",
+        SchemaVer.Full(1, 0, 0)
+      )
+    val schemaKey102 = schemaKey100.copy(version = SchemaVer.Full(1, 0, 2))
+    val schemaKey110 = schemaKey100.copy(version = SchemaVer.Full(1, 1, 0))
+
+    val responses = List(
+      Json.fromString("1-0-0").asRight[RegistryError],
+      Json.fromString("1-0-1").asRight[RegistryError],
+      RegistryError.ClientFailure("Unexpected response code: 401").asLeft[Json],
+      Json.fromString("1-1-0").asRight[RegistryError]
+    )
+
+    implicit val cache = ResolverSpecHelpers.staticResolverCache
+    implicit val clock = ResolverSpecHelpers.staticClock
+    implicit val registryLookup: RegistryLookup[StaticLookup] =
+      ResolverSpecHelpers.getLookup(responses, Nil)
+
+    val result = for {
+      resolver <- Resolver.init[StaticLookup](0, None, Repos.httpRep)
+      response <- resolver.lookupSchemasUntil(schemaKey110)
+    } yield response
+
+    val (_, response) = result.run(ResolverSpecHelpers.RegistryState.init).value
+
+    response must beLeft.like { case SchemaResolutionError(schemaKey, _) =>
+      schemaKey must beEqualTo(schemaKey102)
+    }
+  }
+
+  def e39 = {
+    val schemaKey100 =
+      SchemaKey(
+        "com.snowplowanalytics.iglu-test",
+        "mock_schema",
+        "jsonschema",
+        SchemaVer.Full(1, 0, 0)
+      )
+    val schemaKey101 = schemaKey100.copy(version = SchemaVer.Full(1, 0, 1))
+    val schemaKey102 = schemaKey100.copy(version = SchemaVer.Full(1, 0, 2))
+    val schemaKey110 = schemaKey100.copy(version = SchemaVer.Full(1, 1, 0))
+
+    val responses = List(
+      Json.fromString("1-0-0").asRight[RegistryError],
+      Json.fromString("1-0-1").asRight[RegistryError],
+      RegistryError.ClientFailure("Network blip").asLeft[Json],
+      RegistryError.NotFound.asLeft[Json],
+      Json.fromString("1-1-0").asRight[RegistryError]
+    )
+
+    implicit val cache = ResolverSpecHelpers.staticResolverCache
+    implicit val clock = ResolverSpecHelpers.staticClock
+    implicit val registryLookup: RegistryLookup[StaticLookup] =
+      ResolverSpecHelpers.getLookup(responses, Nil)
+
+    val result = for {
+      resolver  <- Resolver.init[StaticLookup](10, Some(200.seconds), Repos.httpRep)
+      response1 <- resolver.lookupSchemasUntil(schemaKey110)
+      _         <- StaticLookup.addTime(1.second) // past the retry backoff, within the ttl
+      response2 <- resolver.lookupSchemasUntil(schemaKey110)
+    } yield (response1, response2)
+
+    val (_, (response1, response2)) =
+      result.run(ResolverSpecHelpers.RegistryState.init).value
+
+    val expected = List(
+      SelfDescribingSchema(SchemaMap(schemaKey100), Json.fromString("1-0-0")),
+      SelfDescribingSchema(SchemaMap(schemaKey101), Json.fromString("1-0-1")),
+      SelfDescribingSchema(SchemaMap(schemaKey110), Json.fromString("1-1-0"))
+    )
+
+    (response1 must beLeft.like { case SchemaResolutionError(schemaKey, _) =>
+      schemaKey must beEqualTo(schemaKey102)
+    }) and (response2.map(_.toList) must beRight(expected))
+  }
+
+  def e40 = {
+    val schemaKey100 =
+      SchemaKey(
+        "com.snowplowanalytics.iglu-test",
+        "mock_schema",
+        "jsonschema",
+        SchemaVer.Full(1, 0, 0)
+      )
+    val schemaKey101 = schemaKey100.copy(version = SchemaVer.Full(1, 0, 1))
+    val schemaKey110 = schemaKey100.copy(version = SchemaVer.Full(1, 1, 0))
+
+    val responses = List(
+      Json.fromString("1-0-0").asRight[RegistryError],
+      Json.fromString("1-0-1").asRight[RegistryError],
+      RegistryError.NotFound.asLeft[Json],
+      Json.fromString("1-1-0").asRight[RegistryError],
+      Json.fromString("1-0-0").asRight[RegistryError],
+      Json.fromString("1-0-1").asRight[RegistryError],
+      RegistryError.RepoFailure("Registry unavailable").asLeft[Json],
+      Json.fromString("1-1-0").asRight[RegistryError]
+    )
+
+    implicit val cache = ResolverSpecHelpers.staticResolverCache
+    implicit val clock = ResolverSpecHelpers.staticClock
+    implicit val registryLookup: RegistryLookup[StaticLookup] =
+      ResolverSpecHelpers.getLookup(responses, Nil)
+
+    val result = for {
+      resolver  <- Resolver.init[StaticLookup](10, Some(200.seconds), Repos.httpRep)
+      response1 <- resolver.lookupSchemasUntil(schemaKey110)
+      _         <- StaticLookup.addTime(250.seconds) // ttl 200, delay 250
+      response2 <- resolver.lookupSchemasUntil(schemaKey110)
+    } yield (response1, response2)
+
+    val (state, (response1, response2)) =
+      result.run(ResolverSpecHelpers.RegistryState.init).value
+
+    val expected = List(
+      SelfDescribingSchema(SchemaMap(schemaKey100), Json.fromString("1-0-0")),
+      SelfDescribingSchema(SchemaMap(schemaKey101), Json.fromString("1-0-1")),
+      SelfDescribingSchema(SchemaMap(schemaKey110), Json.fromString("1-1-0"))
+    )
+
+    (state.req must beEqualTo(8)).toResult and
+      (response1.map(_.toList) must beRight(expected)).toResult and
+      (response2.map(_.toList) must beRight(expected)).toResult
   }
 }

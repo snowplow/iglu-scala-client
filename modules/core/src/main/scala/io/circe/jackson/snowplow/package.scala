@@ -14,6 +14,7 @@ package io.circe
 package jackson
 
 import cats.syntax.either._
+import cats.syntax.eq._
 import cats.syntax.traverse._
 
 import scala.jdk.CollectionConverters._
@@ -37,13 +38,30 @@ package object snowplow {
    * @return converted JsonNode
    */
   final def circeToJackson(json: Json, maxJsonDepth: Int): Either[CirceToJsonError, JsonNode] =
+    circeToJackson(json, maxJsonDepth, validateNumberRange = false)
+
+  /**
+   * Converts given circe's Json instance to Jackson's JsonNode
+   * Numbers with exponents exceeding Integer.MAX_VALUE are converted to strings
+   * @param json instance of circe's Json
+   * @param validateNumberRange whether to reject numbers whose magnitude lies outside the range of
+   *   a 64-bit floating point number. Appropriate for instance data, which downstream consumers
+   *   read as doubles, but not for schemas, where a number is a bound rather than a value to be
+   *   loaded.
+   * @return converted JsonNode
+   */
+  final def circeToJackson(
+    json: Json,
+    maxJsonDepth: Int,
+    validateNumberRange: Boolean
+  ): Either[CirceToJsonError, JsonNode] =
     if (maxJsonDepth <= 0) CirceToJsonError.MaxDepthExceeded.asLeft
     else
       json.fold(
         NullNode.instance.asRight,
         BooleanNode.valueOf(_).asRight,
         number =>
-          {
+          (if (validateNumberRange) checkMagnitudeInDoubleRange(number) else ().asRight).map { _ =>
             if (json == negativeZeroJson)
               DoubleNode.valueOf(number.toDouble)
             else
@@ -75,16 +93,16 @@ package object snowplow {
                     case _: JsonParseException    => TextNode.valueOf(x)
                   }
               }
-          }.asRight,
+          },
         s => TextNode.valueOf(s).asRight,
         array =>
           array
-            .traverse(circeToJackson(_, maxJsonDepth - 1))
+            .traverse(circeToJackson(_, maxJsonDepth - 1, validateNumberRange))
             .map(l => JsonNodeFactory.instance.arrayNode.addAll(l.asJava)),
         obj =>
           obj.toList
             .traverse { case (k, v) =>
-              circeToJackson(v, maxJsonDepth - 1).map((k, _))
+              circeToJackson(v, maxJsonDepth - 1, validateNumberRange).map((k, _))
             }
             .map { l =>
               objectNodeSetAll(
@@ -93,6 +111,19 @@ package object snowplow {
               )
             }
       )
+
+  private def checkMagnitudeInDoubleRange(number: JsonNumber): Either[CirceToJsonError, Unit] = {
+    val magnitude = Math.abs(number.toDouble)
+    // A NaN or an infinity satisfies neither condition, so neither needs a branch of its own.
+    if (magnitude >= java.lang.Double.MIN_NORMAL && magnitude <= Double.MaxValue)
+      ().asRight
+    // Zero itself is fine; a non-zero number that converts to zero has underflowed.
+    // `toBigDecimal` is None only when the exponent overflows an Int, which cannot be zero.
+    else if (magnitude === 0.0 && number.toBigDecimal.exists(_.signum === 0))
+      ().asRight
+    else
+      CirceToJsonError.NumberOutOfRange(number.toString).asLeft
+  }
 
   def objectNodeSetAll(node: ObjectNode, fields: java.util.Map[String, JsonNode]): JsonNode =
     node.setAll[JsonNode](fields)

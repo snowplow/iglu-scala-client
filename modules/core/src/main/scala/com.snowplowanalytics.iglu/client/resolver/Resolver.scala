@@ -188,21 +188,27 @@ final case class Resolver[F[_]](repos: List[Registry], cache: Option[ResolverCac
     lookupSchemaResult(schemaKey).map(_.map(_.value.schema))
 
   /**
+   * A repository counts as not found when its lookup history contains `NotFound`,
+   * i.e. it has confirmed the schema doesn't exist (403/404), even if other attempts
+   * failed with another error. That confirmation is either from within the current cache
+   * TTL window, or its last known answer for as long as every re-check fails (with any
+   * non-`NotFound` error, e.g. an outage or a misconfiguration) and the entry stays in the
+   * cache: when a re-check after TTL expiry fails, the failure is merged into the cached
+   * history and the earlier `NotFound` is kept. This is consistent with how cached schemas
+   * are served while re-checks fail, and with `getReposForRetry` and `isSystemError`.
+   *
    * If Iglu Central or any of its mirrors doesn't have a schema,
    * it should be considered NotFound, even if one of them returned an error.
-   * All 4xx (`ClientFailure`) are also considered NotFound.
+   * Every other repository must have confirmed `NotFound`.
    */
   private[resolver] def isNotFound(error: ResolutionError): Boolean = {
     val (igluCentral, custom) = error.value.partition { case (repo, _) =>
       allIgluCentral.contains(repo)
     }
-    (igluCentral.isEmpty || igluCentral.values.exists(
-      _.errors.exists(e =>
-        e == RegistryError.NotFound || e.isInstanceOf[RegistryError.ClientFailure]
-      )
-    )) && custom.values
-      .flatMap(_.errors)
-      .forall(e => e == RegistryError.NotFound || e.isInstanceOf[RegistryError.ClientFailure])
+    def confirmedNotFound(history: LookupHistory): Boolean =
+      history.errors.contains(RegistryError.NotFound)
+    (igluCentral.isEmpty || igluCentral.values.exists(confirmedNotFound)) &&
+    custom.values.forall(confirmedNotFound)
   }
 
   /**

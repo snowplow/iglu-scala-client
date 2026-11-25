@@ -121,7 +121,8 @@ object CirceValidator extends Validator[Json] {
     maxJsonDepth: Int
   ): Either[ValidatorError.InvalidData, Unit] =
     for {
-      jacksonJson <- circeToJackson(instance, maxJsonDepth).leftMap(_.toInvalidData)
+      jacksonJson <- circeToJackson(instance, maxJsonDepth, validateNumberRange = true)
+        .leftMap(_.toInvalidData)
       _ <- schema.validate(jacksonJson).asScala.toList.map(fromValidationMessage) match {
         case x :: xs => ValidatorError.InvalidData(NonEmptyList(x, xs)).asLeft
         case Nil     => ().asRight

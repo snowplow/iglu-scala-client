@@ -59,7 +59,8 @@ object Dependencies {
     val specs2Cats   = "org.specs2" %% "specs2-cats"   % V.specs2 % Test
     val specs2CatsEffect =
       "org.typelevel" %% "cats-effect-testing-specs2" % V.specs2CatsEffect % Test
-    val http4sDsl = "org.http4s" %% "http4s-dsl" % V.http4s % Test
+    val catsEffectTestkit = "org.typelevel" %% "cats-effect-testkit" % V.catsEffect % Test
+    val http4sDsl         = "org.http4s"    %% "http4s-dsl"          % V.http4s     % Test
 
     // Java (exists to suppress NOP log message, must not be included in compile-time)
     val slf4jNop = "org.slf4j" % "slf4j-nop" % V.slf4j % Test

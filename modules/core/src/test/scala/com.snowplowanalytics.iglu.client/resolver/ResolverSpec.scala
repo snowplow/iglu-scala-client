@@ -98,14 +98,19 @@ class ResolverSpec extends Specification with CatsEffect {
     return true if custom repo and Iglu Central repos don't have a schema $e14
     return true if one Iglu Central repo returns a RepoFailure and the other one NotFound $e15
     return false if custom repo returns a RepoFailure $e16
-    return true if custom repo returns a ClientFailure $e17
+    return false if custom repo returns a ClientFailure $e17
     return true if there is no custom repo, one Iglu Central repo returns an error and the other one NotFound $e18
     return false if there is no custom repo and Iglu Central ones return a RepoFailure $e19
-    return true if there is no custom repo and Iglu Central ones return a ClientFailure $e20
+    return false if there is no custom repo and Iglu Central ones return a ClientFailure $e20
     return true if there is just one custom repo that returns NotFound $e21
     return false if there is just one custom repo that returns a RepoFailure $e22
-    return true if there is just one custom repo that returns a ClientFailure $e23
+    return false if there is just one custom repo that returns a ClientFailure $e23
     return true if one Iglu Central repo returns 2 errors and the other one returns one error and one NotFound $e24
+    return true if custom repo returns a ClientFailure and later NotFound $e25
+    return true if custom repo returns a RepoFailure and later NotFound $e26
+    return false if one custom repo returns NotFound and another one only a ClientFailure $e27
+    return true, and isSystemError false, if custom repo returned NotFound and its re-check after the ttl fails $e28
+    return false, and isSystemError true, if custom repo returns NotFound but Iglu Central and its mirror are unreachable $e29
 
   isSystemError should return false when
     [single custom]: NotFound $f1
@@ -630,7 +635,7 @@ class ResolverSpec extends Specification with CatsEffect {
       )
     )
 
-    resolver.isNotFound(resolutionError) should beTrue
+    resolver.isNotFound(resolutionError) should beFalse
   }
 
   def e18 = {
@@ -696,7 +701,7 @@ class ResolverSpec extends Specification with CatsEffect {
       )
     )
 
-    resolver.isNotFound(resolutionError) should beTrue
+    resolver.isNotFound(resolutionError) should beFalse
   }
 
   def e21 = {
@@ -743,7 +748,7 @@ class ResolverSpec extends Specification with CatsEffect {
       )
     )
 
-    resolver.isNotFound(resolutionError) should beTrue
+    resolver.isNotFound(resolutionError) should beFalse
   }
 
   def e24 = {
@@ -768,6 +773,128 @@ class ResolverSpec extends Specification with CatsEffect {
     )
 
     resolver.isNotFound(resolutionError) should beTrue
+  }
+
+  def e25 = {
+    val resolver: Resolver[Id] =
+      Resolver.init[Id](0, None, Repos.custom)
+
+    val resolutionError = ResolutionError(
+      SortedMap(
+        Repos.custom.config.name -> LookupHistory(
+          Set(RegistryError.ClientFailure("Network blip"), RegistryError.NotFound),
+          2,
+          Instant.now()
+        )
+      )
+    )
+
+    resolver.isNotFound(resolutionError) should beTrue
+  }
+
+  def e26 = {
+    val resolver: Resolver[Id] =
+      Resolver.init[Id](0, None, Repos.custom)
+
+    val resolutionError = ResolutionError(
+      SortedMap(
+        Repos.custom.config.name -> LookupHistory(
+          Set(RegistryError.RepoFailure("Boom"), RegistryError.NotFound),
+          2,
+          Instant.now()
+        )
+      )
+    )
+
+    resolver.isNotFound(resolutionError) should beTrue
+  }
+
+  def e27 = {
+    val resolver: Resolver[Id] =
+      Resolver.init[Id](0, None, Repos.custom, Repos.custom2)
+
+    val resolutionError = ResolutionError(
+      SortedMap(
+        Repos.custom.config.name -> LookupHistory(Set(RegistryError.NotFound), 1, Instant.now()),
+        Repos.custom2.config.name -> LookupHistory(
+          Set(RegistryError.ClientFailure("Network blip")),
+          1,
+          Instant.now()
+        )
+      )
+    )
+
+    resolver.isNotFound(resolutionError) should beFalse
+  }
+
+  def e28 = {
+    val schemaKey =
+      SchemaKey(
+        "com.snowplowanalytics.iglu-test",
+        "mock_schema",
+        "jsonschema",
+        SchemaVer.Full(1, 0, 0)
+      )
+    val responses = List(
+      RegistryError.NotFound.asLeft[Json],
+      RegistryError.RepoFailure("Registry unavailable").asLeft[Json]
+    )
+
+    implicit val cache = ResolverSpecHelpers.staticResolverCache
+    implicit val clock = ResolverSpecHelpers.staticClock
+    implicit val registryLookup: RegistryLookup[StaticLookup] =
+      ResolverSpecHelpers.getLookup(responses, Nil)
+
+    val result = for {
+      resolver  <- Resolver.init[StaticLookup](10, Some(200.seconds), Repos.httpRep)
+      response1 <- resolver.lookupSchema(schemaKey)
+      _         <- StaticLookup.addTime(250.seconds) // ttl 200, delay 250
+      response2 <- resolver.lookupSchema(schemaKey)
+    } yield (resolver, response1, response2)
+
+    val (state, (resolver, response1, response2)) =
+      result.run(ResolverSpecHelpers.RegistryState.init).value
+
+    val firstNotFound = response1 must beLeft.like { case ResolutionError(history) =>
+      history(Repos.httpRep.config.name).errors must beEqualTo(Set(RegistryError.NotFound))
+    }
+
+    val secondKeepsNotFound = response2 must beLeft.like { case error @ ResolutionError(history) =>
+      (history(Repos.httpRep.config.name).errors must beEqualTo(
+        Set(RegistryError.NotFound, RegistryError.RepoFailure("Registry unavailable"))
+      )).toResult and
+        (resolver.isSystemError(error) must beFalse).toResult and
+        (resolver.isNotFound(error) must beTrue).toResult
+    }
+
+    (state.req must beEqualTo(
+      2
+    )).toResult and firstNotFound.toResult and secondKeepsNotFound.toResult
+  }
+
+  def e29 = {
+    val resolver: Resolver[Id] =
+      Resolver
+        .init[Id](0, None, SpecHelpers.IgluCentral, SpecHelpers.IgluCentralMirror, Repos.custom)
+
+    val resolutionError = ResolutionError(
+      SortedMap(
+        SpecHelpers.IgluCentral.config.name -> LookupHistory(
+          Set(RegistryError.ClientFailure("Connection timed out")),
+          1,
+          Instant.now()
+        ),
+        SpecHelpers.IgluCentralMirror.config.name -> LookupHistory(
+          Set(RegistryError.ClientFailure("Connection timed out")),
+          1,
+          Instant.now()
+        ),
+        Repos.custom.config.name -> LookupHistory(Set(RegistryError.NotFound), 1, Instant.now())
+      )
+    )
+
+    (resolver.isNotFound(resolutionError) should beFalse) and
+      (resolver.isSystemError(resolutionError) should beTrue)
   }
 
   // === FALSE CASES (f1-f9) ===

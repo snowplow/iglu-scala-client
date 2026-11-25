@@ -25,11 +25,19 @@ class JavaNetRegistryLookupSpec extends Specification {
     retry on retriable status codes (500, 503, 429, 408) and eventually succeed $retriesOnRetriableStatusCodesAndSucceeds
     not retry on non-retriable status codes (404, 400) $doesNotRetryOnNonRetriableStatusCodes
     exhaust retries after max attempts on persistent 500 errors $exhaustsRetriesAfterMaxAttempts
+    return NotFound on 403 and 404 without retrying $notFoundOn403And404
+    return ClientFailure on other 4xx without retrying $clientFailureOnOther4xx
+    return ClientFailure on 408 and 429 after retries are exhausted $clientFailureOn408And429
+    return RepoFailure on 5xx after retries are exhausted $repoFailureOn5xx
+    return a non-NotFound error on a persistent exception after retries are exhausted $errorOnPersistentException
     use exponential backoff between retries $usesExponentialBackoff
   """
 
   val testUri    = new URI("http://test.com/schema")
   val testApikey = Some("test-key")
+
+  // Retry tests never sleep for real
+  val noSleep: Long => Unit = _ => ()
 
   // Helper to create a mock HttpResponse with a status code
   def createMockResponse(statusCodeParam: Int, bodyParam: String = ""): HttpResponse[String] =
@@ -56,9 +64,10 @@ class JavaNetRegistryLookupSpec extends Specification {
         else createMockResponse(200, """{"test": "schema"}""")
       }
 
-      val result = JavaNetRegistryLookup.executeCallWithRetry(testUri, testApikey, 0, mockSend)
+      val result =
+        JavaNetRegistryLookup.executeCallWithRetry(testUri, testApikey, 0, mockSend, noSleep)
 
-      (result must beSome("""{"test": "schema"}"""): MatchResult[Any]) and
+      (result must beRight("""{"test": "schema"}"""): MatchResult[Any]) and
         (attemptCounter.get() must beEqualTo(2)) // initial + 1 retry
     }
 
@@ -76,9 +85,10 @@ class JavaNetRegistryLookupSpec extends Specification {
         createMockResponse(statusCode, s"Error $statusCode")
       }
 
-      val result = JavaNetRegistryLookup.executeCallWithRetry(testUri, testApikey, 0, mockSend)
+      val result =
+        JavaNetRegistryLookup.executeCallWithRetry(testUri, testApikey, 0, mockSend, noSleep)
 
-      (result must beNone: MatchResult[Any]) and
+      (result must beLeft: MatchResult[Any]) and
         (attemptCounter.get() must beEqualTo(1)) // no retries
     }
 
@@ -92,9 +102,10 @@ class JavaNetRegistryLookupSpec extends Specification {
       createMockResponse(500, "Internal Server Error")
     }
 
-    val result = JavaNetRegistryLookup.executeCallWithRetry(testUri, testApikey, 0, mockSend)
+    val result =
+      JavaNetRegistryLookup.executeCallWithRetry(testUri, testApikey, 0, mockSend, noSleep)
 
-    (result must beNone) and
+    (result must beLeft(beAnInstanceOf[RegistryError.RepoFailure])) and
       (attemptCounter.get() must beEqualTo(6)) // initial + 5 retries (MaxRetries = 5)
   }
 
@@ -107,15 +118,83 @@ class JavaNetRegistryLookupSpec extends Specification {
       else createMockResponse(200, """{"test": "schema"}""")
     }
 
-    val startTime = System.currentTimeMillis()
-    val result    = JavaNetRegistryLookup.executeCallWithRetry(testUri, testApikey, 0, mockSend)
+    val delays                    = scala.collection.mutable.ListBuffer.empty[Long]
+    val recordSleep: Long => Unit = delays += _
+    val result =
+      JavaNetRegistryLookup.executeCallWithRetry(testUri, testApikey, 0, mockSend, recordSleep)
 
-    val totalTime = System.currentTimeMillis() - startTime
-    // Expected backoffs: 100ms, 200ms, 400ms = 700ms minimum
-    // Allow some tolerance for execution overhead
-    (result must beSome("""{"test": "schema"}"""): MatchResult[Any]) and
+    (result must beRight("""{"test": "schema"}"""): MatchResult[Any]) and
       (attemptCounter.get() must beEqualTo(4)) and
-      (totalTime must be_>(600L)) and
-      (totalTime must be_<(800L))
+      (delays.toList must beEqualTo(List(100L, 200L, 400L)))
   }
+
+  // Returns the result and the number of attempts made
+  def runWithStatus(statusCode: Int): (Either[RegistryError, String], Int) = {
+    val attemptCounter = new AtomicInteger(0)
+    val mockSend: HttpRequest => HttpResponse[String] = { _ =>
+      attemptCounter.incrementAndGet()
+      createMockResponse(statusCode, s"Body of $statusCode")
+    }
+    val result =
+      JavaNetRegistryLookup.executeCallWithRetry(testUri, testApikey, 0, mockSend, noSleep)
+    (result, attemptCounter.get())
+  }
+
+  def notFoundOn403And404: MatchResult[Any] =
+    List(403, 404)
+      .map { statusCode =>
+        val (result, attempts) = runWithStatus(statusCode)
+        (result must beLeft(RegistryError.NotFound: RegistryError): MatchResult[Any]) and
+          (attempts must beEqualTo(1))
+      }
+      .reduce(_ and _)
+
+  def clientFailureOnOther4xx: MatchResult[Any] =
+    List(400, 401, 405, 410)
+      .map { statusCode =>
+        val (result, attempts) = runWithStatus(statusCode)
+        (result must beLeft(
+          RegistryError.ClientFailure(s"Unexpected response code: $statusCode"): RegistryError
+        ): MatchResult[Any]) and
+          (attempts must beEqualTo(1))
+      }
+      .reduce(_ and _)
+
+  def clientFailureOn408And429: MatchResult[Any] =
+    List(408, 429)
+      .map { statusCode =>
+        val (result, attempts) = runWithStatus(statusCode)
+        (result must beLeft(
+          RegistryError.ClientFailure(s"Unexpected response code: $statusCode"): RegistryError
+        ): MatchResult[Any]) and
+          (attempts must beEqualTo(6))
+      }
+      .reduce(_ and _)
+
+  def repoFailureOn5xx: MatchResult[Any] =
+    List(500, 503)
+      .map { statusCode =>
+        val (result, attempts) = runWithStatus(statusCode)
+        (result must beLeft(
+          RegistryError.RepoFailure(s"Unexpected server response code: $statusCode"): RegistryError
+        ): MatchResult[Any]) and
+          (attempts must beEqualTo(6))
+      }
+      .reduce(_ and _)
+
+  def errorOnPersistentException: MatchResult[Any] = {
+    val attemptCounter = new AtomicInteger(0)
+    val mockSend: HttpRequest => HttpResponse[String] = { _ =>
+      attemptCounter.incrementAndGet()
+      throw new java.io.IOException("Connection refused")
+    }
+
+    val result =
+      JavaNetRegistryLookup.executeCallWithRetry(testUri, testApikey, 0, mockSend, noSleep)
+
+    (result must beLeft(RegistryError.RepoFailure("Connection refused"): RegistryError)) and
+      (result must not(beLeft(RegistryError.NotFound: RegistryError))) and
+      (attemptCounter.get() must beEqualTo(6))
+  }
+
 }

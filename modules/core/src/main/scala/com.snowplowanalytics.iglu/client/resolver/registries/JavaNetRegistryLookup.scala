@@ -164,12 +164,10 @@ object JavaNetRegistryLookup {
 
   /** Non-RT analog of [[getFromUri]] */
   private def unsafeGetFromUri(uri: URI, apikey: Option[String]): Either[RegistryError, Json] =
-    try {
+    try
       executeCall(uri, apikey)
-        .map(parse)
-        .map(_.leftMap(e => RegistryError.RepoFailure(e.show)))
-        .getOrElse(RegistryError.NotFound.asLeft)
-    } catch {
+        .flatMap(body => parse(body).leftMap(e => RegistryError.RepoFailure(e.show)))
+    catch {
       case NonFatal(e) =>
         Utils.repoFailure(e).asLeft
     }
@@ -181,36 +179,51 @@ object JavaNetRegistryLookup {
       list <- json.as[SchemaList].leftMap(e => RegistryError.RepoFailure(e.show))
     } yield list
 
-  private def executeCall(uri: URI, apikey: Option[String]): Option[String] =
-    executeCallWithRetry(uri, apikey, 0, httpClient.send(_, BodyHandlers.ofString()))
+  private def executeCall(uri: URI, apikey: Option[String]): Either[RegistryError, String] =
+    executeCallWithRetry(uri, apikey, 0, httpClient.send(_, BodyHandlers.ofString()), Thread.sleep)
 
+  /**
+   * Sends the request, retrying transient failures, and classifies the outcome:
+   * 2xx gives the body, 403 and 404 give `NotFound`, 5xx gives `RepoFailure`,
+   * any other status gives `ClientFailure`, and an exception gives `RepoFailure`.
+   * Only 403 and 404 may ever give `NotFound`.
+   */
   private[registries] def executeCallWithRetry(
     uri: URI,
     apikey: Option[String],
     attempt: Int,
-    send: HttpRequest => HttpResponse[String]
-  ): Option[String] = {
+    send: HttpRequest => HttpResponse[String],
+    sleep: Long => Unit
+  ): Either[RegistryError, String] = {
     val httpRequest = buildLookupRequest(uri, apikey)
     try {
       val response = send(httpRequest)
       if (is2xx(response)) {
-        response.body.some
+        response.body.asRight
       } else if (isRetriableStatus(response) && attempt < MaxRetries) {
         val backoffMs = calculateBackoff(attempt)
-        Thread.sleep(backoffMs)
-        executeCallWithRetry(uri, apikey, attempt + 1, send)
+        sleep(backoffMs)
+        executeCallWithRetry(uri, apikey, attempt + 1, send, sleep)
       } else {
-        None
+        classifyStatus(response.statusCode()).asLeft
       }
     } catch {
       case NonFatal(_) if attempt < MaxRetries =>
         val backoffMs = calculateBackoff(attempt)
-        Thread.sleep(backoffMs)
-        executeCallWithRetry(uri, apikey, attempt + 1, send)
-      case NonFatal(_) =>
-        None
+        sleep(backoffMs)
+        executeCallWithRetry(uri, apikey, attempt + 1, send, sleep)
+      case NonFatal(e) =>
+        Utils.repoFailure(e).asLeft
     }
   }
+
+  private def classifyStatus(status: Int): RegistryError =
+    if (status == 404 || status == 403)
+      RegistryError.NotFound
+    else if (status >= 500 && status < 600)
+      RegistryError.RepoFailure(s"Unexpected server response code: $status")
+    else
+      RegistryError.ClientFailure(s"Unexpected response code: $status")
 
   private def calculateBackoff(attempt: Int): Long = {
     val backoff = InitialBackoffMs * Math.pow(2, attempt.toDouble).toLong

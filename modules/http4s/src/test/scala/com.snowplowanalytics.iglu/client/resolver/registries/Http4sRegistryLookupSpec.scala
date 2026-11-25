@@ -14,6 +14,7 @@ package com.snowplowanalytics.iglu.client.resolver.registries
 
 import cats.effect.testing.specs2.CatsEffect
 import cats.effect.{IO, Resource}
+import cats.effect.testkit.TestControl
 import com.snowplowanalytics.iglu.client.resolver.registries.RegistryError.{
   ClientFailure,
   RepoFailure
@@ -23,9 +24,11 @@ import io.circe.Json
 import org.http4s.client.{Client => HttpClient}
 import org.http4s.dsl.Http4sDsl
 import org.http4s.implicits._
+import org.specs2.matcher.MatchResult
 import org.specs2.mutable.Specification
 
 import java.net.URI
+import java.util.concurrent.atomic.AtomicInteger
 
 class Http4sRegistryLookupSpec extends Specification with CatsEffect {
 
@@ -80,12 +83,18 @@ class Http4sRegistryLookupSpec extends Specification with CatsEffect {
         )
       val schemaKey = SchemaKey("com.myvendor", "myname", "jsonschema", SchemaVer.Full(42, 42, 42))
 
+      val attempts = new AtomicInteger(0)
       val client = HttpClient[IO] { _ =>
-        Resource.eval(IO.raiseError(new RuntimeException("boom!")))
+        Resource.eval(
+          IO(attempts.incrementAndGet()) *> IO.raiseError(new RuntimeException("boom!"))
+        )
       }
 
-      Http4sRegistryLookup(client).lookup(repositoryRef, schemaKey).map { result =>
-        result should beLeft(ClientFailure("boom!"))
+      // The retry backoff runs on virtual time
+      TestControl.executeEmbed(Http4sRegistryLookup(client).lookup(repositoryRef, schemaKey)).map {
+        result =>
+          (result should beLeft(ClientFailure("boom!")): MatchResult[Any]) and
+            (attempts.get() must beEqualTo(6))
       }
     }
 
@@ -117,13 +126,19 @@ class Http4sRegistryLookupSpec extends Specification with CatsEffect {
         )
       val schemaKey = SchemaKey("com.myvendor", "myname", "jsonschema", SchemaVer.Full(42, 42, 42))
 
+      val attempts = new AtomicInteger(0)
       val client = HttpClient[IO] { _ =>
         val dsl = new Http4sDsl[IO] {}; import dsl._
-        Resource.eval(RequestTimeout("timeout"))
+        Resource.eval(IO(attempts.incrementAndGet()) *> RequestTimeout("timeout"))
       }
 
-      Http4sRegistryLookup(client).lookup(repositoryRef, schemaKey).map { result =>
-        result should beLeft(ClientFailure("Unexpected response code: 408"))
+      // The retry backoff runs on virtual time
+      TestControl.executeEmbed(Http4sRegistryLookup(client).lookup(repositoryRef, schemaKey)).map {
+        result =>
+          (result should beLeft(ClientFailure("Unexpected response code: 408")): MatchResult[
+            Any
+          ]) and
+            (attempts.get() must beEqualTo(6))
       }
     }
 
@@ -136,13 +151,20 @@ class Http4sRegistryLookupSpec extends Specification with CatsEffect {
         )
       val schemaKey = SchemaKey("com.myvendor", "myname", "jsonschema", SchemaVer.Full(42, 42, 42))
 
+      val attempts = new AtomicInteger(0)
       val client = HttpClient[IO] { _ =>
         val dsl = new Http4sDsl[IO] {}; import dsl._
-        Resource.eval(InternalServerError("internal error"))
+        Resource.eval(IO(attempts.incrementAndGet()) *> InternalServerError("internal error"))
       }
 
-      Http4sRegistryLookup(client).lookup(repositoryRef, schemaKey).map { result =>
-        result should beLeft(RepoFailure("Unexpected server response: internal error"))
+      // The retry backoff runs on virtual time
+      TestControl.executeEmbed(Http4sRegistryLookup(client).lookup(repositoryRef, schemaKey)).map {
+        result =>
+          (result should beLeft(RepoFailure("Unexpected server response code: 500")): MatchResult[
+            Any
+          ]) and
+            (result.left.toOption.map(_.toString) should beSome(not(contain("internal error")))) and
+            (attempts.get() must beEqualTo(6))
       }
     }
 
@@ -207,13 +229,20 @@ class Http4sRegistryLookupSpec extends Specification with CatsEffect {
           Registry.HttpConnection(URI.create("http://custom-iglu.com"), None)
         )
 
+      val attempts = new AtomicInteger(0)
       val client = HttpClient[IO] { _ =>
-        Resource.eval(IO.raiseError(new RuntimeException("boom!")))
+        Resource.eval(
+          IO(attempts.incrementAndGet()) *> IO.raiseError(new RuntimeException("boom!"))
+        )
       }
 
-      Http4sRegistryLookup(client).list(registry, "com.myvendor", "myname", 42).map { result =>
-        result should beLeft(ClientFailure("boom!"))
-      }
+      // The retry backoff runs on virtual time
+      TestControl
+        .executeEmbed(Http4sRegistryLookup(client).list(registry, "com.myvendor", "myname", 42))
+        .map { result =>
+          (result should beLeft(ClientFailure("boom!")): MatchResult[Any]) and
+            (attempts.get() must beEqualTo(6))
+        }
     }
 
   }

@@ -130,18 +130,14 @@ object Http4sRegistryLookup {
           if response.status.code == 404 || response.status.code == 403 =>
         (RegistryError.NotFound: RegistryError).asLeft[A].pure[F]
       case Status.ServerError(response) =>
-        response.bodyText.compile.string.map { body =>
-          val error = s"Unexpected server response: $body"
-          RegistryError.RepoFailure(error).asLeft
-        }
+        val error = s"Unexpected server response code: ${response.status.code}"
+        (RegistryError.RepoFailure(error): RegistryError).asLeft[A].pure[F]
       case Status.ClientError(response) =>
         val error = s"Unexpected response code: ${response.status.code}"
         (RegistryError.ClientFailure(error): RegistryError).asLeft[A].pure[F]
       case response =>
-        response.bodyText.compile.string.map { body =>
-          val error = s"Unexpected response: $body"
-          RegistryError.ClientFailure(error).asLeft
-        }
+        val error = s"Unexpected response code: ${response.status.code}"
+        (RegistryError.ClientFailure(error): RegistryError).asLeft[A].pure[F]
     }
 
     responseResult.recover { case NonFatal(exception) =>
