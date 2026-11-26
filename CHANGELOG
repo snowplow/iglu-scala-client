@@ -1,3 +1,7 @@
+Version 4.3.1 (2026-10-31)
+--------------------------
+Build Jackson nodes directly in circeToJackson (#12)
+
 Version 4.3.0 (2026-10-28)
 --------------------------
 Only skip a revision in lookupSchemasUntil on a genuine NotFound (#10)

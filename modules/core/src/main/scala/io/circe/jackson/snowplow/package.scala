@@ -15,9 +15,8 @@ package jackson
 
 import cats.syntax.either._
 import cats.syntax.eq._
-import cats.syntax.traverse._
 
-import scala.jdk.CollectionConverters._
+import scala.annotation.tailrec
 
 import java.math.{BigDecimal => JBigDecimal}
 
@@ -96,21 +95,59 @@ package object snowplow {
           },
         s => TextNode.valueOf(s).asRight,
         array =>
-          array
-            .traverse(circeToJackson(_, maxJsonDepth - 1, validateNumberRange))
-            .map(l => JsonNodeFactory.instance.arrayNode.addAll(l.asJava)),
+          addElements(
+            array.iterator,
+            JsonNodeFactory.instance.arrayNode(array.size),
+            maxJsonDepth - 1,
+            validateNumberRange
+          ),
         obj =>
-          obj.toList
-            .traverse { case (k, v) =>
-              circeToJackson(v, maxJsonDepth - 1, validateNumberRange).map((k, _))
-            }
-            .map { l =>
-              objectNodeSetAll(
-                JsonNodeFactory.instance.objectNode,
-                l.toMap.asJava
-              )
-            }
+          putFields(
+            obj.toIterable.iterator,
+            JsonNodeFactory.instance.objectNode(),
+            maxJsonDepth - 1,
+            validateNumberRange
+          )
       )
+
+  /** Stops at the first element that fails, so the error is the first one found depth-first. */
+  @tailrec
+  private def addElements(
+    elements: Iterator[Json],
+    node: ArrayNode,
+    maxJsonDepth: Int,
+    validateNumberRange: Boolean
+  ): Either[CirceToJsonError, JsonNode] =
+    if (!elements.hasNext) node.asRight
+    else
+      circeToJackson(elements.next(), maxJsonDepth, validateNumberRange) match {
+        case Right(child) =>
+          node.add(child)
+          addElements(elements, node, maxJsonDepth, validateNumberRange)
+        case Left(error) => Left(error)
+      }
+
+  /**
+   * Fields reach Jackson in the circe object's insertion order.
+   * Stops at the first field that fails, so the error is the first one found depth-first.
+   */
+  @tailrec
+  private def putFields(
+    fields: Iterator[(String, Json)],
+    node: ObjectNode,
+    maxJsonDepth: Int,
+    validateNumberRange: Boolean
+  ): Either[CirceToJsonError, JsonNode] =
+    if (!fields.hasNext) node.asRight
+    else {
+      val (key, value) = fields.next()
+      circeToJackson(value, maxJsonDepth, validateNumberRange) match {
+        case Right(child) =>
+          node.replace(key, child)
+          putFields(fields, node, maxJsonDepth, validateNumberRange)
+        case Left(error) => Left(error)
+      }
+    }
 
   private def checkMagnitudeInDoubleRange(number: JsonNumber): Either[CirceToJsonError, Unit] = {
     val magnitude = Math.abs(number.toDouble)
